@@ -63,9 +63,6 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
     e.preventDefault();
     const cleanToken = manualToken.trim().replace(/\s+/g, '');
 
-    console.log('Token length:', cleanToken.length);
-    console.log('Token preview:', cleanToken.substring(0, 30) + '...');
-
     if (!cleanToken) {
       setError('Por favor ingresa un Access Token válido');
       return;

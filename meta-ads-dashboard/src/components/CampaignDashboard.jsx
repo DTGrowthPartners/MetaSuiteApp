@@ -104,14 +104,16 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     'onsite_conversion.lead_grouped': 'lead',
     'landing_page_view': 'vista de página',
     'link_click': 'clic',
-    'post_engagement': 'interacción',
-    'page_engagement': 'interacción',
+    'post_engagement': 'resultado',
+    'page_engagement': 'resultado',
     'video_view': 'vista de video',
     'onsite_conversion.post_save': 'guardado',
     'comment': 'comentario',
     'like': 'like',
-    'ig_account_visit': 'visita perfil IG',
-    'profile_visit': 'visita perfil'
+    'ig_account_visit': 'visita perfil',
+    'profile_visit': 'visita perfil',
+    'onsite_conversion.ig_account_visit': 'visita perfil',
+    'onsite_conversion.profile_visit': 'visita perfil'
   };
 
   // Obtener el costo por resultado según el tipo de campaña
@@ -123,7 +125,26 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
 
     const costPerAction = insights.cost_per_action_type || [];
     const actions = insights.actions || [];
+    const costPerResult = insights.cost_per_result || [];
     const campaignType = getCampaignType(campaign);
+
+    // Usar cost_per_result de Meta si está disponible (es el valor más preciso)
+    if (costPerResult.length > 0) {
+      const result = costPerResult[0];
+      if (result.values && result.values.length > 0) {
+        const value = parseFloat(result.values[0].value);
+        const indicator = result.indicator || 'resultado';
+        const labelMap = {
+          'profile_visit_view': 'visita perfil',
+          'landing_page_view': 'vista de página',
+          'link_click': 'clic',
+          'purchase': 'venta',
+          'lead': 'lead'
+        };
+        const label = labelMap[indicator] || 'resultado';
+        return `${formatCurrency(value)} / ${label}`;
+      }
+    }
 
     // Definir qué acción es el "resultado" según el tipo de campaña
     let targetActions = [];
@@ -133,15 +154,17 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
       targetActions = ['landing_page_view', 'link_click'];
       resultLabel = 'vista de página';
     } else if (campaignType === 'instagram') {
-      // Todas las posibles variantes para visitas al perfil de Instagram
+      // Para Instagram: visitas al perfil, o page_engagement como alternativa
       targetActions = [
         'onsite_conversion.ig_account_visit',
         'ig_account_visit',
         'profile_visit',
         'onsite_conversion.profile_visit',
+        'page_engagement',
+        'post_engagement',
         'link_click'
       ];
-      resultLabel = 'visita al perfil';
+      resultLabel = 'interacción';
     } else {
       targetActions = ['landing_page_view', 'ig_account_visit', 'profile_visit', 'link_click'];
     }
@@ -185,9 +208,10 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     return 0;
   };
 
-  // Detectar el tipo de campaña basado en las acciones disponibles (lo más confiable)
+  // Detectar el tipo de campaña basado en las acciones y nombre
   const getCampaignType = (campaign) => {
     const actions = campaign.insights?.actions || [];
+    const campaignName = (campaign.name || '').toLowerCase();
 
     // Buscar acciones específicas (incluir variantes con prefijo onsite_conversion)
     const hasIGVisits = actions.some(a =>
@@ -197,21 +221,40 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
       a.action_type === 'landing_page_view'
     );
 
-    // Lógica simple: si tiene vistas de página = web, si tiene visitas IG = instagram
-    if (hasLandingPageViews && !hasIGVisits) {
+    // Detectar por nombre si contiene "instagram" o "perfil ig"
+    const nameIndicatesIG = campaignName.includes('instagram') ||
+                            campaignName.includes('perfil ig') ||
+                            (campaignName.includes('perfil') && !campaignName.includes('web'));
+
+    // Lógica: priorizar detección por acciones, luego por nombre
+    if (hasLandingPageViews && !hasIGVisits && !nameIndicatesIG) {
       return 'traffic_web';
     }
-    if (hasIGVisits && !hasLandingPageViews) {
+    if (hasIGVisits || nameIndicatesIG) {
       return 'instagram';
     }
-    // Si tiene ambos, priorizar por cantidad
-    if (hasLandingPageViews && hasIGVisits) {
-      const lpvCount = getActionValue(campaign.insights, 'landing_page_view');
-      const igCount = getActionValue(campaign.insights, ['ig_account_visit', 'profile_visit', 'onsite_conversion.ig_account_visit']);
-      return lpvCount > igCount ? 'traffic_web' : 'instagram';
+    if (hasLandingPageViews) {
+      return 'traffic_web';
     }
 
     return 'general';
+  };
+
+  // Obtener el número de resultados desde cost_per_result
+  const getResultsFromCostPerResult = (insights) => {
+    const costPerResult = insights?.cost_per_result || [];
+    const spend = parseFloat(insights?.spend || 0);
+
+    if (costPerResult.length > 0 && spend > 0) {
+      const result = costPerResult[0];
+      if (result.values && result.values.length > 0) {
+        const costValue = parseFloat(result.values[0].value);
+        if (costValue > 0) {
+          return Math.round(spend / costValue);
+        }
+      }
+    }
+    return 0;
   };
 
   // Obtener las métricas relevantes según el tipo de campaña
@@ -223,9 +266,15 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     const igVisitTypes = ['ig_account_visit', 'profile_visit', 'onsite_conversion.ig_account_visit', 'onsite_conversion.profile_visit'];
 
     if (campaignType === 'instagram') {
+      // Calcular visitas al perfil desde cost_per_result si no está en actions
+      let profileVisits = getActionValue(insights, igVisitTypes);
+      if (profileVisits === 0) {
+        profileVisits = getResultsFromCostPerResult(insights);
+      }
+
       // Métricas específicas para Instagram
       metrics.push(
-        { label: 'Visitas al perfil IG', value: getActionValue(insights, igVisitTypes) },
+        { label: 'Visitas al perfil', value: profileVisits },
         { label: 'Clics en enlace', value: getActionValue(insights, 'link_click') },
         { label: 'Interacciones', value: getActionValue(insights, ['post_engagement', 'page_engagement']) }
       );

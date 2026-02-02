@@ -51,7 +51,7 @@ class MetaAdsService {
     try {
       const params = {
         access_token: this.accessToken,
-        fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type'
+        fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type,cost_per_result,website_ctr,inline_link_clicks,unique_actions,outbound_clicks'
       };
 
       // 'maximum' significa todo el tiempo de vida de la campaña (no se pasa date_preset)
