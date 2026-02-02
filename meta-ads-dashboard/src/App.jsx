@@ -29,6 +29,7 @@ function App() {
         <CampaignDashboard
           apiKey={credentials.apiKey}
           initialAdAccountId={credentials.adAccountId}
+          businessId={credentials.businessId}
           onLogout={handleLogout}
         />
       )}

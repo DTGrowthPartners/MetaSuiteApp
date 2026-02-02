@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import MetaAdsService from '../services/metaAdsApi';
 import './CampaignDashboard.css';
 
-function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
+function CampaignDashboard({ apiKey, initialAdAccountId, businessId, onLogout }) {
   const [campaigns, setCampaigns] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
   const [adAccounts, setAdAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,8 +18,29 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     try {
       setLoading(true);
       setError('');
-      const accounts = await metaService.getAdAccounts();
+
+      let accounts = [];
+      let biz = [];
+
+      // Si se proporcionó un Business ID específico, obtener cuentas de ese business
+      if (businessId) {
+        const { businesses: bizList, adAccounts: bizAccounts } = await metaService.getAdAccountsFromSpecificBusiness(businessId);
+        biz = bizList;
+        accounts = bizAccounts;
+      } else {
+        // Obtener todas las cuentas de todos los portafolios comerciales
+        const result = await metaService.getAllAdAccountsFromBusinesses();
+        biz = result.businesses;
+        accounts = result.adAccounts;
+      }
+
+      setBusinesses(biz);
       setAdAccounts(accounts);
+
+      // Si no se encontraron cuentas y no hay Business ID, mostrar mensaje informativo
+      if (accounts.length === 0 && !businessId && !initialAdAccountId) {
+        setError('No se encontraron cuentas publicitarias. Si usas un Page Token, necesitas un User Access Token. También puedes proporcionar el Business Manager ID directamente.');
+      }
 
       // Si se proporcionó un ID de cuenta inicial, usarlo
       if (initialAdAccountId) {
@@ -35,7 +57,13 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
         setError('');
       } else {
         const errorMsg = err.response?.data?.error?.message || err.message || 'Error desconocido';
-        setError(`Error al cargar cuentas: ${errorMsg}. Verifica tu Access Token.`);
+
+        // Mensaje más amigable para Page Tokens
+        if (errorMsg.includes('Page')) {
+          setError('El token proporcionado es de una Página, no de un Usuario. Necesitas un User Access Token del Graph API Explorer, o proporciona el ID del Business Manager.');
+        } else {
+          setError(`Error al cargar cuentas: ${errorMsg}. Verifica tu Access Token.`);
+        }
       }
     } finally {
       setLoading(false);
@@ -363,11 +391,25 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
             onChange={(e) => setSelectedAccount(e.target.value)}
             className="account-select"
           >
-            {adAccounts.map(account => (
-              <option key={account.id} value={account.id}>
-                {account.name} ({account.id})
-              </option>
-            ))}
+            {/* Agrupar cuentas por portafolio comercial */}
+            {(() => {
+              const grouped = {};
+              adAccounts.forEach(account => {
+                const bizName = account.business_name || 'Sin portafolio';
+                if (!grouped[bizName]) grouped[bizName] = [];
+                grouped[bizName].push(account);
+              });
+
+              return Object.entries(grouped).map(([bizName, accounts]) => (
+                <optgroup key={bizName} label={bizName}>
+                  {accounts.map(account => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} ({account.id.replace('act_', '')})
+                    </option>
+                  ))}
+                </optgroup>
+              ));
+            })()}
           </select>
         ) : (
           <input

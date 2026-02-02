@@ -19,10 +19,215 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/me/adaccounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,account_status'
+          fields: 'id,name,account_status,business{id,name}'
         }
       });
-      return response.data.data;
+      return response.data.data || [];
+    } catch (error) {
+      // Si es un Page Token, no tendrá acceso a adaccounts
+      if (error.response?.data?.error?.message?.includes('Page')) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  // Verificar el tipo de token (User vs Page)
+  async getTokenInfo() {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/me`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Obtener todos los portafolios comerciales (businesses) del usuario
+  async getBusinesses() {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/me/businesses`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,profile_picture_uri'
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      // Si es un Page Token, no tendrá acceso a businesses
+      if (error.response?.data?.error?.message?.includes('Page')) {
+        console.warn('Page token detected - cannot access /me/businesses');
+      }
+      return [];
+    }
+  }
+
+  // Obtener cuentas publicitarias propias de un business
+  async getBusinessOwnedAdAccounts(businessId) {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_ad_accounts`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,account_status',
+          limit: 100
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // Obtener cuentas publicitarias de clientes (para agencias)
+  async getBusinessClientAdAccounts(businessId) {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/${businessId}/client_ad_accounts`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,account_status',
+          limit: 100
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // Obtener páginas del business para identificar el negocio
+  async getBusinessOwnedPages(businessId) {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_pages`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name',
+          limit: 100
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // Obtener todas las cuentas publicitarias de todos los businesses
+  async getAllAdAccountsFromBusinesses() {
+    try {
+      const businesses = await this.getBusinesses();
+      const allAccounts = [];
+      const seenIds = new Set();
+
+      for (const business of businesses) {
+        // Obtener cuentas propias del business
+        const ownedAccounts = await this.getBusinessOwnedAdAccounts(business.id);
+        for (const account of ownedAccounts) {
+          if (!seenIds.has(account.id)) {
+            seenIds.add(account.id);
+            allAccounts.push({
+              ...account,
+              business_name: business.name,
+              business_id: business.id,
+              account_type: 'owned'
+            });
+          }
+        }
+
+        // Obtener cuentas de clientes (para agencias)
+        const clientAccounts = await this.getBusinessClientAdAccounts(business.id);
+        for (const account of clientAccounts) {
+          if (!seenIds.has(account.id)) {
+            seenIds.add(account.id);
+            allAccounts.push({
+              ...account,
+              business_name: `${business.name} (Cliente)`,
+              business_id: business.id,
+              account_type: 'client'
+            });
+          }
+        }
+      }
+
+      // También agregar cuentas de /me/adaccounts que no estén en businesses
+      const personalAccounts = await this.getAdAccounts();
+      for (const account of personalAccounts) {
+        if (!seenIds.has(account.id)) {
+          seenIds.add(account.id);
+          allAccounts.push({
+            ...account,
+            business_name: account.business?.name || 'Personal',
+            business_id: account.business?.id || null,
+            account_type: 'personal'
+          });
+        }
+      }
+
+      return { businesses, adAccounts: allAccounts };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Obtener información de un business específico
+  async getBusinessInfo(businessId) {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/${businessId}`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,profile_picture_uri'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Obtener todas las cuentas publicitarias de un Business ID específico
+  async getAdAccountsFromSpecificBusiness(businessId) {
+    try {
+      const allAccounts = [];
+      const seenIds = new Set();
+
+      // Obtener info del business
+      const businessInfo = await this.getBusinessInfo(businessId);
+      const businessName = businessInfo?.name || `Business ${businessId}`;
+
+      // Obtener cuentas propias del business
+      const ownedAccounts = await this.getBusinessOwnedAdAccounts(businessId);
+      for (const account of ownedAccounts) {
+        if (!seenIds.has(account.id)) {
+          seenIds.add(account.id);
+          allAccounts.push({
+            ...account,
+            business_name: businessName,
+            business_id: businessId,
+            account_type: 'owned'
+          });
+        }
+      }
+
+      // Obtener cuentas de clientes (para agencias)
+      const clientAccounts = await this.getBusinessClientAdAccounts(businessId);
+      for (const account of clientAccounts) {
+        if (!seenIds.has(account.id)) {
+          seenIds.add(account.id);
+          allAccounts.push({
+            ...account,
+            business_name: `${businessName} (Cliente)`,
+            business_id: businessId,
+            account_type: 'client'
+          });
+        }
+      }
+
+      return {
+        businesses: businessInfo ? [businessInfo] : [],
+        adAccounts: allAccounts
+      };
     } catch (error) {
       throw error;
     }

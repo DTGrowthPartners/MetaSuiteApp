@@ -7,6 +7,7 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualToken, setManualToken] = useState('');
   const [manualAccountId, setManualAccountId] = useState('');
+  const [businessId, setBusinessId] = useState('');
 
   useEffect(() => {
     // Esperar a que el SDK de Facebook se cargue
@@ -67,7 +68,11 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
       setError('Por favor ingresa un Access Token válido');
       return;
     }
-    onManualToken({ apiKey: cleanToken, adAccountId: manualAccountId.trim() });
+    onManualToken({
+      apiKey: cleanToken,
+      adAccountId: manualAccountId.trim(),
+      businessId: businessId.trim()
+    });
   };
 
   if (loading) {
@@ -131,6 +136,21 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
                   rows={3}
                 />
                 <p className="token-hint">El token debe ser largo (100+ caracteres) y empezar con EAAL</p>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="businessId">
+                  ID del Business Manager <span className="optional">(Recomendado para agencias)</span>
+                </label>
+                <input
+                  id="businessId"
+                  type="text"
+                  value={businessId}
+                  onChange={(e) => setBusinessId(e.target.value)}
+                  placeholder="Ej: 123456789012345"
+                  className="token-input"
+                />
+                <p className="token-hint">Si tienes un Business Manager específico, ingresa su ID para ver todas sus cuentas</p>
               </div>
 
               <div className="input-group">
