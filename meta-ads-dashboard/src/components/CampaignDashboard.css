@@ -1,0 +1,367 @@
+.dashboard-container {
+  min-height: 100vh;
+  background: #f7fafc;
+  padding: 20px;
+}
+
+.dashboard-header {
+  background: white;
+  padding: 24px 32px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-header h1 {
+  margin: 0 0 4px 0;
+  color: #1a202c;
+  font-size: 28px;
+}
+
+.last-update {
+  margin: 0;
+  color: #718096;
+  font-size: 14px;
+}
+
+.logout-button {
+  padding: 10px 20px;
+  background: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.logout-button:hover {
+  background: #c53030;
+}
+
+.account-selector {
+  background: white;
+  padding: 20px 32px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-selector label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.account-select {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.account-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.date-select {
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.date-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.refresh-button {
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.refresh-button:hover {
+  background: #5568d3;
+}
+
+.error-banner {
+  background: #fff5f5;
+  color: #e53e3e;
+  padding: 16px 24px;
+  border-radius: 8px;
+  border-left: 4px solid #e53e3e;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-container p {
+  color: #718096;
+  font-size: 16px;
+}
+
+.campaigns-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 24px;
+}
+
+.no-campaigns {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.no-campaigns p {
+  color: #718096;
+  font-size: 16px;
+  margin: 0;
+}
+
+.no-campaigns-hint {
+  margin-top: 12px !important;
+  font-size: 14px !important;
+  color: #a0aec0 !important;
+}
+
+.campaign-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.campaign-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.campaign-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f7fafc;
+}
+
+.campaign-name {
+  margin: 0;
+  color: #1a202c;
+  font-size: 18px;
+  font-weight: 700;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.campaign-status {
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.campaign-status.status-active {
+  background: #48bb78;
+}
+
+.campaign-status.status-paused {
+  background: #ecc94b;
+  color: #744210;
+}
+
+.campaign-status.status-archived {
+  background: #a0aec0;
+}
+
+.campaign-status.status-deleted {
+  background: #e53e3e;
+}
+
+.campaign-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.campaign-type {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.campaign-type.type-instagram {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: white;
+}
+
+.campaign-type.type-traffic_web {
+  background: #3182ce;
+  color: white;
+}
+
+.campaign-type.type-messaging {
+  background: #0084ff;
+  color: white;
+}
+
+.campaign-type.type-sales {
+  background: #38a169;
+  color: white;
+}
+
+.campaign-type.type-leads {
+  background: #805ad5;
+  color: white;
+}
+
+.campaign-type.type-engagement {
+  background: #ed64a6;
+  color: white;
+}
+
+.campaign-type.type-awareness {
+  background: #ecc94b;
+  color: #744210;
+}
+
+.campaign-type.type-general {
+  background: #718096;
+  color: white;
+}
+
+.campaign-objective-tag {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #edf2f7;
+  color: #4a5568;
+  text-transform: capitalize;
+}
+
+.metrics-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.metrics-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.metrics-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.metric-value.highlight {
+  color: #3182ce;
+  font-size: 15px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 16px;
+  color: #1a202c;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .campaigns-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .account-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
