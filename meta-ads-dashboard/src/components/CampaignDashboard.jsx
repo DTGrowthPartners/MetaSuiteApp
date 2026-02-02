@@ -37,7 +37,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
         const errorMsg = err.response?.data?.error?.message || err.message || 'Error desconocido';
         setError(`Error al cargar cuentas: ${errorMsg}. Verifica tu Access Token.`);
       }
-      console.error('Error completo:', err);
     } finally {
       setLoading(false);
     }
@@ -55,7 +54,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     } catch (err) {
       const errorMsg = err.response?.data?.error?.message || err.message || 'Error desconocido';
       setError(`Error al cargar campañas: ${errorMsg}`);
-      console.error('Error completo:', err);
     } finally {
       setLoading(false);
     }
@@ -127,9 +125,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     const actions = insights.actions || [];
     const campaignType = getCampaignType(campaign);
 
-    // Debug: mostrar todos los cost_per_action_type disponibles
-    console.log('Cost per action types disponibles:', costPerAction.map(a => `${a.action_type}: ${a.value}`));
-
     // Definir qué acción es el "resultado" según el tipo de campaña
     let targetActions = [];
     let resultLabel = 'resultado';
@@ -156,7 +151,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
       const costAction = costPerAction.find(a => a.action_type === type);
       if (costAction) {
         const label = actionLabels[type] || resultLabel;
-        console.log(`Encontrado cost_per_action para ${type}: ${costAction.value}`);
         return `${formatCurrency(parseFloat(costAction.value))} / ${label}`;
       }
     }
@@ -167,7 +161,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
       if (action && parseFloat(action.value) > 0) {
         const cost = spend / parseFloat(action.value);
         const label = actionLabels[type] || resultLabel;
-        console.log(`Calculando manualmente para ${type}: ${spend} / ${action.value} = ${cost}`);
         return `${formatCurrency(cost)} / ${label}`;
       }
     }
@@ -203,10 +196,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     const hasLandingPageViews = actions.some(a =>
       a.action_type === 'landing_page_view'
     );
-
-    // Debug
-    console.log('Acciones detectadas:', actions.map(a => a.action_type));
-    console.log('hasIGVisits:', hasIGVisits, 'hasLandingPageViews:', hasLandingPageViews);
 
     // Lógica simple: si tiene vistas de página = web, si tiene visitas IG = instagram
     if (hasLandingPageViews && !hasIGVisits) {
@@ -279,17 +268,6 @@ function CampaignDashboard({ apiKey, initialAdAccountId, onLogout }) {
     const lifetimeBudget = campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) : null;
     const spent = campaign.insights?.spend ? parseFloat(campaign.insights.spend) : 0;
     const budgetRemaining = campaign.budget_remaining ? parseFloat(campaign.budget_remaining) : null;
-
-    // Debug para ver los valores originales
-    console.log('Budget debug:', {
-      daily_budget_raw: campaign.daily_budget,
-      lifetime_budget_raw: campaign.lifetime_budget,
-      budget_remaining_raw: campaign.budget_remaining,
-      dailyBudget,
-      lifetimeBudget,
-      budgetRemaining,
-      spent
-    });
 
     if (dailyBudget) {
       return {

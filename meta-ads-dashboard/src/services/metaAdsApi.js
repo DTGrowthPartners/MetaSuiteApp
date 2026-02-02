@@ -24,8 +24,6 @@ class MetaAdsService {
       });
       return response.data.data;
     } catch (error) {
-      console.error('Error al obtener cuentas de anuncios:', error);
-      console.error('Detalles del error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -39,16 +37,12 @@ class MetaAdsService {
         limit: 100
       };
 
-      console.log('Llamando a API con URL:', `${META_API_BASE_URL}/${normalizedId}/campaigns`);
       const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, { params });
-      console.log('Respuesta de campañas:', response.data);
 
       // Filtrar en el frontend para mostrar solo activas y pausadas
       const allCampaigns = response.data.data || [];
       return allCampaigns.filter(c => c.status === 'ACTIVE' || c.status === 'PAUSED');
     } catch (error) {
-      console.error('Error al obtener campañas:', error);
-      console.error('Detalles del error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -65,16 +59,10 @@ class MetaAdsService {
         params.date_preset = datePreset;
       }
 
-      console.log('Obteniendo insights con date_preset:', datePreset);
       const response = await axios.get(`${META_API_BASE_URL}/${campaignId}/insights`, { params });
       const insights = response.data.data[0] || {};
-      console.log('Insights para campaña', campaignId, ':', insights);
-      console.log('Actions disponibles:', insights.actions);
-      console.log('Cost per action:', insights.cost_per_action_type);
       return insights;
     } catch (error) {
-      console.error('Error al obtener insights de campaña:', error);
-      console.error('Detalles del error:', error.response?.data || error.message);
       return {};
     }
   }
@@ -95,7 +83,6 @@ class MetaAdsService {
 
       return campaignsWithInsights;
     } catch (error) {
-      console.error('Error al obtener campañas con insights:', error);
       throw error;
     }
   }
