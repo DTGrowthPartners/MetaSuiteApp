@@ -1,38 +1,43 @@
 import { useState } from 'react';
-import FacebookLogin from './components/FacebookLogin';
 import CampaignDashboard from './components/CampaignDashboard';
 import './App.css';
 
-function App() {
-  const [credentials, setCredentials] = useState(null);
+// Token de acceso de 3 meses para Dtgrowth Partners
+const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQjZAIECshdnZAGz5D2JGTcdVaFaBDMZAZCxyG7UUGA0mV1wiuYUsQZAZAbF7Cz5S0jDn65ZCx7f9p55ZCrtSZCZBwvjx0GfFO7tulv4nP2wfHxI32WFTqDSfOiN3ZBpAKZAQI7OVvPNkYrjI7fJdkfH9uFoXN5ivU00RUVyqLP3Vx2LZCZCWGzbPAqPP3d';
 
-  const handleLoginSuccess = (creds) => {
-    setCredentials(creds);
-  };
+function App() {
+  const [isLoggedOut, setIsLoggedOut] = useState(false);
 
   const handleLogout = () => {
-    setCredentials(null);
-    // Cerrar sesión de Facebook también
-    if (window.FB) {
-      window.FB.logout();
-    }
+    setIsLoggedOut(true);
   };
+
+  const handleLogin = () => {
+    setIsLoggedOut(false);
+  };
+
+  if (isLoggedOut) {
+    return (
+      <div className="app">
+        <div className="logout-screen">
+          <h1>Meta Ads Dashboard</h1>
+          <p>Has cerrado sesión</p>
+          <button onClick={handleLogin} className="login-button">
+            Volver al Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
-      {!credentials ? (
-        <FacebookLogin
-          onLoginSuccess={handleLoginSuccess}
-          onManualToken={handleLoginSuccess}
-        />
-      ) : (
-        <CampaignDashboard
-          apiKey={credentials.apiKey}
-          initialAdAccountId={credentials.adAccountId}
-          businessId={credentials.businessId}
-          onLogout={handleLogout}
-        />
-      )}
+      <CampaignDashboard
+        apiKey={ACCESS_TOKEN}
+        initialAdAccountId=""
+        businessId=""
+        onLogout={handleLogout}
+      />
     </div>
   );
 }
