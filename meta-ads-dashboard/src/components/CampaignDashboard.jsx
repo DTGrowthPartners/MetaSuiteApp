@@ -11,8 +11,31 @@ function CampaignDashboard({ apiKey, initialAdAccountId, businessId, onLogout })
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [datePreset, setDatePreset] = useState('maximum'); // Por defecto: todo el tiempo de la campaña
+  const [togglingCampaigns, setTogglingCampaigns] = useState({}); // Track campaigns being toggled
 
   const metaService = new MetaAdsService(apiKey);
+
+  // Función para activar/pausar una campaña
+  const handleToggleCampaign = async (campaignId, currentStatus) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+
+    // Marcar campaña como en proceso de cambio
+    setTogglingCampaigns(prev => ({ ...prev, [campaignId]: true }));
+
+    const result = await metaService.updateCampaignStatus(campaignId, newStatus);
+
+    if (result.success) {
+      // Actualizar el estado local de la campaña
+      setCampaigns(prev => prev.map(c =>
+        c.id === campaignId ? { ...c, status: newStatus } : c
+      ));
+    } else {
+      setError(`Error al cambiar estado: ${result.error}`);
+    }
+
+    // Quitar el estado de carga
+    setTogglingCampaigns(prev => ({ ...prev, [campaignId]: false }));
+  };
 
   const loadAdAccounts = async () => {
     try {
@@ -469,9 +492,20 @@ function CampaignDashboard({ apiKey, initialAdAccountId, businessId, onLogout })
                 <div key={campaign.id} className="campaign-card">
                   <div className="campaign-header">
                     <h3 className="campaign-name">{campaign.name}</h3>
-                    <span className={`campaign-status status-${campaign.status?.toLowerCase()}`}>
-                      {campaign.status === 'ACTIVE' ? 'ACTIVA' : campaign.status === 'PAUSED' ? 'PAUSADA' : campaign.status}
-                    </span>
+                    <div className="campaign-controls">
+                      <label className="toggle-switch">
+                        <input
+                          type="checkbox"
+                          checked={campaign.status === 'ACTIVE'}
+                          onChange={() => handleToggleCampaign(campaign.id, campaign.status)}
+                          disabled={togglingCampaigns[campaign.id]}
+                        />
+                        <span className="toggle-slider"></span>
+                      </label>
+                      <span className={`campaign-status status-${campaign.status?.toLowerCase()}`}>
+                        {togglingCampaigns[campaign.id] ? 'Cambiando...' : (campaign.status === 'ACTIVE' ? 'ACTIVA' : 'PAUSADA')}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="campaign-tags">

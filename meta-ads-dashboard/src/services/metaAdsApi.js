@@ -291,6 +291,26 @@ class MetaAdsService {
       throw error;
     }
   }
+
+  // Actualizar el estado de una campaña (ACTIVE o PAUSED)
+  async updateCampaignStatus(campaignId, newStatus) {
+    try {
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${campaignId}`,
+        null,
+        {
+          params: {
+            access_token: this.accessToken,
+            status: newStatus // 'ACTIVE' o 'PAUSED'
+          }
+        }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      return { success: false, error: errorMsg };
+    }
+  }
 }
 
 export default MetaAdsService;
