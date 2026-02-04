@@ -1,0 +1,69 @@
+{
+  "slug": "messages_whatsapp",
+  "name": "Mensajes a WhatsApp",
+  "description": "Campañas optimizadas para iniciar conversaciones en WhatsApp. Ideal para negocios que venden por chat.",
+  "category": "messages",
+
+  "objective": "OUTCOME_ENGAGEMENT",
+  "specialAdCategories": [],
+
+  "optimizationGoal": "CONVERSATIONS",
+  "billingEvent": "IMPRESSIONS",
+  "bidStrategy": "LOWEST_COST_WITHOUT_CAP",
+
+  "placements": {
+    "facebook": ["feed", "video_feeds", "story", "reels", "marketplace"],
+    "instagram": ["stream", "story", "reels", "explore"],
+    "audience_network": [],
+    "messenger": []
+  },
+
+  "budgetType": "daily",
+  "budgetDefault": 50000,
+  "budgetMin": 15000,
+  "budgetMax": 500000,
+
+  "targetingBase": {
+    "geo_locations": {
+      "countries": ["CO"]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "publisher_platforms": ["facebook", "instagram"],
+    "facebook_positions": ["feed", "video_feeds", "story", "reels", "marketplace"],
+    "instagram_positions": ["stream", "story", "reels", "explore"]
+  },
+
+  "creativeFormat": "video",
+  "creativeSpec": {
+    "video_data": {
+      "call_to_action": {
+        "type": "WHATSAPP_MESSAGE",
+        "value": {
+          "link": "https://wa.me/{{WHATSAPP_NUMBER}}",
+          "app_destination": "WHATSAPP"
+        }
+      },
+      "video_id": "{{VIDEO_ID}}",
+      "message": "{{PRIMARY_TEXT}}",
+      "title": "{{HEADLINE}}",
+      "link_description": "{{DESCRIPTION}}"
+    }
+  },
+
+  "allowedCtas": [
+    "WHATSAPP_MESSAGE",
+    "SEND_MESSAGE",
+    "GET_QUOTE",
+    "CONTACT_US",
+    "LEARN_MORE"
+  ],
+  "defaultCta": "WHATSAPP_MESSAGE",
+
+  "destinationType": "whatsapp",
+  "destinationConfig": {
+    "type": "whatsapp",
+    "requiresWhatsAppNumber": true,
+    "linkFormat": "https://wa.me/{{WHATSAPP_NUMBER}}?text={{PREFILLED_MESSAGE}}"
+  }
+}

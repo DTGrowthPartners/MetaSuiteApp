@@ -1,0 +1,76 @@
+{
+  "slug": "conversions_website",
+  "name": "Conversiones en Sitio Web",
+  "description": "Campañas optimizadas para generar conversiones en tu sitio web. Requiere pixel de Meta configurado.",
+  "category": "conversions",
+
+  "objective": "OUTCOME_SALES",
+  "specialAdCategories": [],
+
+  "optimizationGoal": "OFFSITE_CONVERSIONS",
+  "billingEvent": "IMPRESSIONS",
+  "bidStrategy": "LOWEST_COST_WITHOUT_CAP",
+
+  "placements": {
+    "facebook": ["feed", "video_feeds", "story", "reels", "marketplace", "right_hand_column"],
+    "instagram": ["stream", "story", "reels", "explore", "shop"],
+    "audience_network": ["classic", "rewarded_video"],
+    "messenger": ["messenger_home"]
+  },
+
+  "budgetType": "daily",
+  "budgetDefault": 100000,
+  "budgetMin": 30000,
+  "budgetMax": 1000000,
+
+  "targetingBase": {
+    "geo_locations": {
+      "countries": ["CO"]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "publisher_platforms": ["facebook", "instagram", "audience_network"],
+    "facebook_positions": ["feed", "video_feeds", "story", "reels", "marketplace"],
+    "instagram_positions": ["stream", "story", "reels", "explore", "shop"]
+  },
+
+  "creativeFormat": "video",
+  "creativeSpec": {
+    "video_data": {
+      "call_to_action": {
+        "type": "{{CTA}}",
+        "value": {
+          "link": "{{WEBSITE_URL}}"
+        }
+      },
+      "video_id": "{{VIDEO_ID}}",
+      "message": "{{PRIMARY_TEXT}}",
+      "title": "{{HEADLINE}}",
+      "link_description": "{{DESCRIPTION}}"
+    }
+  },
+
+  "allowedCtas": [
+    "SHOP_NOW",
+    "LEARN_MORE",
+    "SIGN_UP",
+    "SUBSCRIBE",
+    "GET_OFFER",
+    "ORDER_NOW",
+    "BOOK_TRAVEL",
+    "DOWNLOAD"
+  ],
+  "defaultCta": "SHOP_NOW",
+
+  "destinationType": "website",
+  "destinationConfig": {
+    "type": "website",
+    "requiresPixelId": true,
+    "requiresWebsiteUrl": true,
+    "trackingParams": {
+      "utm_source": "facebook",
+      "utm_medium": "paid",
+      "utm_campaign": "{{CAMPAIGN_NAME}}"
+    }
+  }
+}

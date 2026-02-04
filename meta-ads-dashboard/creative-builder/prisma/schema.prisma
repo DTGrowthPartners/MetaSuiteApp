@@ -1,0 +1,388 @@
+// ===========================================
+// META CREATIVE BUILDER - Database Schema
+// ===========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// Client & Account Management
+// ===========================================
+
+model Client {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  company       String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  adAccounts    AdAccount[]
+  assets        Asset[]
+  jobs          Job[]
+}
+
+model AdAccount {
+  id              String    @id @default(uuid())
+  clientId        String
+  metaAccountId   String    // act_123456789
+  name            String
+  currency        String    @default("COP")
+  timezone        String    @default("America/Bogota")
+
+  // Associated Meta objects
+  pageId          String?   // Facebook Page ID
+  pageName        String?
+  igActorId       String?   // Instagram Account ID
+  igUsername      String?
+  pixelId         String?   // For conversion campaigns
+
+  // Token management (encrypted)
+  accessToken     String    // Encrypted with ENCRYPTION_KEY
+  tokenExpiresAt  DateTime?
+  tokenScope      String?
+
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  jobs            Job[]
+  drafts          Draft[]
+
+  @@unique([clientId, metaAccountId])
+  @@index([metaAccountId])
+}
+
+// ===========================================
+// Assets (Videos & Images)
+// ===========================================
+
+model Asset {
+  id            String    @id @default(uuid())
+  clientId      String
+
+  // File info
+  type          AssetType
+  filename      String    // Stored filename
+  originalName  String    // Original upload name
+  mimeType      String
+  size          Int       // Bytes
+
+  // Storage
+  storageProvider String  // "s3" | "local" | etc
+  storageUrl    String    // URL or path
+  storageKey    String?   // S3 key or similar
+
+  // Media metadata
+  thumbnailUrl  String?
+  duration      Float?    // For videos (seconds)
+  width         Int?
+  height        Int?
+  aspectRatio   String?   // "9:16", "1:1", "16:9"
+
+  // Processing status
+  processedAt   DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  jobs          Job[]
+
+  @@index([clientId])
+  @@index([type])
+}
+
+enum AssetType {
+  VIDEO
+  IMAGE
+}
+
+// ===========================================
+// Jobs (Processing Pipeline)
+// ===========================================
+
+model Job {
+  id              String      @id @default(uuid())
+  clientId        String
+  adAccountId     String
+  assetId         String
+  templateSlug    String      // Reference to template
+
+  status          JobStatus   @default(PENDING)
+
+  // ===========================================
+  // Analysis Results (CreativeBrief)
+  // ===========================================
+  creativeBrief   Json?
+  // Structure:
+  // {
+  //   product_or_service: string,
+  //   offer: string,
+  //   category: string,
+  //   target_audience: string,
+  //   key_benefits: string[],
+  //   angle: string,
+  //   tone: string,
+  //   objective_recommended: string,
+  //   format: string,
+  //   detected_text: string[],
+  //   transcript_summary: string,
+  //   safety_flags: string[],
+  //   suggested_ctas: string[]
+  // }
+
+  // Analysis intermediate data
+  extractedFrames   Json?     // Array of frame URLs
+  transcription     String?   // Full audio transcription
+  ocrResults        Json?     // Text detected in frames
+
+  // ===========================================
+  // Generated Content (5-5-5-5)
+  // ===========================================
+  copies          Json?       // Array of 5 primary texts
+  headlines       Json?       // Array of 5 headlines
+  descriptions    Json?       // Array of 5 descriptions
+  ctas            Json?       // Array of 5 CTAs
+
+  bestPick        Json?
+  // Structure:
+  // {
+  //   copyIndex: number,
+  //   headlineIndex: number,
+  //   descriptionIndex: number,
+  //   ctaIndex: number,
+  //   score: number,
+  //   reasoning: string
+  // }
+
+  // ===========================================
+  // User Selection
+  // ===========================================
+  selectedCopy        Int?    // Index 0-4
+  selectedHeadline    Int?
+  selectedDescription Int?
+  selectedCta         Int?
+  customCampaignName  String?
+  customBudget        Float?
+
+  // ===========================================
+  // Processing Metadata
+  // ===========================================
+  error               String?
+  errorDetails        Json?
+  retryCount          Int       @default(0)
+  processingStartedAt DateTime?
+  analysisCompletedAt DateTime?
+  generationCompletedAt DateTime?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  client              Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  adAccount           AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  asset               Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  draft               Draft?
+
+  @@index([clientId])
+  @@index([adAccountId])
+  @@index([status])
+}
+
+enum JobStatus {
+  PENDING
+  UPLOADING_ASSET
+  ANALYZING
+  ANALYZED
+  GENERATING
+  GENERATED
+  READY_FOR_DRAFT
+  CREATING_DRAFT
+  DRAFT_CREATED
+  ERROR
+  CANCELLED
+}
+
+// ===========================================
+// Drafts (Meta Objects Created)
+// ===========================================
+
+model Draft {
+  id              String      @id @default(uuid())
+  jobId           String      @unique
+  adAccountId     String
+
+  // ===========================================
+  // Meta Object IDs
+  // ===========================================
+
+  // Video/Image upload
+  metaVideoId     String?     // Video ID if video asset
+  metaImageHash   String?     // Image hash if image asset
+
+  // Campaign structure
+  campaignId      String?
+  campaignName    String?
+  adSetId         String?
+  adSetName       String?
+  creativeId      String?
+  adId            String?
+  adName          String?
+
+  // Status of each object
+  videoUploadStatus   String?
+  campaignStatus      String?   // PAUSED
+  adSetStatus         String?   // PAUSED
+  creativeStatus      String?
+  adStatus            String?   // PAUSED
+
+  // ===========================================
+  // Configuration Used
+  // ===========================================
+  templateConfig    Json?     // Snapshot of template used
+  finalCopy         String?
+  finalHeadline     String?
+  finalDescription  String?
+  finalCta          String?
+  dailyBudget       Float?
+
+  // ===========================================
+  // Meta API Responses
+  // ===========================================
+  metaResponses     Json?     // All API responses (sanitized)
+
+  // ===========================================
+  // URLs for easy access
+  // ===========================================
+  campaignUrl       String?
+  adSetUrl          String?
+  adUrl             String?
+  previewUrl        String?
+
+  // ===========================================
+  // Audit & Timestamps
+  // ===========================================
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  publishedAt       DateTime? // When changed to ACTIVE (future)
+
+  job               Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  adAccount         AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  auditLogs         AuditLog[]
+
+  @@index([adAccountId])
+  @@index([campaignId])
+}
+
+// ===========================================
+// Audit Logging
+// ===========================================
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  draftId     String?
+
+  action      String    // "CREATE_CAMPAIGN", "UPLOAD_VIDEO", etc.
+  endpoint    String?   // API endpoint called
+  method      String?   // HTTP method
+
+  // Request/Response (sanitized - no tokens)
+  requestBody Json?
+  responseBody Json?
+  statusCode  Int?
+
+  // Status
+  success     Boolean   @default(true)
+  error       String?
+  errorCode   String?
+
+  // Metadata
+  duration    Int?      // ms
+  metaRequestId String? // x-fb-trace-id
+
+  createdAt   DateTime  @default(now())
+
+  draft       Draft?    @relation(fields: [draftId], references: [id], onDelete: SetNull)
+
+  @@index([draftId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ===========================================
+// Templates (Campaign Configurations)
+// ===========================================
+
+model Template {
+  id                  String   @id @default(uuid())
+  slug                String   @unique
+  name                String
+  description         String?
+  category            String?  // "traffic", "messages", "conversions"
+
+  // ===========================================
+  // Campaign Configuration
+  // ===========================================
+  objective           String   // OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT, etc.
+  specialAdCategories String[] @default([])
+
+  // ===========================================
+  // AdSet Configuration
+  // ===========================================
+  optimizationGoal    String   // LINK_CLICKS, LANDING_PAGE_VIEWS, etc.
+  billingEvent        String   // IMPRESSIONS, LINK_CLICKS, etc.
+  bidStrategy         String?  // LOWEST_COST_WITHOUT_CAP, etc.
+
+  // Placements
+  placements          Json     // {facebook: [...], instagram: [...]}
+
+  // Budget defaults
+  budgetType          String   @default("daily") // "daily" | "lifetime"
+  budgetDefault       Float    @default(50000)   // COP
+  budgetMin           Float    @default(10000)
+  budgetMax           Float?
+
+  // Schedule
+  scheduleType        String   @default("continuous") // "continuous" | "scheduled"
+  scheduleConfig      Json?
+
+  // Targeting base (can be extended)
+  targetingBase       Json?
+
+  // ===========================================
+  // Creative Configuration
+  // ===========================================
+  creativeFormat      String   // "video" | "image" | "carousel"
+  creativeSpec        Json     // object_story_spec template
+
+  // Allowed CTAs for this objective
+  allowedCtas         String[]
+  defaultCta          String
+
+  // ===========================================
+  // Destination
+  // ===========================================
+  destinationType     String   // "ig_profile" | "whatsapp" | "website"
+  destinationConfig   Json
+
+  // ===========================================
+  // Metadata
+  // ===========================================
+  isActive            Boolean  @default(true)
+  isDefault           Boolean  @default(false)
+  sortOrder           Int      @default(0)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([category])
+}

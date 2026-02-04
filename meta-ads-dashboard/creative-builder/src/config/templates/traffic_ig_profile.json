@@ -1,0 +1,70 @@
+{
+  "slug": "traffic_ig_profile",
+  "name": "Tráfico a Perfil de Instagram",
+  "description": "Campañas optimizadas para generar visitas al perfil de Instagram. Ideal para aumentar seguidores y engagement.",
+  "category": "traffic",
+
+  "objective": "OUTCOME_TRAFFIC",
+  "specialAdCategories": [],
+
+  "optimizationGoal": "VISIT_INSTAGRAM_PROFILE",
+  "billingEvent": "IMPRESSIONS",
+  "bidStrategy": "LOWEST_COST_WITHOUT_CAP",
+
+  "placements": {
+    "facebook": ["feed", "video_feeds", "story", "reels"],
+    "instagram": ["stream", "story", "reels", "explore", "explore_home"],
+    "audience_network": [],
+    "messenger": []
+  },
+
+  "budgetType": "daily",
+  "budgetDefault": 50000,
+  "budgetMin": 10000,
+  "budgetMax": 500000,
+
+  "targetingBase": {
+    "geo_locations": {
+      "countries": ["CO"]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "publisher_platforms": ["facebook", "instagram"],
+    "facebook_positions": ["feed", "video_feeds", "story", "reels"],
+    "instagram_positions": ["stream", "story", "reels", "explore", "explore_home"]
+  },
+
+  "creativeFormat": "video",
+  "creativeSpec": {
+    "video_data": {
+      "call_to_action": {
+        "type": "{{CTA}}",
+        "value": {
+          "link": "{{DESTINATION_URL}}"
+        }
+      },
+      "video_id": "{{VIDEO_ID}}",
+      "message": "{{PRIMARY_TEXT}}",
+      "title": "{{HEADLINE}}",
+      "link_description": "{{DESCRIPTION}}"
+    }
+  },
+
+  "allowedCtas": [
+    "LEARN_MORE",
+    "SHOP_NOW",
+    "SIGN_UP",
+    "WATCH_MORE",
+    "GET_QUOTE",
+    "CONTACT_US",
+    "SUBSCRIBE"
+  ],
+  "defaultCta": "LEARN_MORE",
+
+  "destinationType": "ig_profile",
+  "destinationConfig": {
+    "type": "instagram_profile",
+    "requiresIgActorId": true,
+    "linkFormat": "instagram://user?username={{IG_USERNAME}}"
+  }
+}
