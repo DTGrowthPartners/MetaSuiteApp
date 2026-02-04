@@ -3,10 +3,10 @@ import cors from 'cors';
 import axios from 'axios';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
-// Token de acceso de 3 meses para Dtgrowth Partners
-const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQjZAIECshdnZAGz5D2JGTcdVaFaBDMZAZCxyG7UUGA0mV1wiuYUsQZAZAbF7Cz5S0jDn65ZCx7f9p55ZCrtSZCZBwvjx0GfFO7tulv4nP2wfHxI32WFTqDSfOiN3ZBpAKZAQI7OVvPNkYrjI7fJdkfH9uFoXN5ivU00RUVyqLP3Vx2LZCZCWGzbPAqPP3d';
+// Token de acceso con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
+const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQrzKEhsGwlcsa820qgiSn6ZA4XlfCZBTNGZBfZAHY6UN4ttDdRKjsuO2EFEBM6DA4hdSR5NFfxniZBhrdkneOaSA6YwuUGjiMYn59UyQSKTfhPkahJF4ZBOvBeevWAWnYa46nXKzKvfWOcZAEdS6K9TGkST76XXOrPcshkgnPmZCmSt7ls4XHx95';
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
 
@@ -392,6 +392,265 @@ app.get('/api/dashboard/summary', async (req, res) => {
   }
 });
 
+// ============================================
+// UPLOAD ENDPOINTS - Imágenes y Videos
+// ============================================
+
+// Subir imagen desde URL a Meta Ads
+app.post('/api/upload/image', async (req, res) => {
+  try {
+    const { adAccountId, imageUrl } = req.body;
+
+    if (!adAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'adAccountId es requerido'
+      });
+    }
+
+    if (!imageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'imageUrl es requerido'
+      });
+    }
+
+    // Validar que sea una URL válida
+    try {
+      new URL(imageUrl);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'imageUrl debe ser una URL válida (ej: https://ejemplo.com/imagen.jpg)'
+      });
+    }
+
+    const normalizedId = normalizeAccountId(adAccountId);
+    console.log(`Uploading image from URL to ${normalizedId}:`, imageUrl);
+
+    // Subir imagen a Meta usando URL
+    const response = await axios.post(
+      `${META_API_BASE_URL}/${normalizedId}/adimages`,
+      null,
+      {
+        params: {
+          access_token: ACCESS_TOKEN,
+          url: imageUrl
+        }
+      }
+    );
+
+    console.log('Image upload response:', JSON.stringify(response.data, null, 2));
+
+    // Extraer el image_hash del resultado
+    const images = response.data.images;
+    const imageHash = images ? Object.values(images)[0]?.hash : null;
+
+    if (!imageHash) {
+      return res.status(500).json({
+        success: false,
+        error: 'No se obtuvo image_hash de Meta'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        imageHash,
+        images: response.data.images
+      },
+      message: 'Imagen subida exitosamente'
+    });
+  } catch (error) {
+    console.error('Image upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+
+    const errorData = error.response?.data?.error;
+    let errorMsg = errorData?.message || error.message;
+
+    // Agregar más contexto al error
+    if (errorData?.error_user_title) {
+      errorMsg = `${errorData.error_user_title}: ${errorData.error_user_msg || errorMsg}`;
+    }
+    if (errorData?.code === 1487390) {
+      errorMsg = 'Error de imagen: La URL no es accesible o el formato no es válido. Asegúrate de que la URL sea pública y el archivo sea JPG o PNG.';
+    }
+
+    res.status(500).json({
+      success: false,
+      error: errorMsg,
+      details: errorData
+    });
+  }
+});
+
+// Subir video desde URL a Meta Ads
+app.post('/api/upload/video', async (req, res) => {
+  try {
+    const { adAccountId, videoUrl, title } = req.body;
+
+    if (!adAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'adAccountId es requerido'
+      });
+    }
+
+    if (!videoUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'videoUrl es requerido'
+      });
+    }
+
+    // Validar que sea una URL válida
+    try {
+      new URL(videoUrl);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'videoUrl debe ser una URL válida (ej: https://ejemplo.com/video.mp4)'
+      });
+    }
+
+    const normalizedId = normalizeAccountId(adAccountId);
+    console.log(`Uploading video from URL to ${normalizedId}:`, videoUrl);
+
+    // Subir video a Meta usando URL
+    const response = await axios.post(
+      `${META_API_BASE_URL}/${normalizedId}/advideos`,
+      null,
+      {
+        params: {
+          access_token: ACCESS_TOKEN,
+          file_url: videoUrl,
+          title: title || 'Video Creative'
+        }
+      }
+    );
+
+    console.log('Video upload response:', JSON.stringify(response.data, null, 2));
+
+    res.json({
+      success: true,
+      data: {
+        videoId: response.data.id,
+        ...response.data
+      },
+      message: 'Video subido exitosamente'
+    });
+  } catch (error) {
+    console.error('Video upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+
+    const errorData = error.response?.data?.error;
+    let errorMsg = errorData?.message || error.message;
+
+    if (errorData?.error_user_title) {
+      errorMsg = `${errorData.error_user_title}: ${errorData.error_user_msg || errorMsg}`;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: errorMsg,
+      details: errorData
+    });
+  }
+});
+
+// Obtener páginas de Facebook del usuario
+app.get('/api/pages', async (req, res) => {
+  try {
+    const response = await axios.get(`${META_API_BASE_URL}/me/accounts`, {
+      params: {
+        access_token: ACCESS_TOKEN,
+        fields: 'id,name,access_token,instagram_business_account{id,username}'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: response.data.data || [],
+      count: (response.data.data || []).length
+    });
+  } catch (error) {
+    console.error('Error getting pages:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+// Obtener públicos guardados de una cuenta
+app.get('/api/audiences/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const normalizedId = normalizeAccountId(accountId);
+
+    // Obtener Saved Audiences
+    const savedResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}/saved_audiences`, {
+      params: {
+        access_token: ACCESS_TOKEN,
+        fields: 'id,name,targeting',
+        limit: 100
+      }
+    }).catch(() => ({ data: { data: [] } }));
+
+    // Obtener Custom Audiences
+    const customResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, {
+      params: {
+        access_token: ACCESS_TOKEN,
+        fields: 'id,name,subtype,description',
+        limit: 100
+      }
+    }).catch(() => ({ data: { data: [] } }));
+
+    res.json({
+      success: true,
+      data: {
+        savedAudiences: savedResponse.data.data || [],
+        customAudiences: customResponse.data.data || []
+      },
+      counts: {
+        saved: (savedResponse.data.data || []).length,
+        custom: (customResponse.data.data || []).length
+      }
+    });
+  } catch (error) {
+    console.error('Error getting audiences:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+// Obtener pixels de una cuenta publicitaria
+app.get('/api/pixels/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const normalizedId = normalizeAccountId(accountId);
+
+    const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/adspixels`, {
+      params: {
+        access_token: ACCESS_TOKEN,
+        fields: 'id,name,code,last_fired_time,is_unavailable'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: response.data.data || [],
+      count: (response.data.data || []).length
+    });
+  } catch (error) {
+    console.error('Error getting pixels:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`
@@ -409,6 +668,13 @@ app.listen(PORT, () => {
 ║  POST /api/campaigns/:id/status- Activar/Pausar campaña   ║
 ║  GET  /api/dashboard           - TODOS los datos          ║
 ║  GET  /api/dashboard/summary   - Resumen ejecutivo        ║
+║  ─────────────────────────────────────────────────────────║
+║  UPLOAD & CONFIG ENDPOINTS:                               ║
+║  POST /api/upload/image        - Subir imagen desde URL   ║
+║  POST /api/upload/video        - Subir video desde URL    ║
+║  GET  /api/pages               - Páginas de Facebook      ║
+║  GET  /api/audiences/:id       - Públicos de una cuenta   ║
+║  GET  /api/pixels/:id          - Pixels de una cuenta     ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });

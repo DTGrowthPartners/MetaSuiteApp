@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
 import MetaAdsService from '../services/metaAdsApi';
+import {
+  CAMPAIGN_TEMPLATES,
+  CTA_OPTIONS,
+  getCategories,
+  getTemplatesByCategory,
+  getTemplateRequirements,
+  getCTALabel
+} from '../config/campaignTemplates';
 import './CreativeBuilder.css';
 
 // Token de acceso de 3 meses con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
@@ -8,178 +16,7 @@ const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQrzKEhsGwlcsa820qgiSn6ZA4XlfCZBTNGZBfZAHY6UN
 // Prefijo para identificar campañas creadas por CARLOS
 const CAMPAIGN_PREFIX = 'CARLOS - ';
 
-// Opciones de CTA disponibles en Meta Ads
-const CTA_OPTIONS = [
-  { value: 'LEARN_MORE', label: 'Más información' },
-  { value: 'SHOP_NOW', label: 'Comprar' },
-  { value: 'SIGN_UP', label: 'Registrarse' },
-  { value: 'BOOK_TRAVEL', label: 'Reservar' },
-  { value: 'CONTACT_US', label: 'Contactar' },
-  { value: 'GET_QUOTE', label: 'Obtener cotización' },
-  { value: 'SUBSCRIBE', label: 'Suscribirse' },
-  { value: 'DOWNLOAD', label: 'Descargar' },
-  { value: 'WATCH_MORE', label: 'Ver más' },
-  { value: 'APPLY_NOW', label: 'Aplicar ahora' },
-  { value: 'GET_OFFER', label: 'Obtener oferta' },
-  { value: 'SEND_MESSAGE', label: 'Enviar mensaje' },
-  { value: 'WHATSAPP_MESSAGE', label: 'WhatsApp' }
-];
-
-// ============================================
-// PLANTILLAS DE CAMPAÑAS PRE-CONFIGURADAS
-// ============================================
-const CAMPAIGN_TEMPLATES = [
-  {
-    id: 'traffic_landing',
-    name: 'Tráfico a Landing Page',
-    icon: '🌐',
-    category: 'Tráfico',
-    description: 'Lleva visitantes a tu sitio web o landing page. Ideal para captación de leads.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 50000,
-    headlines: [
-      '¡Descubre cómo transformar tu negocio!',
-      'La solución que estabas buscando',
-      'Resultados garantizados',
-      'Empieza hoy mismo',
-      'Tu éxito comienza aquí'
-    ],
-    descriptions: [
-      'Miles de empresarios ya están usando esta estrategia para hacer crecer su negocio. ¿Qué esperas para unirte?',
-      'Descubre el método probado que ha ayudado a cientos de emprendedores a alcanzar sus metas.',
-      'No dejes pasar esta oportunidad única. Haz clic y conoce todos los detalles.',
-      'Aprende los secretos que los expertos no quieren que sepas. Información exclusiva.',
-      'Transforma tu vida y tu negocio con esta metodología revolucionaria.'
-    ],
-    ctas: ['LEARN_MORE', 'LEARN_MORE', 'SIGN_UP', 'LEARN_MORE', 'LEARN_MORE']
-  },
-  {
-    id: 'traffic_ecommerce',
-    name: 'Tráfico a Tienda Online',
-    icon: '🛒',
-    category: 'Tráfico',
-    description: 'Dirige compradores potenciales a tu tienda online o catálogo de productos.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 75000,
-    headlines: [
-      '¡Ofertas exclusivas solo por hoy!',
-      'Los productos que amas, al mejor precio',
-      'Envío gratis en tu primera compra',
-      'Calidad premium, precios increíbles',
-      'Tu próximo favorito te espera'
-    ],
-    descriptions: [
-      'Encuentra los productos más buscados con descuentos de hasta el 50%. Stock limitado.',
-      'Miles de clientes satisfechos nos respaldan. Compra segura y garantizada.',
-      'No te pierdas nuestras promociones especiales. Válido hasta agotar existencias.',
-      'La mejor selección de productos al alcance de un clic. Compra fácil y rápido.',
-      'Descubre por qué somos la tienda preferida de miles de compradores.'
-    ],
-    ctas: ['SHOP_NOW', 'SHOP_NOW', 'GET_OFFER', 'SHOP_NOW', 'LEARN_MORE']
-  },
-  {
-    id: 'traffic_services',
-    name: 'Promoción de Servicios',
-    icon: '💼',
-    category: 'Tráfico',
-    description: 'Promociona tus servicios profesionales y genera consultas de clientes potenciales.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 60000,
-    headlines: [
-      'Expertos a tu servicio',
-      'Soluciones profesionales garantizadas',
-      'Consulta sin compromiso',
-      'Calidad que marca la diferencia',
-      'Tu proyecto, nuestra prioridad'
-    ],
-    descriptions: [
-      'Contamos con años de experiencia brindando soluciones de alta calidad a nuestros clientes.',
-      'Nuestro equipo de expertos está listo para ayudarte a alcanzar tus objetivos.',
-      'Agenda una consulta gratuita y descubre cómo podemos ayudarte.',
-      'Servicios personalizados que se adaptan a tus necesidades específicas.',
-      'Confía en profesionales comprometidos con tu éxito.'
-    ],
-    ctas: ['GET_QUOTE', 'CONTACT_US', 'LEARN_MORE', 'GET_QUOTE', 'CONTACT_US']
-  },
-  {
-    id: 'traffic_events',
-    name: 'Promoción de Eventos',
-    icon: '🎉',
-    category: 'Tráfico',
-    description: 'Promociona eventos, webinars, talleres o conferencias y aumenta tus registros.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 45000,
-    headlines: [
-      '¡No te lo puedes perder!',
-      'Cupos limitados - Reserva ahora',
-      'El evento del año',
-      'Aprende de los mejores',
-      'Una experiencia única'
-    ],
-    descriptions: [
-      'Únete a cientos de participantes en este evento exclusivo. Cupos limitados disponibles.',
-      'Aprende estrategias prácticas que podrás aplicar inmediatamente en tu negocio.',
-      'Networking, contenido de valor y sorpresas te esperan. ¡Regístrate ya!',
-      'No dejes que otros te cuenten. Vive la experiencia en primera persona.',
-      'Este es el momento de dar el siguiente paso. ¡Te esperamos!'
-    ],
-    ctas: ['SIGN_UP', 'SIGN_UP', 'BOOK_TRAVEL', 'LEARN_MORE', 'SIGN_UP']
-  },
-  {
-    id: 'traffic_content',
-    name: 'Contenido / Blog',
-    icon: '📝',
-    category: 'Tráfico',
-    description: 'Promociona artículos, guías o contenido educativo para atraer lectores.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 35000,
-    headlines: [
-      'Guía completa [GRATIS]',
-      'Los 10 secretos que debes conocer',
-      'Aprende en 5 minutos',
-      'La guía definitiva',
-      'Información que cambiará tu perspectiva'
-    ],
-    descriptions: [
-      'Descarga nuestra guía gratuita y descubre los secretos que los expertos usan a diario.',
-      'Contenido exclusivo diseñado para ayudarte a mejorar tus resultados.',
-      'Miles de personas ya aplicaron estos consejos. ¿Serás el próximo?',
-      'Información clara, práctica y fácil de aplicar. Sin rodeos.',
-      'Actualizado con las últimas tendencias y mejores prácticas del mercado.'
-    ],
-    ctas: ['LEARN_MORE', 'DOWNLOAD', 'LEARN_MORE', 'WATCH_MORE', 'LEARN_MORE']
-  },
-  {
-    id: 'traffic_app',
-    name: 'Promoción de App',
-    icon: '📱',
-    category: 'Tráfico',
-    description: 'Dirige usuarios a la página de descarga de tu aplicación móvil.',
-    objective: 'OUTCOME_TRAFFIC',
-    optimizationGoal: 'LANDING_PAGE_VIEWS',
-    suggestedBudget: 55000,
-    headlines: [
-      'Descarga la app GRATIS',
-      'Tu vida más fácil con un clic',
-      'La app #1 en su categoría',
-      'Millones ya la usan',
-      'Descubre la nueva forma de [X]'
-    ],
-    descriptions: [
-      'Únete a millones de usuarios que ya disfrutan de nuestra app. Descarga gratuita.',
-      'Todo lo que necesitas en la palma de tu mano. Fácil, rápido y seguro.',
-      'Calificación de 4.8 estrellas. Descubre por qué somos los favoritos.',
-      'Actualizaciones constantes y nuevas funciones cada mes. ¡No te quedes atrás!',
-      'La app que revolucionó la forma de hacer las cosas. Pruébala ya.'
-    ],
-    ctas: ['DOWNLOAD', 'DOWNLOAD', 'LEARN_MORE', 'DOWNLOAD', 'DOWNLOAD']
-  }
-];
+// Las plantillas ahora se importan desde campaignTemplates.js
 
 // ============================================
 // TEMPLATE SELECTOR COMPONENT - Selección de plantilla
@@ -187,11 +24,20 @@ const CAMPAIGN_TEMPLATES = [
 function TemplateSelector({ onSelectTemplate }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const categories = ['all', ...new Set(CAMPAIGN_TEMPLATES.map(t => t.category))];
+  const categories = getCategories();
+  const filteredTemplates = getTemplatesByCategory(selectedCategory);
 
-  const filteredTemplates = selectedCategory === 'all'
-    ? CAMPAIGN_TEMPLATES
-    : CAMPAIGN_TEMPLATES.filter(t => t.category === selectedCategory);
+  // Función para obtener badges de requisitos
+  const getRequirementBadges = (template) => {
+    const reqs = getTemplateRequirements(template);
+    const badges = [];
+    if (reqs.pixel) badges.push({ label: 'Pixel', color: '#e74c3c' });
+    if (reqs.whatsapp) badges.push({ label: 'WhatsApp', color: '#25D366' });
+    if (reqs.catalog) badges.push({ label: 'Catálogo', color: '#9b59b6' });
+    if (reqs.leadForm) badges.push({ label: 'Formulario', color: '#3498db' });
+    if (reqs.website) badges.push({ label: 'URL', color: '#2ecc71' });
+    return badges;
+  };
 
   return (
     <div className="template-selector">
@@ -213,29 +59,47 @@ function TemplateSelector({ onSelectTemplate }) {
 
       {/* Template Cards Grid */}
       <div className="templates-grid">
-        {filteredTemplates.map(template => (
-          <div
-            key={template.id}
-            className="template-card"
-            onClick={() => onSelectTemplate(template)}
-          >
-            <div className="template-icon">{template.icon}</div>
-            <div className="template-content">
-              <h3>{template.name}</h3>
-              <span className="template-category">{template.category}</span>
-              <p className="template-description">{template.description}</p>
-              <div className="template-meta">
-                <span className="meta-item">
-                  <strong>Presupuesto sugerido:</strong> ${new Intl.NumberFormat('es-CO').format(template.suggestedBudget)} COP/día
-                </span>
-                <span className="meta-item">
-                  <strong>CTAs:</strong> {[...new Set(template.ctas)].map(c => CTA_OPTIONS.find(o => o.value === c)?.label).join(', ')}
-                </span>
+        {filteredTemplates.map(template => {
+          const requirements = getRequirementBadges(template);
+          const suggestedBudget = template.adSetConfig?.suggestedBudget || template.suggestedBudget || 50000;
+          const ctaList = template.creativeContent?.ctas || template.ctas || [];
+
+          return (
+            <div
+              key={template.id}
+              className="template-card"
+              onClick={() => onSelectTemplate(template)}
+            >
+              <div className="template-icon">{template.icon}</div>
+              <div className="template-content">
+                <h3>{template.name}</h3>
+                <span className="template-category">{template.category}</span>
+                <p className="template-description">{template.description}</p>
+
+                {/* Badges de requisitos */}
+                {requirements.length > 0 && (
+                  <div className="template-requirements">
+                    {requirements.map((req, idx) => (
+                      <span key={idx} className="requirement-badge" style={{ backgroundColor: req.color }}>
+                        {req.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="template-meta">
+                  <span className="meta-item">
+                    <strong>Presupuesto:</strong> ${new Intl.NumberFormat('es-CO').format(suggestedBudget)} COP/día
+                  </span>
+                  <span className="meta-item">
+                    <strong>CTAs:</strong> {[...new Set(ctaList)].slice(0, 3).map(c => getCTALabel(c)).join(', ')}
+                  </span>
+                </div>
               </div>
+              <div className="template-arrow">→</div>
             </div>
-            <div className="template-arrow">→</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -245,6 +109,13 @@ function TemplateSelector({ onSelectTemplate }) {
 // TEMPLATE PREVIEW COMPONENT - Vista previa del contenido
 // ============================================
 function TemplatePreview({ template, onClose }) {
+  const content = template.creativeContent || {};
+  const headlines = content.headlines || template.headlines || [];
+  const descriptions = content.descriptions || template.descriptions || [];
+  const primaryTexts = content.primaryTexts || [];
+  const ctas = content.ctas || template.ctas || [];
+  const requirements = getTemplateRequirements(template);
+
   return (
     <div className="template-preview-overlay" onClick={onClose}>
       <div className="template-preview-modal" onClick={e => e.stopPropagation()}>
@@ -257,30 +128,71 @@ function TemplatePreview({ template, onClose }) {
         </div>
 
         <div className="preview-content">
+          {/* Configuración técnica */}
           <div className="preview-section">
-            <h4>Títulos Pre-configurados</h4>
-            <ul>
-              {template.headlines.map((h, i) => <li key={i}>{h}</li>)}
+            <h4>Configuración</h4>
+            <ul className="config-list">
+              <li><strong>Objetivo:</strong> {template.objective}</li>
+              <li><strong>Optimización:</strong> {template.adSetConfig?.optimizationGoal}</li>
+              <li><strong>Ubicación:</strong> {template.adSetConfig?.conversionLocation || 'N/A'}</li>
+              <li><strong>Formatos:</strong> {template.adConfig?.allowedFormats?.join(', ')}</li>
             </ul>
           </div>
 
-          <div className="preview-section">
-            <h4>Descripciones Pre-configuradas</h4>
-            <ul>
-              {template.descriptions.map((d, i) => <li key={i}>{d}</li>)}
-            </ul>
-          </div>
-
-          <div className="preview-section">
-            <h4>CTAs</h4>
-            <div className="cta-badges">
-              {template.ctas.map((cta, i) => (
-                <span key={i} className="cta-badge">
-                  {CTA_OPTIONS.find(c => c.value === cta)?.label || cta}
-                </span>
-              ))}
+          {/* Requisitos */}
+          {Object.values(requirements).some(v => v) && (
+            <div className="preview-section">
+              <h4>Requisitos</h4>
+              <ul className="requirements-list">
+                {requirements.pixel && <li>Pixel de Meta configurado</li>}
+                {requirements.whatsapp && <li>Número de WhatsApp Business</li>}
+                {requirements.catalog && <li>Catálogo de productos</li>}
+                {requirements.leadForm && <li>Formulario de leads</li>}
+                {requirements.website && <li>URL de destino</li>}
+                {requirements.phone && <li>Número de teléfono</li>}
+              </ul>
             </div>
-          </div>
+          )}
+
+          {headlines.length > 0 && (
+            <div className="preview-section">
+              <h4>Títulos Pre-configurados</h4>
+              <ul>
+                {headlines.map((h, i) => <li key={i}>{h}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {primaryTexts.length > 0 && (
+            <div className="preview-section">
+              <h4>Textos Primarios</h4>
+              <ul>
+                {primaryTexts.slice(0, 3).map((t, i) => <li key={i}>{t.substring(0, 100)}...</li>)}
+              </ul>
+            </div>
+          )}
+
+          {descriptions.length > 0 && (
+            <div className="preview-section">
+              <h4>Descripciones</h4>
+              <ul>
+                {descriptions.map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {ctas.length > 0 && (
+            <div className="preview-section">
+              <h4>CTAs</h4>
+              <div className="cta-badges">
+                {[...new Set(ctas)].map((cta, i) => (
+                  <span key={i} className="cta-badge">
+                    {getCTALabel(cta)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -291,16 +203,28 @@ function TemplatePreview({ template, onClose }) {
 // UPLOAD STEP COMPONENT - Configuración rápida post-plantilla
 // ============================================
 function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTemplates }) {
+  // Obtener configuración de la plantilla (nueva estructura)
+  const templateContent = selectedTemplate?.creativeContent || {};
+  const templateAdSetConfig = selectedTemplate?.adSetConfig || {};
+  const templateAdConfig = selectedTemplate?.adConfig || {};
+  const templateRequirements = getTemplateRequirements(selectedTemplate);
+
   const [campaignName, setCampaignName] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
-  const [dailyBudget, setDailyBudget] = useState(selectedTemplate?.suggestedBudget?.toString() || '50000');
+  const [dailyBudget, setDailyBudget] = useState(
+    (templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000).toString()
+  );
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
   // Campos obligatorios para crear el anuncio
   const [linkUrl, setLinkUrl] = useState(''); // URL de destino
-  const [imageUrl, setImageUrl] = useState(''); // URL de imagen para el creative
+  // NOTA: La funcionalidad de imagen está deshabilitada temporalmente
+
+  // Campos dinámicos según tipo de campaña
+  const [whatsappNumber, setWhatsappNumber] = useState(''); // Para campañas de WhatsApp
+  const [phoneNumber, setPhoneNumber] = useState(''); // Para campañas de llamadas
 
   // Páginas de Facebook
   const [pages, setPages] = useState([]);
@@ -313,10 +237,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [loadingAudiences, setLoadingAudiences] = useState(false);
   const [audienceError, setAudienceError] = useState('');
 
-  // Creative Copy - Inicializado desde la plantilla
-  const [headlines, setHeadlines] = useState(selectedTemplate?.headlines || ['', '', '', '', '']);
-  const [descriptions, setDescriptions] = useState(selectedTemplate?.descriptions || ['', '', '', '', '']);
-  const [ctas, setCtas] = useState(selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']);
+  // Creative Copy - Inicializado desde la plantilla (nueva estructura)
+  const [headlines, setHeadlines] = useState(
+    templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', '']
+  );
+  const [descriptions, setDescriptions] = useState(
+    templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', '']
+  );
+  const [ctas, setCtas] = useState(
+    templateContent.ctas || selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']
+  );
 
   // Edición avanzada toggle
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -417,15 +347,25 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       return;
     }
 
-    if (!linkUrl.trim()) {
+    // Validar URL solo si es requerida
+    if (templateRequirements.website && !linkUrl.trim()) {
       setError('Por favor ingresa la URL de destino');
       return;
     }
 
-    if (!imageUrl.trim()) {
-      setError('Por favor ingresa la URL de una imagen para el anuncio');
+    // Validar WhatsApp si es requerido
+    if (templateRequirements.whatsapp && !whatsappNumber.trim()) {
+      setError('Por favor ingresa el número de WhatsApp (ej: 573001234567)');
       return;
     }
+
+    // Validar teléfono si es requerido
+    if (templateRequirements.phone && !phoneNumber.trim()) {
+      setError('Por favor ingresa el número de teléfono');
+      return;
+    }
+
+    // NOTA: La validación de imagen está deshabilitada temporalmente
 
     if (!dailyBudget || parseFloat(dailyBudget) < 5000) {
       setError('El presupuesto mínimo es $5,000 COP diario');
@@ -450,19 +390,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       // Agregar prefijo "CARLOS - " al nombre de la campaña
       const fullCampaignName = `${CAMPAIGN_PREFIX}${campaignName.trim()}`;
 
+      // Determinar tipo de campaña basado en la plantilla
+      const conversionLocation = templateAdSetConfig.conversionLocation || 'WEBSITE';
+
       const jobData = {
         id: 'job_' + Date.now(),
         campaignName: fullCampaignName,
-        adName: `${CAMPAIGN_PREFIX}${campaignName.trim()}`, // Nombre del anuncio = CARLOS + nombre campaña
+        adName: `${CAMPAIGN_PREFIX}${campaignName.trim()}`,
         adAccountId: selectedAccount,
         adAccountName: selectedAccountData?.name || selectedAccount,
-        dailyBudgetCOP: parseFloat(dailyBudget), // En pesos colombianos
+        dailyBudgetCOP: parseFloat(dailyBudget),
         // Página de Facebook para el anuncio
         pageId: selectedPage,
         pageName: selectedPageData?.name || selectedPage,
-        // URL de destino y imagen
-        linkUrl: linkUrl.trim(),
-        imageUrl: imageUrl.trim(),
+        // URL de destino (si aplica)
+        linkUrl: linkUrl.trim() || null,
+        // NOTA: imageUrl deshabilitado temporalmente
+        imageUrl: null,
+        // Campos dinámicos según tipo
+        whatsappNumber: whatsappNumber.trim() || null,
+        phoneNumber: phoneNumber.trim() || null,
         // Público (puede ser null si no hay disponibles)
         savedAudienceId: selectedAudience || null,
         savedAudienceName: selectedAudienceData?.name || 'Colombia 18-65 (Por defecto)',
@@ -475,9 +422,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         // Configuración desde plantilla
         templateId: selectedTemplate?.id,
         templateName: selectedTemplate?.name,
-        campaignType: 'TRAFFIC_WEBSITE',
+        conversionLocation: conversionLocation,
+        campaignType: `${selectedTemplate?.category?.toUpperCase() || 'TRAFFIC'}_${conversionLocation}`,
         objective: selectedTemplate?.objective || 'OUTCOME_TRAFFIC',
-        optimizationGoal: selectedTemplate?.optimizationGoal || 'LANDING_PAGE_VIEWS',
+        optimizationGoal: templateAdSetConfig.optimizationGoal || selectedTemplate?.optimizationGoal || 'LANDING_PAGE_VIEWS',
+        billingEvent: templateAdSetConfig.billingEvent || 'IMPRESSIONS',
+        // CTAs permitidos
+        allowedCtas: templateAdConfig.allowedCtas || [],
         status: 'PENDING'
       };
 
@@ -573,30 +524,57 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <p className="hint">La página desde la cual se publicará el anuncio</p>
         </div>
 
-        {/* Landing Page URL */}
-        <div className="form-group">
-          <label>URL de Destino (Landing Page) *</label>
-          <input
-            type="url"
-            placeholder="https://tusitio.com/landing"
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            required
-          />
-          <p className="hint">Donde llegarán los usuarios al hacer clic en el anuncio</p>
-        </div>
+        {/* Landing Page URL - Solo si es requerido */}
+        {templateRequirements.website && (
+          <div className="form-group">
+            <label>URL de Destino (Landing Page) *</label>
+            <input
+              type="url"
+              placeholder="https://tusitio.com/landing"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              required
+            />
+            <p className="hint">Donde llegarán los usuarios al hacer clic en el anuncio</p>
+          </div>
+        )}
 
-        {/* Image URL */}
-        <div className="form-group">
-          <label>URL de Imagen del Anuncio *</label>
-          <input
-            type="url"
-            placeholder="https://tusitio.com/imagen.jpg"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            required
-          />
-          <p className="hint">URL pública de la imagen (JPG, PNG). Recomendado: 1200x628px</p>
+        {/* WhatsApp Number - Solo si es requerido */}
+        {templateRequirements.whatsapp && (
+          <div className="form-group">
+            <label>Número de WhatsApp *</label>
+            <input
+              type="tel"
+              placeholder="573001234567"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
+              required
+            />
+            <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
+          </div>
+        )}
+
+        {/* Phone Number - Solo si es requerido */}
+        {templateRequirements.phone && (
+          <div className="form-group">
+            <label>Número de Teléfono *</label>
+            <input
+              type="tel"
+              placeholder="+57 300 123 4567"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required
+            />
+            <p className="hint">Número de teléfono para recibir llamadas</p>
+          </div>
+        )}
+
+        {/* NOTA: Campo de imagen deshabilitado temporalmente */}
+        <div className="form-group" style={{ background: '#fff3cd', padding: '12px', borderRadius: '8px', border: '1px solid #ffc107' }}>
+          <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
+            <strong>⚠️ Nota:</strong> La subida de imágenes está deshabilitada temporalmente.
+            Se creará la Campaña y Ad Set. Deberás agregar el Creative manualmente en Meta Ads Manager.
+          </p>
         </div>
 
         {/* Audience Selection (Saved + Custom) */}
@@ -647,7 +625,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             required
           />
           <p className="hint">
-            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día (CBO) - Sugerido: ${formatCOP(selectedTemplate?.suggestedBudget || 50000)}
+            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día (CBO) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000)}
           </p>
         </div>
 
@@ -788,66 +766,107 @@ function DraftStep({ job, onComplete, onBack }) {
 
       // Usar el targeting del público guardado
       const targeting = job.savedAudienceTargeting || {
-        geo_locations: {
-          countries: ['CO']
-        },
+        geo_locations: { countries: ['CO'] },
         age_min: 18,
         age_max: 65
       };
 
-      const objective = 'OUTCOME_TRAFFIC';
-      const optimizationGoal = 'LANDING_PAGE_VIEWS';
-      const billingEvent = 'IMPRESSIONS';
+      // Obtener configuración desde el job
+      const objective = job.objective || 'OUTCOME_TRAFFIC';
+      const optimizationGoal = job.optimizationGoal || 'LANDING_PAGE_VIEWS';
+      const billingEvent = job.billingEvent || 'IMPRESSIONS';
+      const conversionLocation = job.conversionLocation || 'WEBSITE';
 
+      addLog(`Tipo: ${job.templateName || 'Campaña personalizada'}`);
       addLog(`Objetivo: ${objective}`);
       addLog(`Optimización: ${optimizationGoal}`);
+      addLog(`Destino: ${conversionLocation}`);
       addLog(`Cuenta: ${job.adAccountId}`);
       addLog(`Página: ${job.pageName}`);
       addLog(`Público: ${job.savedAudienceName || 'Colombia 18-65'}`);
       addLog(`Presupuesto: $${formatCOP(job.dailyBudgetCOP)} COP/día (CBO)`);
-      addLog(`URL destino: ${job.linkUrl}`);
-      addLog(`Títulos: ${job.headlines?.length || 0}, Descripciones: ${job.descriptions?.length || 0}`);
 
-      // Crear Campaign + AdSet + Creative + Ad completo
-      const result = await metaService.createCampaignWithAd(job.adAccountId, {
-        // Campaign
-        campaignName: job.campaignName,
-        objective,
-        specialAdCategories: [],
-        // AdSet
-        adSetName: `${job.campaignName} - Ad Set`,
-        dailyBudget: Math.round(job.dailyBudgetCOP), // COP directo en pesos
-        targeting,
-        optimizationGoal,
-        billingEvent,
-        // Creative & Ad
-        adName: job.adName,
-        pageId: job.pageId,
-        imageUrl: job.imageUrl,
-        titles: job.headlines || [],
-        bodies: job.descriptions || [], // Las descripciones largas van como "bodies" (texto primario)
-        descriptions: job.headlines || [], // Las descripciones cortas del link (reusamos títulos)
-        callToActionTypes: job.ctas || ['LEARN_MORE'],
-        linkUrl: job.linkUrl
-      });
+      let result;
+
+      // Seleccionar método de creación según el tipo de campaña
+      if (conversionLocation === 'WHATSAPP' && job.whatsappNumber) {
+        addLog(`WhatsApp: ${job.whatsappNumber}`);
+        addLog('Creando campaña para WhatsApp...');
+
+        result = await metaService.createCampaignForWhatsApp(job.adAccountId, {
+          campaignName: job.campaignName,
+          adSetName: `${job.campaignName} - Ad Set`,
+          adName: job.adName,
+          dailyBudget: Math.round(job.dailyBudgetCOP),
+          targeting,
+          pageId: job.pageId,
+          whatsappNumber: job.whatsappNumber,
+          imageUrl: job.imageUrl,
+          headlines: job.headlines || [],
+          descriptions: job.descriptions || [],
+          primaryTexts: job.descriptions || [],
+          callToAction: job.ctas?.[0] || 'WHATSAPP_MESSAGE'
+        });
+
+      } else if (conversionLocation === 'MESSENGER') {
+        addLog('Creando campaña para Messenger...');
+
+        result = await metaService.createCampaignForMessenger(job.adAccountId, {
+          campaignName: job.campaignName,
+          adSetName: `${job.campaignName} - Ad Set`,
+          adName: job.adName,
+          dailyBudget: Math.round(job.dailyBudgetCOP),
+          targeting,
+          pageId: job.pageId,
+          imageUrl: job.imageUrl,
+          headlines: job.headlines || [],
+          descriptions: job.descriptions || [],
+          primaryTexts: job.descriptions || [],
+          callToAction: job.ctas?.[0] || 'SEND_MESSAGE'
+        });
+
+      } else {
+        // Campaña estándar (website, traffic, etc.)
+        // NOTA: Solo crea Campaign + AdSet (sin creative ni ad por ahora)
+        addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
+        addLog('Creando solo Campaign + AdSet (sin creative)...');
+
+        result = await metaService.createCampaignAndAdSet(job.adAccountId, {
+          campaignName: job.campaignName,
+          objective,
+          specialAdCategories: [],
+          adSetName: `${job.campaignName} - Ad Set`,
+          dailyBudget: Math.round(job.dailyBudgetCOP),
+          targeting,
+          optimizationGoal,
+          billingEvent
+        });
+      }
 
       if (result.success) {
-        addLog('✅ ¡Campaña, Ad Set, Creative y Anuncio creados exitosamente!');
+        addLog('✅ ¡Campaña y Ad Set creados exitosamente!');
+        addLog('⚠️ Recuerda agregar el Creative y Anuncio manualmente en Meta Ads Manager');
         setDraftData({
           campaignId: result.campaign?.id,
           campaignName: job.campaignName,
           adSetId: result.adSet?.id,
-          creativeId: result.creative?.id,
-          adId: result.ad?.id,
+          creativeId: result.creative?.id || null,
+          adId: result.ad?.id || null,
           adName: job.adName,
           dailyBudgetCOP: job.dailyBudgetCOP,
           savedAudienceName: job.savedAudienceName,
           pageName: job.pageName,
           linkUrl: job.linkUrl,
+          whatsappNumber: job.whatsappNumber,
+          conversionLocation: conversionLocation,
+          objective: objective,
+          optimizationGoal: optimizationGoal,
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
           ctas: job.ctas || [],
-          status: 'PAUSED'
+          status: 'PAUSED',
+          // Flag para indicar que falta el creative
+          needsCreative: !result.creative && !result.ad
         });
         setCreated(true);
       } else {
@@ -868,9 +887,14 @@ function DraftStep({ job, onComplete, onBack }) {
     return (
       <div className="draft-step">
         <div className="success-section">
-          <div className="success-icon">✅</div>
-          <h2>¡Campaña Completa Creada!</h2>
-          <p>Tu campaña, ad set y anuncio han sido creados en Meta Ads Manager en estado <strong>PAUSADO</strong>.</p>
+          <div className="success-icon">{draftData.needsCreative ? '⚠️' : '✅'}</div>
+          <h2>{draftData.needsCreative ? '¡Campaña y Ad Set Creados!' : '¡Campaña Completa Creada!'}</h2>
+          <p>
+            {draftData.needsCreative
+              ? <>Tu campaña y ad set han sido creados en Meta Ads Manager en estado <strong>PAUSADO</strong>. <span style={{color: '#cc6600'}}>Falta agregar el Creative y Anuncio manualmente.</span></>
+              : <>Tu campaña, ad set y anuncio han sido creados en Meta Ads Manager en estado <strong>PAUSADO</strong>.</>
+            }
+          </p>
 
           <div className="draft-details">
             <div className="draft-card">
@@ -879,7 +903,8 @@ function DraftStep({ job, onComplete, onBack }) {
                 <h4>Campaña</h4>
                 <p>{draftData.campaignName}</p>
                 <p className="hint">ID: {draftData.campaignId}</p>
-                <p className="hint">Objetivo: Tráfico Web (Landing Page Views)</p>
+                <p className="hint">Objetivo: {draftData.objective || 'OUTCOME_TRAFFIC'}</p>
+                <p className="hint">Destino: {draftData.conversionLocation || 'WEBSITE'}</p>
                 <span className="status-badge paused">PAUSADO</span>
               </div>
             </div>
@@ -895,62 +920,44 @@ function DraftStep({ job, onComplete, onBack }) {
               </div>
             </div>
 
-            <div className="draft-card">
-              <span className="card-icon">📢</span>
-              <div>
-                <h4>Anuncio</h4>
-                <p>{draftData.adName}</p>
-                <p className="hint">ID: {draftData.adId}</p>
-                <p className="hint">Página: {draftData.pageName}</p>
-                <p className="hint">Destino: {draftData.linkUrl}</p>
-                <span className="status-badge paused">PAUSADO</span>
+            {draftData.adId && (
+              <div className="draft-card">
+                <span className="card-icon">📢</span>
+                <div>
+                  <h4>Anuncio</h4>
+                  <p>{draftData.adName}</p>
+                  <p className="hint">ID: {draftData.adId}</p>
+                  <p className="hint">Página: {draftData.pageName}</p>
+                  <p className="hint">Destino: {draftData.linkUrl}</p>
+                  <span className="status-badge paused">PAUSADO</span>
+                </div>
               </div>
-            </div>
+            )}
+
+            {draftData.needsCreative && (
+              <div className="draft-card" style={{ background: '#fff3cd', borderColor: '#ffc107' }}>
+                <span className="card-icon">⚠️</span>
+                <div>
+                  <h4>Creative y Anuncio Pendientes</h4>
+                  <p style={{ color: '#856404' }}>Debes agregar el creative (imagen/video) y crear el anuncio manualmente en Meta Ads Manager.</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Resumen del contenido creativo usado */}
-          {(draftData.headlines?.length > 0 || draftData.descriptions?.length > 0) && (
-            <div className="saved-creative-copy" style={{ background: '#e8f5e9', borderColor: '#81c784' }}>
-              <h3 style={{ color: '#2e7d32' }}>📝 Contenido del Anuncio (Ya aplicado)</h3>
-              <p className="hint" style={{ color: '#388e3c' }}>Este contenido ya está configurado en tu anuncio</p>
-
-              {draftData.headlines?.length > 0 && (
-                <div className="copy-section">
-                  <label>Títulos ({draftData.headlines.length})</label>
-                  {draftData.headlines.map((h, i) => (
-                    <div key={i} className="copy-item">{h}</div>
-                  ))}
-                </div>
-              )}
-
-              {draftData.descriptions?.length > 0 && (
-                <div className="copy-section">
-                  <label>Descripciones ({draftData.descriptions.length})</label>
-                  {draftData.descriptions.map((d, i) => (
-                    <div key={i} className="copy-item">{d}</div>
-                  ))}
-                </div>
-              )}
-
-              {draftData.ctas?.length > 0 && (
-                <div className="copy-section">
-                  <label>CTAs</label>
-                  <div className="cta-badges">
-                    {[...new Set(draftData.ctas)].map((cta, i) => (
-                      <span key={i} className="cta-badge">{CTA_OPTIONS.find(c => c.value === cta)?.label || cta}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Resumen del contenido creativo - DESHABILITADO TEMPORALMENTE */}
 
           <div className="next-steps">
             <h3>Próximos Pasos</h3>
             <ol>
               <li>Ve a <a href="https://business.facebook.com/adsmanager" target="_blank" rel="noopener noreferrer">Meta Ads Manager</a></li>
-              <li>Revisa la campaña, ad set y anuncio creados</li>
-              <li>Ajusta cualquier configuración si es necesario</li>
+              {draftData.needsCreative && (
+                <>
+                  <li><strong style={{color: '#cc6600'}}>Agrega un Creative (imagen/video) al Ad Set</strong></li>
+                  <li><strong style={{color: '#cc6600'}}>Crea el Anuncio dentro del Ad Set</strong></li>
+                </>
+              )}
+              <li>Revisa la configuración de la campaña</li>
               <li>Cuando estés listo, <strong>activa la campaña</strong></li>
             </ol>
           </div>
@@ -970,7 +977,15 @@ function DraftStep({ job, onComplete, onBack }) {
       <h2>Crear Campaña</h2>
 
       <div className="campaign-type-badge">
-        <span>🌐</span> Campaña de Tráfico Web - Optimizada para Landing Page Views
+        {job.conversionLocation === 'WHATSAPP' ? (
+          <><span>💬</span> Campaña de WhatsApp - Optimizada para Conversaciones</>
+        ) : job.conversionLocation === 'MESSENGER' ? (
+          <><span>💭</span> Campaña de Messenger - Optimizada para Conversaciones</>
+        ) : job.conversionLocation === 'CALLS' ? (
+          <><span>📞</span> Campaña de Llamadas - Optimizada para Llamadas</>
+        ) : (
+          <><span>🌐</span> {job.templateName || 'Campaña de Tráfico Web'} - {job.optimizationGoal || 'Landing Page Views'}</>
+        )}
       </div>
 
       <div className="summary-section">
@@ -1000,44 +1015,42 @@ function DraftStep({ job, onComplete, onBack }) {
             <label>Público</label>
             <p>{job.savedAudienceName || 'Colombia 18-65'}</p>
           </div>
-          <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
-            <label>URL de Destino</label>
-            <p style={{ wordBreak: 'break-all' }}>{job.linkUrl}</p>
-          </div>
+          {/* URL de destino - solo si aplica */}
+          {job.linkUrl && (
+            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+              <label>URL de Destino</label>
+              <p style={{ wordBreak: 'break-all' }}>{job.linkUrl}</p>
+            </div>
+          )}
+          {/* WhatsApp - solo si aplica */}
+          {job.whatsappNumber && (
+            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+              <label>Número de WhatsApp</label>
+              <p>{job.whatsappNumber}</p>
+            </div>
+          )}
+          {/* Teléfono - solo si aplica */}
+          {job.phoneNumber && (
+            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+              <label>Número de Teléfono</label>
+              <p>{job.phoneNumber}</p>
+            </div>
+          )}
+          {/* Imagen deshabilitada temporalmente
           <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
             <label>Imagen del Anuncio</label>
             <p style={{ wordBreak: 'break-all' }}>{job.imageUrl}</p>
           </div>
+          */}
         </div>
 
-        {/* Creative Copy Summary */}
+        {/* Creative Copy Summary - DESHABILITADO TEMPORALMENTE
         {(job.headlines?.length > 0 || job.descriptions?.length > 0) && (
           <div className="creative-summary">
-            <h4>Contenido del Anuncio ({job.headlines?.length || 0} títulos, {job.descriptions?.length || 0} descripciones)</h4>
-            {job.headlines?.length > 0 && (
-              <div className="creative-list">
-                <label>Títulos</label>
-                <ul>
-                  {job.headlines.map((h, i) => <li key={i}>{h}</li>)}
-                </ul>
-              </div>
-            )}
-            {job.descriptions?.length > 0 && (
-              <div className="creative-list">
-                <label>Descripciones</label>
-                <ul>
-                  {job.descriptions.map((d, i) => <li key={i}>{d}</li>)}
-                </ul>
-              </div>
-            )}
-            {job.ctas?.length > 0 && (
-              <div className="creative-list">
-                <label>CTAs</label>
-                <p>{[...new Set(job.ctas)].map(c => CTA_OPTIONS.find(o => o.value === c)?.label || c).join(', ')}</p>
-              </div>
-            )}
+            ...
           </div>
         )}
+        */}
       </div>
 
       <div className="info-box">
@@ -1045,11 +1058,12 @@ function DraftStep({ job, onComplete, onBack }) {
         <div>
           <p><strong>Se creará en Meta Ads:</strong></p>
           <ul>
-            <li><strong>1 Campaña</strong> - Objetivo: Tráfico (PAUSADA)</li>
-            <li><strong>1 Ad Set</strong> - Optimización: Landing Page Views</li>
-            <li><strong>1 Creative</strong> - Con {job.headlines?.length || 0} títulos y {job.descriptions?.length || 0} descripciones</li>
-            <li><strong>1 Anuncio</strong> - "{job.adName}"</li>
+            <li><strong>1 Campaña</strong> - Objetivo: {job.objective || 'Tráfico'} (PAUSADA)</li>
+            <li><strong>1 Ad Set</strong> - Optimización: {job.optimizationGoal || 'Landing Page Views'}</li>
           </ul>
+          <p style={{ marginTop: '10px', color: '#cc6600' }}>
+            <strong>⚠️ Nota:</strong> El Creative y Anuncio deberás agregarlos manualmente en Meta Ads Manager.
+          </p>
         </div>
       </div>
 

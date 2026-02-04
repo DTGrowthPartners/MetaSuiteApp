@@ -2,6 +2,9 @@ import axios from 'axios';
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
 
+// Backend URL para endpoints que requieren proxy (uploads, etc.)
+const BACKEND_API_URL = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
+
 class MetaAdsService {
   constructor(accessToken, adAccountId = null) {
     this.accessToken = accessToken;
@@ -588,7 +591,7 @@ class MetaAdsService {
     }
   }
 
-  // Subir un video a la cuenta publicitaria (soporta File o URL)
+  // Subir un video a la cuenta publicitaria (usa backend para evitar CORS)
   async uploadVideo(adAccountId, videoSource, title = 'Video Creative') {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -597,54 +600,42 @@ class MetaAdsService {
       const isFile = videoSource instanceof File;
 
       if (isFile) {
-        // Upload directo de archivo usando FormData (multipart/form-data)
-        const formData = new FormData();
-        formData.append('access_token', this.accessToken);
-        formData.append('source', videoSource);
-        formData.append('title', title);
-
-        console.log('Uploading video file:', { adAccountId: normalizedId, fileName: videoSource.name, title });
-
-        const response = await axios.post(
-          `${META_API_BASE_URL}/${normalizedId}/advideos`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            },
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
-          }
-        );
-        return { success: true, data: response.data };
+        // Para archivos, primero necesitaríamos subirlo a un servidor temporal
+        // Por ahora, solo soportamos URLs
+        return {
+          success: false,
+          error: 'La subida de archivos de video no está soportada. Por favor usa una URL pública del video.'
+        };
       } else {
-        // Upload desde URL
-        const formData = new URLSearchParams();
-        formData.append('access_token', this.accessToken);
-        formData.append('file_url', videoSource);
-        formData.append('title', title);
+        // Upload desde URL usando el backend
+        console.log('Uploading video from URL via backend:', { adAccountId: normalizedId, videoUrl: videoSource, title });
 
-        console.log('Uploading video from URL:', { adAccountId: normalizedId, videoUrl: videoSource, title });
+        const response = await axios.post(`${BACKEND_API_URL}/upload/video`, {
+          adAccountId: normalizedId,
+          videoUrl: videoSource,
+          title
+        });
 
-        const response = await axios.post(
-          `${META_API_BASE_URL}/${normalizedId}/advideos`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            }
-          }
-        );
-        return { success: true, data: response.data };
+        if (response.data.success) {
+          return { success: true, data: response.data.data };
+        } else {
+          return { success: false, error: response.data.error };
+        }
       }
     } catch (error) {
-      console.error('Video upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-      const errorMsg = error.response?.data?.error?.message || error.message;
+      console.error('Video upload error:', error.response?.data || error.message);
+      let errorMsg = error.response?.data?.error || error.message;
+
+      // Detectar error de permisos (#3) y mostrar mensaje más claro
+      if (errorMsg.includes('(#3)') || errorMsg.includes('does not have the capability')) {
+        errorMsg = '⚠️ PERMISOS INSUFICIENTES: La app no tiene permiso para subir videos. Necesitas el permiso "ads_management" con acceso de escritura aprobado por Meta.';
+      }
+
       return { success: false, error: errorMsg };
     }
   }
 
-  // Subir una imagen (soporta File o URL)
+  // Subir una imagen (usa backend para evitar CORS)
   async uploadImage(adAccountId, imageSource) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -653,45 +644,36 @@ class MetaAdsService {
       const isFile = imageSource instanceof File;
 
       if (isFile) {
-        // Upload directo de archivo usando FormData (multipart/form-data)
-        const formData = new FormData();
-        formData.append('access_token', this.accessToken);
-        formData.append('filename', imageSource);
-
-        console.log('Uploading image file:', { adAccountId: normalizedId, fileName: imageSource.name });
-
-        const response = await axios.post(
-          `${META_API_BASE_URL}/${normalizedId}/adimages`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          }
-        );
-        return { success: true, data: response.data };
+        // Para archivos, primero necesitaríamos subirlo a un servidor temporal
+        // Por ahora, solo soportamos URLs
+        return {
+          success: false,
+          error: 'La subida de archivos de imagen no está soportada. Por favor usa una URL pública de la imagen.'
+        };
       } else {
-        // Upload desde URL
-        const formData = new URLSearchParams();
-        formData.append('access_token', this.accessToken);
-        formData.append('url', imageSource);
+        // Upload desde URL usando el backend
+        console.log('Uploading image from URL via backend:', { adAccountId: normalizedId, imageUrl: imageSource });
 
-        console.log('Uploading image from URL:', { adAccountId: normalizedId, imageUrl: imageSource });
+        const response = await axios.post(`${BACKEND_API_URL}/upload/image`, {
+          adAccountId: normalizedId,
+          imageUrl: imageSource
+        });
 
-        const response = await axios.post(
-          `${META_API_BASE_URL}/${normalizedId}/adimages`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            }
-          }
-        );
-        return { success: true, data: response.data };
+        if (response.data.success) {
+          return { success: true, data: response.data.data };
+        } else {
+          return { success: false, error: response.data.error };
+        }
       }
     } catch (error) {
-      console.error('Image upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-      const errorMsg = error.response?.data?.error?.message || error.message;
+      console.error('Image upload error:', error.response?.data || error.message);
+      let errorMsg = error.response?.data?.error || error.message;
+
+      // Detectar error de permisos (#3) y mostrar mensaje más claro
+      if (errorMsg.includes('(#3)') || errorMsg.includes('does not have the capability')) {
+        errorMsg = '⚠️ PERMISOS INSUFICIENTES: La app no tiene permiso para subir imágenes. Necesitas el permiso "ads_management" con acceso de escritura aprobado por Meta. Ve a developers.facebook.com para verificar tu app.';
+      }
+
       return { success: false, error: errorMsg };
     }
   }
@@ -851,10 +833,12 @@ class MetaAdsService {
   }
 
   // Crear Ad Creative con Asset Feed Spec (múltiples títulos, descripciones y CTAs)
+  // Usa URL de imagen directamente (sin necesidad de subir)
   async createAdCreativeWithAssetFeedSpec(adAccountId, {
     name,
     pageId,
-    imageHash,
+    imageHash = null, // Opcional - si se subió la imagen
+    imageUrl = null,  // URL directa de la imagen (sin subir)
     titles, // Array de títulos (max 5)
     bodies, // Array de descripciones/textos primarios (max 5)
     descriptions, // Array de descripciones link (max 5)
@@ -866,8 +850,9 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
       // Asset Feed Spec para Dynamic Creative Optimization
+      // Usar URL directa si no hay hash, o hash si está disponible
       const assetFeedSpec = {
-        images: [{ hash: imageHash }],
+        images: imageHash ? [{ hash: imageHash }] : [{ url: imageUrl }],
         bodies: bodies.slice(0, 5).map(text => ({ text })),
         titles: titles.slice(0, 5).map(text => ({ text })),
         descriptions: descriptions.slice(0, 5).map(text => ({ text })),
@@ -887,6 +872,8 @@ class MetaAdsService {
       console.log('Creating Asset Feed Spec creative:', {
         name,
         pageId,
+        imageHash: imageHash || 'N/A (using URL)',
+        imageUrl: imageUrl || 'N/A (using hash)',
         titles: titles.length,
         bodies: bodies.length,
         descriptions: descriptions.length,
@@ -978,6 +965,7 @@ class MetaAdsService {
   }
 
   // Crear Campaign + AdSet + Creative + Ad completo con Asset Feed Spec (5-5-5)
+  // NOTA: Usa URL de imagen directamente sin subir (evita errores de permisos)
   async createCampaignWithAd(adAccountId, {
     // Campaign
     campaignName,
@@ -992,7 +980,7 @@ class MetaAdsService {
     // Creative & Ad
     adName,
     pageId,
-    imageUrl, // URL de imagen
+    imageUrl, // URL de imagen (se usa directamente, sin subir)
     titles, // Array de 5 títulos
     bodies, // Array de 5 textos primarios (descripciones largas)
     descriptions, // Array de 5 descripciones cortas
@@ -1010,7 +998,7 @@ class MetaAdsService {
 
     try {
       // 1. Crear Campaña con CBO
-      console.log('Step 1/5: Creating campaign with CBO...');
+      console.log('Step 1/4: Creating campaign with CBO...');
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
@@ -1026,7 +1014,7 @@ class MetaAdsService {
       results.campaign = campaignResult.data;
 
       // 2. Crear AdSet
-      console.log('Step 2/5: Creating ad set...');
+      console.log('Step 2/4: Creating ad set...');
       const adSetResult = await this.createAdSet(adAccountId, {
         name: adSetName || `${campaignName} - Ad Set`,
         campaignId: results.campaign.id,
@@ -1042,30 +1030,12 @@ class MetaAdsService {
       }
       results.adSet = adSetResult.data;
 
-      // 3. Subir imagen desde URL
-      console.log('Step 3/5: Uploading image...');
-      const imageResult = await this.uploadImage(adAccountId, imageUrl);
-      if (!imageResult.success) {
-        results.errors.push(`Image Upload: ${imageResult.error}`);
-        return { success: false, ...results };
-      }
-
-      // Obtener el image_hash del resultado
-      const imageHash = imageResult.data.images ?
-        Object.values(imageResult.data.images)[0]?.hash :
-        null;
-
-      if (!imageHash) {
-        results.errors.push('Image Upload: No image hash returned');
-        return { success: false, ...results };
-      }
-
-      // 4. Crear Creative con Asset Feed Spec
-      console.log('Step 4/5: Creating creative with Asset Feed Spec...');
+      // 3. Crear Creative con Asset Feed Spec (usando URL directa, sin subir imagen)
+      console.log('Step 3/4: Creating creative with Asset Feed Spec (using image URL directly)...');
       const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
         name: `${adName} - Creative`,
         pageId,
-        imageHash,
+        imageUrl, // Usar URL directa en lugar de imageHash
         titles,
         bodies,
         descriptions,
@@ -1080,8 +1050,8 @@ class MetaAdsService {
       }
       results.creative = creativeResult.data;
 
-      // 5. Crear Ad
-      console.log('Step 5/5: Creating ad...');
+      // 4. Crear Ad
+      console.log('Step 4/4: Creating ad...');
       const adResult = await this.createAd(adAccountId, {
         name: adName,
         adsetId: results.adSet.id,
@@ -1243,6 +1213,396 @@ class MetaAdsService {
       results.ad = adResult.data;
 
       console.log('Full campaign created successfully!');
+      return { success: true, ...results };
+
+    } catch (error) {
+      results.errors.push(`Unexpected: ${error.message}`);
+      return { success: false, ...results };
+    }
+  }
+
+  // ============================================
+  // MÉTODOS ADICIONALES PARA NUEVOS TIPOS DE CAMPAÑA
+  // ============================================
+
+  // Obtener pixels de una cuenta publicitaria
+  async getPixels(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/adspixels`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,code,last_fired_time'
+        }
+      });
+      return { success: true, data: response.data.data || [] };
+    } catch (error) {
+      console.error('Error getting pixels:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
+    }
+  }
+
+  // Crear AdSet para WhatsApp
+  async createAdSetForWhatsApp(adAccountId, {
+    name,
+    campaignId,
+    targeting,
+    optimizationGoal = 'CONVERSATIONS',
+    billingEvent = 'IMPRESSIONS',
+    status = 'PAUSED',
+    promotedObject = null
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('campaign_id', campaignId);
+      formData.append('billing_event', billingEvent);
+      formData.append('optimization_goal', optimizationGoal);
+      formData.append('targeting', JSON.stringify(targeting));
+      formData.append('status', status);
+      formData.append('destination_type', 'WHATSAPP');
+
+      if (promotedObject) {
+        formData.append('promoted_object', JSON.stringify(promotedObject));
+      }
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adsets`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('AdSet for WhatsApp error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Crear AdSet para Messenger
+  async createAdSetForMessenger(adAccountId, {
+    name,
+    campaignId,
+    targeting,
+    optimizationGoal = 'CONVERSATIONS',
+    billingEvent = 'IMPRESSIONS',
+    status = 'PAUSED',
+    promotedObject = null
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('campaign_id', campaignId);
+      formData.append('billing_event', billingEvent);
+      formData.append('optimization_goal', optimizationGoal);
+      formData.append('targeting', JSON.stringify(targeting));
+      formData.append('status', status);
+      formData.append('destination_type', 'MESSENGER');
+
+      if (promotedObject) {
+        formData.append('promoted_object', JSON.stringify(promotedObject));
+      }
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adsets`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('AdSet for Messenger error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Crear Creative para WhatsApp (usa URL de imagen directamente)
+  async createCreativeForWhatsApp(adAccountId, {
+    name,
+    pageId,
+    imageHash = null,
+    imageUrl = null, // URL directa de la imagen
+    whatsappNumber,
+    primaryText,
+    headline,
+    description,
+    callToAction = 'WHATSAPP_MESSAGE'
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const linkData = {
+        link: `https://wa.me/${whatsappNumber}`,
+        message: primaryText,
+        name: headline,
+        description: description,
+        call_to_action: {
+          type: callToAction,
+          value: {
+            app_destination: 'WHATSAPP'
+          }
+        }
+      };
+
+      // Usar image_hash si está disponible, sino usar picture (URL directa)
+      if (imageHash) {
+        linkData.image_hash = imageHash;
+      } else if (imageUrl) {
+        linkData.picture = imageUrl;
+      }
+
+      const objectStorySpec = {
+        page_id: pageId,
+        link_data: linkData
+      };
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Creative for WhatsApp error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Crear Creative para Messenger (usa URL de imagen directamente)
+  async createCreativeForMessenger(adAccountId, {
+    name,
+    pageId,
+    imageHash = null,
+    imageUrl = null, // URL directa de la imagen
+    primaryText,
+    headline,
+    description,
+    callToAction = 'SEND_MESSAGE'
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const linkData = {
+        link: `https://m.me/${pageId}`,
+        message: primaryText,
+        name: headline,
+        description: description,
+        call_to_action: {
+          type: callToAction,
+          value: {
+            app_destination: 'MESSENGER'
+          }
+        }
+      };
+
+      // Usar image_hash si está disponible, sino usar picture (URL directa)
+      if (imageHash) {
+        linkData.image_hash = imageHash;
+      } else if (imageUrl) {
+        linkData.picture = imageUrl;
+      }
+
+      const objectStorySpec = {
+        page_id: pageId,
+        link_data: linkData
+      };
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Creative for Messenger error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Crear campaña completa para WhatsApp (usa URL de imagen directamente, sin subir)
+  async createCampaignForWhatsApp(adAccountId, {
+    campaignName,
+    adSetName,
+    adName,
+    dailyBudget,
+    targeting,
+    pageId,
+    whatsappNumber,
+    imageUrl,
+    headlines = [],
+    descriptions = [],
+    primaryTexts = [],
+    callToAction = 'WHATSAPP_MESSAGE'
+  }) {
+    const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
+
+    try {
+      // 1. Crear Campaña
+      console.log('Step 1/4: Creating campaign...');
+      const campaignResult = await this.createCampaign(adAccountId, {
+        name: campaignName,
+        objective: 'OUTCOME_ENGAGEMENT',
+        status: 'PAUSED',
+        dailyBudget
+      });
+
+      if (!campaignResult.success) {
+        results.errors.push(`Campaign: ${campaignResult.error}`);
+        return { success: false, ...results };
+      }
+      results.campaign = campaignResult.data;
+
+      // 2. Crear AdSet para WhatsApp
+      console.log('Step 2/4: Creating ad set for WhatsApp...');
+      const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+        name: adSetName || `${campaignName} - Ad Set`,
+        campaignId: results.campaign.id,
+        targeting,
+        promotedObject: { page_id: pageId }
+      });
+
+      if (!adSetResult.success) {
+        results.errors.push(`AdSet: ${adSetResult.error}`);
+        return { success: false, ...results };
+      }
+      results.adSet = adSetResult.data;
+
+      // 3. Crear Creative para WhatsApp (usando URL directa, sin subir imagen)
+      console.log('Step 3/4: Creating creative (using image URL directly)...');
+      const creativeResult = await this.createCreativeForWhatsApp(adAccountId, {
+        name: `${campaignName} - Creative`,
+        pageId,
+        imageUrl, // Usar URL directa en lugar de imageHash
+        whatsappNumber,
+        primaryText: primaryTexts[0] || descriptions[0] || 'Escríbenos por WhatsApp',
+        headline: headlines[0] || 'Contáctanos',
+        description: descriptions[0] || '',
+        callToAction
+      });
+
+      if (!creativeResult.success) {
+        results.errors.push(`Creative: ${creativeResult.error}`);
+        return { success: false, ...results };
+      }
+      results.creative = creativeResult.data;
+
+      // 4. Crear Ad
+      console.log('Step 4/4: Creating ad...');
+      const adResult = await this.createAd(adAccountId, {
+        name: adName || `${campaignName} - Ad`,
+        adsetId: results.adSet.id,
+        creativeId: results.creative.id,
+        status: 'PAUSED'
+      });
+
+      if (!adResult.success) {
+        results.errors.push(`Ad: ${adResult.error}`);
+        return { success: false, ...results };
+      }
+      results.ad = adResult.data;
+
+      return { success: true, ...results };
+
+    } catch (error) {
+      results.errors.push(`Unexpected: ${error.message}`);
+      return { success: false, ...results };
+    }
+  }
+
+  // Crear campaña completa para Messenger (usa URL de imagen directamente, sin subir)
+  async createCampaignForMessenger(adAccountId, {
+    campaignName,
+    adSetName,
+    adName,
+    dailyBudget,
+    targeting,
+    pageId,
+    imageUrl,
+    headlines = [],
+    descriptions = [],
+    primaryTexts = [],
+    callToAction = 'SEND_MESSAGE'
+  }) {
+    const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
+
+    try {
+      // 1. Crear Campaña
+      console.log('Step 1/4: Creating campaign...');
+      const campaignResult = await this.createCampaign(adAccountId, {
+        name: campaignName,
+        objective: 'OUTCOME_ENGAGEMENT',
+        status: 'PAUSED',
+        dailyBudget
+      });
+
+      if (!campaignResult.success) {
+        results.errors.push(`Campaign: ${campaignResult.error}`);
+        return { success: false, ...results };
+      }
+      results.campaign = campaignResult.data;
+
+      // 2. Crear AdSet para Messenger
+      console.log('Step 2/4: Creating ad set for Messenger...');
+      const adSetResult = await this.createAdSetForMessenger(adAccountId, {
+        name: adSetName || `${campaignName} - Ad Set`,
+        campaignId: results.campaign.id,
+        targeting,
+        promotedObject: { page_id: pageId }
+      });
+
+      if (!adSetResult.success) {
+        results.errors.push(`AdSet: ${adSetResult.error}`);
+        return { success: false, ...results };
+      }
+      results.adSet = adSetResult.data;
+
+      // 3. Crear Creative para Messenger (usando URL directa, sin subir imagen)
+      console.log('Step 3/4: Creating creative (using image URL directly)...');
+      const creativeResult = await this.createCreativeForMessenger(adAccountId, {
+        name: `${campaignName} - Creative`,
+        pageId,
+        imageUrl, // Usar URL directa en lugar de imageHash
+        primaryText: primaryTexts[0] || descriptions[0] || 'Envíanos un mensaje',
+        headline: headlines[0] || 'Contáctanos',
+        description: descriptions[0] || '',
+        callToAction
+      });
+
+      if (!creativeResult.success) {
+        results.errors.push(`Creative: ${creativeResult.error}`);
+        return { success: false, ...results };
+      }
+      results.creative = creativeResult.data;
+
+      // 4. Crear Ad
+      console.log('Step 4/4: Creating ad...');
+      const adResult = await this.createAd(adAccountId, {
+        name: adName || `${campaignName} - Ad`,
+        adsetId: results.adSet.id,
+        creativeId: results.creative.id,
+        status: 'PAUSED'
+      });
+
+      if (!adResult.success) {
+        results.errors.push(`Ad: ${adResult.error}`);
+        return { success: false, ...results };
+      }
+      results.ad = adResult.data;
+
       return { success: true, ...results };
 
     } catch (error) {
