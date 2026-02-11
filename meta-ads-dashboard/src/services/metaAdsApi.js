@@ -11,6 +11,30 @@ class MetaAdsService {
     this.adAccountId = adAccountId;
   }
 
+  // Generar contenido 5+5+5 con IA
+  async generateContentWithAI(prompt, category = null) {
+    try {
+      console.log('Generating content with AI:', prompt.substring(0, 50) + '...');
+
+      const response = await axios.post(`${BACKEND_API_URL}/generate-content`, {
+        prompt,
+        category
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.error };
+      }
+    } catch (error) {
+      console.error('AI generation error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message
+      };
+    }
+  }
+
   // Normaliza el ID de cuenta para asegurar que tenga el prefijo 'act_'
   normalizeAccountId(accountId) {
     if (!accountId) return null;
@@ -451,6 +475,124 @@ class MetaAdsService {
     return results;
   }
 
+  // Obtener cuentas de Instagram vinculadas a la cuenta publicitaria
+  async getInstagramAccounts(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Fetching Instagram accounts for ad account:', normalizedId);
+
+      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/instagram_accounts`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,username,profile_pic'
+        }
+      });
+
+      console.log('Instagram accounts response:', response.data);
+      return { success: true, data: response.data.data || [] };
+    } catch (error) {
+      console.error('Error fetching Instagram accounts:', error.response?.data?.error || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
+    }
+  }
+
+  // Obtener imágenes de la biblioteca de medios de la cuenta publicitaria
+  async getAdImages(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Fetching ad images for:', normalizedId);
+
+      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/adimages`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'hash,url,name,width,height,created_time',
+          limit: 50
+        }
+      });
+
+      const images = response.data.data || [];
+      console.log('Ad images found:', images.length);
+      return { success: true, data: images };
+    } catch (error) {
+      console.error('Error fetching ad images:', error.response?.data?.error || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
+    }
+  }
+
+  // Obtener videos de la biblioteca de medios de la cuenta publicitaria
+  async getAdVideos(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Fetching ad videos for:', normalizedId);
+
+      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/advideos`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,title,thumbnails,source,created_time,length',
+          limit: 50
+        }
+      });
+
+      const videos = response.data.data || [];
+      console.log('Ad videos found:', videos.length);
+      return { success: true, data: videos };
+    } catch (error) {
+      console.error('Error fetching ad videos:', error.response?.data?.error || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
+    }
+  }
+
+  // Subir imagen desde archivo del dispositivo
+  async uploadImageFile(adAccountId, file) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Uploading image file:', file.name, file.size, 'bytes');
+
+      const formData = new FormData();
+      formData.append('adAccountId', normalizedId);
+      formData.append('image', file);
+
+      const response = await axios.post(`${BACKEND_API_URL}/upload/image-file`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, error: response.data.error };
+    } catch (error) {
+      console.error('Image file upload error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  }
+
+  // Subir video desde archivo del dispositivo
+  async uploadVideoFile(adAccountId, file) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Uploading video file:', file.name, file.size, 'bytes');
+
+      const formData = new FormData();
+      formData.append('adAccountId', normalizedId);
+      formData.append('video', file);
+      formData.append('title', file.name);
+
+      const response = await axios.post(`${BACKEND_API_URL}/upload/video-file`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, error: response.data.error };
+    } catch (error) {
+      console.error('Video file upload error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  }
+
   // Obtener páginas de Facebook asociadas al usuario
   async getPages() {
     try {
@@ -531,7 +673,8 @@ class MetaAdsService {
     billingEvent = 'IMPRESSIONS',
     optimizationGoal = 'LINK_CLICKS',
     targeting,
-    status = 'PAUSED'
+    status = 'PAUSED',
+    endTime = null // Fecha de fin en formato ISO o timestamp UNIX
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -555,6 +698,15 @@ class MetaAdsService {
       // NO enviamos bid_strategy cuando usamos CBO - se hereda de la campaña
       formData.append('targeting', JSON.stringify(targeting));
       formData.append('status', status);
+
+      // Agregar fecha de fin si está especificada
+      if (endTime) {
+        // Convertir a timestamp UNIX si es una fecha en formato YYYY-MM-DD
+        const endTimestamp = typeof endTime === 'string' && endTime.includes('-')
+          ? Math.floor(new Date(endTime + 'T23:59:59').getTime() / 1000)
+          : endTime;
+        formData.append('end_time', endTimestamp.toString());
+      }
 
       console.log('Creating adset with:', {
         adAccountId: normalizedId,
@@ -695,24 +847,23 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
       // Estructura correcta para video ads con objetivo de tráfico
+      // imageHash (thumbnail) es REQUERIDO por Meta para video ads
       const objectStorySpec = {
         page_id: pageId,
         video_data: {
           video_id: videoId,
+          image_hash: imageHash, // Miniatura seleccionada por el usuario (requerida)
           message: primaryText,
+          title: headline,
+          link_description: description,
           call_to_action: {
             type: callToAction,
             value: {
-              link: linkUrl,
-              link_caption: headline // Muestra debajo del video
+              link: linkUrl
             }
           }
         }
       };
-
-      if (imageHash) {
-        objectStorySpec.video_data.image_hash = imageHash;
-      }
 
       if (igActorId) {
         objectStorySpec.instagram_actor_id = igActorId;
@@ -832,6 +983,107 @@ class MetaAdsService {
     }
   }
 
+  // Crear Ad Creative estándar (sin DCO)
+  // La imagen es OPCIONAL - si no se proporciona, Meta usa la vista previa del link
+  async createStandardAdCreative(adAccountId, {
+    name,
+    pageId,
+    imageUrl = null, // URL directa de la imagen (OPCIONAL)
+    imageHash = null, // Hash de imagen ya subida a Meta (más confiable)
+    primaryText, // Texto principal del anuncio
+    headline, // Título
+    description = '', // Descripción del link
+    linkUrl, // URL de destino
+    callToAction = 'LEARN_MORE',
+    igActorId = null
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      // Estructura estándar para anuncio de link
+      const linkData = {
+        link: linkUrl,
+        message: primaryText,
+        name: headline, // Título del anuncio
+        call_to_action: {
+          type: callToAction
+        }
+      };
+
+      // Priorizar image_hash sobre picture URL (más confiable)
+      if (imageHash) {
+        linkData.image_hash = imageHash;
+      } else if (imageUrl && imageUrl.trim()) {
+        linkData.picture = imageUrl;
+      }
+
+      // Agregar descripción si existe
+      if (description && description.trim()) {
+        linkData.description = description;
+      }
+
+      const objectStorySpec = {
+        page_id: pageId,
+        link_data: linkData
+      };
+
+      // Agregar cuenta de Instagram si está disponible
+      if (igActorId) {
+        objectStorySpec.instagram_actor_id = igActorId;
+      }
+
+      console.log('Creating standard creative:', {
+        name,
+        pageId,
+        imageUrl: imageUrl || '(usando vista previa del link)',
+        headline,
+        primaryText: primaryText?.substring(0, 50) + '...',
+        linkUrl,
+        callToAction
+      });
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Standard creative creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      const errorData = error.response?.data?.error;
+      let errorMsg = errorData?.message || error.message;
+
+      // Agregar detalles adicionales del error si están disponibles
+      if (errorData?.error_user_title) {
+        errorMsg = `${errorData.error_user_title}: ${errorData.error_user_msg || errorMsg}`;
+      }
+      if (errorData?.error_subcode) {
+        errorMsg += ` (code: ${errorData.code}, subcode: ${errorData.error_subcode})`;
+      }
+
+      // Log adicional para debugging
+      console.error('Creative error details:', {
+        code: errorData?.code,
+        subcode: errorData?.error_subcode,
+        title: errorData?.error_user_title,
+        msg: errorData?.error_user_msg,
+        fbtrace_id: errorData?.fbtrace_id
+      });
+
+      return { success: false, error: errorMsg };
+    }
+  }
+
   // Crear Ad Creative con Asset Feed Spec (múltiples títulos, descripciones y CTAs)
   // Usa URL de imagen directamente (sin necesidad de subir)
   async createAdCreativeWithAssetFeedSpec(adAccountId, {
@@ -913,7 +1165,8 @@ class MetaAdsService {
     dailyBudget, // en centavos
     targeting,
     optimizationGoal = 'LINK_CLICKS',
-    billingEvent = 'IMPRESSIONS'
+    billingEvent = 'IMPRESSIONS',
+    endDate = null // Fecha de fin opcional (YYYY-MM-DD)
   }) {
     const results = {
       campaign: null,
@@ -946,7 +1199,8 @@ class MetaAdsService {
         billingEvent,
         optimizationGoal,
         targeting,
-        status: 'PAUSED'
+        status: 'PAUSED',
+        endTime: endDate // Pasar fecha de fin si existe
       });
 
       if (!adSetResult.success) {
@@ -964,8 +1218,8 @@ class MetaAdsService {
     }
   }
 
-  // Crear Campaign + AdSet + Creative + Ad completo con Asset Feed Spec (5-5-5)
-  // NOTA: Usa URL de imagen directamente sin subir (evita errores de permisos)
+  // Crear Campaign + AdSet + Creative + Ad completo
+  // La imagen es OPCIONAL - si no se proporciona, Meta usa la vista previa del link
   async createCampaignWithAd(adAccountId, {
     // Campaign
     campaignName,
@@ -977,14 +1231,18 @@ class MetaAdsService {
     targeting,
     optimizationGoal = 'LANDING_PAGE_VIEWS',
     billingEvent = 'IMPRESSIONS',
+    endDate = null, // Fecha de fin opcional
     // Creative & Ad
     adName,
     pageId,
-    imageUrl, // URL de imagen (se usa directamente, sin subir)
-    titles, // Array de 5 títulos
-    bodies, // Array de 5 textos primarios (descripciones largas)
-    descriptions, // Array de 5 descripciones cortas
-    callToActionTypes, // Array de 5 CTAs
+    imageUrl = null, // URL de imagen (OPCIONAL)
+    imageHash = null, // Hash de imagen subida a Meta (más confiable)
+    videoId = null, // ID de video de la biblioteca de Meta
+    videoThumbnailHash = null, // Hash de miniatura para video ads
+    titles, // Array de títulos
+    bodies, // Array de textos primarios (descripciones largas)
+    descriptions, // Array de descripciones cortas
+    callToActionTypes, // Array de CTAs
     linkUrl,
     igActorId = null
   }) {
@@ -1021,7 +1279,8 @@ class MetaAdsService {
         billingEvent,
         optimizationGoal,
         targeting,
-        status: 'PAUSED'
+        status: 'PAUSED',
+        endTime: endDate // Pasar fecha de fin si existe
       });
 
       if (!adSetResult.success) {
@@ -1030,42 +1289,95 @@ class MetaAdsService {
       }
       results.adSet = adSetResult.data;
 
-      // 3. Crear Creative con Asset Feed Spec (usando URL directa, sin subir imagen)
-      console.log('Step 3/4: Creating creative with Asset Feed Spec (using image URL directly)...');
-      const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
-        name: `${adName} - Creative`,
-        pageId,
-        imageUrl, // Usar URL directa en lugar de imageHash
-        titles,
-        bodies,
-        descriptions,
-        callToActionTypes,
-        linkUrl,
-        igActorId
-      });
+      // 3. Crear Creatives y Ads para cada variación de título/descripción
+      // Esto crea múltiples anuncios dentro del mismo AdSet para que Meta optimice
+      const validTitles = titles && titles.length > 0 ? titles.filter(t => t && t.trim()) : ['Conoce más'];
+      const validBodies = bodies && bodies.length > 0 ? bodies.filter(b => b && b.trim()) : ['Descubre más'];
+      const cta = callToActionTypes && callToActionTypes.length > 0 ? callToActionTypes[0] : 'LEARN_MORE';
 
-      if (!creativeResult.success) {
-        results.errors.push(`Creative: ${creativeResult.error}`);
-        return { success: false, ...results };
+      const totalAds = Math.min(validTitles.length, 5); // Máximo 5 ads
+      console.log(`Step 3-4: Creating ${totalAds} creative(s) and ad(s)...`);
+
+      results.creatives = [];
+      results.ads = [];
+
+      for (let i = 0; i < totalAds; i++) {
+        const headline = validTitles[i] || validTitles[0];
+        const primaryText = validBodies[i] || validBodies[0];
+        const description = descriptions && descriptions[i] ? descriptions[i] : '';
+
+        console.log(`Creating creative ${i + 1}/${totalAds}: "${headline.substring(0, 30)}..."`);
+
+        let creativeResult;
+
+        if (videoId) {
+          // Crear creative con video de la biblioteca
+          creativeResult = await this.createAdCreativeWithVideo(adAccountId, {
+            name: `${adName} - Creative ${i + 1}`,
+            pageId,
+            videoId,
+            imageHash: videoThumbnailHash || imageHash, // Miniatura seleccionada por el usuario
+            primaryText,
+            headline,
+            description,
+            callToAction: cta,
+            linkUrl,
+            igActorId
+          });
+        } else {
+          // Crear creative estándar (con imagen o sin)
+          creativeResult = await this.createStandardAdCreative(adAccountId, {
+            name: `${adName} - Creative ${i + 1}`,
+            pageId,
+            imageUrl,
+            imageHash,
+            primaryText,
+            headline,
+            description,
+            linkUrl,
+            callToAction: cta,
+            igActorId
+          });
+        }
+
+        if (!creativeResult.success) {
+          // Si el primer creative falla, es un error crítico
+          if (i === 0) {
+            results.errors.push(`Creative: ${creativeResult.error}`);
+            return { success: false, ...results };
+          }
+          // Si fallan los siguientes, solo loguear y continuar
+          console.warn(`Creative ${i + 1} failed:`, creativeResult.error);
+          continue;
+        }
+
+        results.creatives.push(creativeResult.data);
+
+        // Crear Ad para este creative
+        const adResult = await this.createAd(adAccountId, {
+          name: `${adName} ${totalAds > 1 ? `- Variación ${i + 1}` : ''}`,
+          adsetId: results.adSet.id,
+          creativeId: creativeResult.data.id,
+          status: 'PAUSED'
+        });
+
+        if (!adResult.success) {
+          if (i === 0) {
+            results.errors.push(`Ad: ${adResult.error}`);
+            return { success: false, ...results };
+          }
+          console.warn(`Ad ${i + 1} failed:`, adResult.error);
+          continue;
+        }
+
+        results.ads.push(adResult.data);
       }
-      results.creative = creativeResult.data;
 
-      // 4. Crear Ad
-      console.log('Step 4/4: Creating ad...');
-      const adResult = await this.createAd(adAccountId, {
-        name: adName,
-        adsetId: results.adSet.id,
-        creativeId: results.creative.id,
-        status: 'PAUSED'
-      });
+      // Para compatibilidad, también guardar el primero como creative/ad principal
+      results.creative = results.creatives[0] || null;
+      results.ad = results.ads[0] || null;
 
-      if (!adResult.success) {
-        results.errors.push(`Ad: ${adResult.error}`);
-        return { success: false, ...results };
-      }
-      results.ad = adResult.data;
-
-      console.log('Campaign with Ad created successfully!');
+      console.log(`Campaign created with ${results.ads.length} ad(s) successfully!`);
       return { success: true, ...results };
 
     } catch (error) {

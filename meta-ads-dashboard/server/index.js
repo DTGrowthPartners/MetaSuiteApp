@@ -1,14 +1,44 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import OpenAI from 'openai';
+import multer from 'multer';
+import FormData from 'form-data';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const app = express();
+
+// Configurar multer con almacenamiento en memoria (evita problemas de archivos temporales en Windows)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB máximo
+});
 const PORT = process.env.PORT || 3002;
 
 // Token de acceso con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
-const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQrzKEhsGwlcsa820qgiSn6ZA4XlfCZBTNGZBfZAHY6UN4ttDdRKjsuO2EFEBM6DA4hdSR5NFfxniZBhrdkneOaSA6YwuUGjiMYn59UyQSKTfhPkahJF4ZBOvBeevWAWnYa46nXKzKvfWOcZAEdS6K9TGkST76XXOrPcshkgnPmZCmSt7ls4XHx95';
+const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI';
+
+// OpenAI Configuration
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'TU_OPENAI_API_KEY_AQUI';
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
+
+// Helper: detectar content-type desde extensión de archivo
+function getContentTypeFromExt(filename) {
+  const ext = (filename || '').toLowerCase().split('.').pop();
+  const types = {
+    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+    'png': 'image/png', 'gif': 'image/gif',
+    'bmp': 'image/bmp', 'tiff': 'image/tiff',
+    'mp4': 'video/mp4', 'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo', 'mkv': 'video/x-matroska',
+    'webm': 'video/webm', 'webp': 'image/webp'
+  };
+  return types[ext] || 'application/octet-stream';
+}
 
 // Middleware
 app.use(cors());
@@ -556,6 +586,135 @@ app.post('/api/upload/video', async (req, res) => {
   }
 });
 
+// Subir imagen desde ARCHIVO a Meta Ads (multipart)
+app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
+  try {
+    const { adAccountId } = req.body;
+    const file = req.file;
+
+    if (!adAccountId) {
+      return res.status(400).json({ success: false, error: 'adAccountId es requerido' });
+    }
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No se recibió ningún archivo' });
+    }
+
+    const normalizedId = normalizeAccountId(adAccountId);
+    const contentType = file.mimetype || getContentTypeFromExt(file.originalname);
+
+    // Validar formato soportado por Meta
+    const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
+    if (!supportedImageTypes.includes(contentType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Formato no soportado: ${contentType}. Meta acepta: JPG, PNG, GIF, BMP, TIFF. (No se acepta WebP)`
+      });
+    }
+
+    console.log(`Uploading image file to ${normalizedId}:`, file.originalname, file.size, 'bytes', 'contentType:', contentType);
+    console.log('Buffer size:', file.buffer.length, 'bytes');
+
+    // Usar file.buffer directamente (memoryStorage)
+    const formData = new FormData();
+    formData.append('access_token', ACCESS_TOKEN);
+    formData.append('filename', file.originalname);
+    formData.append('source', file.buffer, {
+      filename: file.originalname,
+      contentType: contentType
+    });
+
+    const response = await axios.post(
+      `${META_API_BASE_URL}/${normalizedId}/adimages`,
+      formData,
+      { headers: formData.getHeaders() }
+    );
+
+    console.log('Image file upload response:', JSON.stringify(response.data, null, 2));
+
+    const images = response.data.images;
+    const imageData = images ? Object.values(images)[0] : null;
+
+    if (!imageData?.hash) {
+      return res.status(500).json({ success: false, error: 'No se obtuvo image_hash de Meta' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        imageHash: imageData.hash,
+        url: imageData.url,
+        name: file.originalname,
+        images: response.data.images
+      }
+    });
+  } catch (error) {
+    console.error('Image file upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+    const errorData = error.response?.data?.error;
+    let errorMsg = errorData?.error_user_msg || errorData?.message || error.message;
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
+// Subir video desde ARCHIVO a Meta Ads (multipart)
+app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
+  try {
+    const { adAccountId, title } = req.body;
+    const file = req.file;
+
+    if (!adAccountId) {
+      return res.status(400).json({ success: false, error: 'adAccountId es requerido' });
+    }
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No se recibió ningún archivo' });
+    }
+
+    const normalizedId = normalizeAccountId(adAccountId);
+    const contentType = file.mimetype || getContentTypeFromExt(file.originalname);
+
+    // Validar formato soportado por Meta
+    const supportedVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm'];
+    if (!supportedVideoTypes.includes(contentType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Formato no soportado: ${contentType}. Meta acepta: MP4, MOV, AVI, MKV.`
+      });
+    }
+
+    console.log(`Uploading video file to ${normalizedId}:`, file.originalname, file.size, 'bytes', 'contentType:', contentType);
+    console.log('Buffer size:', file.buffer.length, 'bytes');
+
+    // Usar file.buffer directamente (memoryStorage)
+    const formData = new FormData();
+    formData.append('access_token', ACCESS_TOKEN);
+    formData.append('title', title || file.originalname);
+    formData.append('source', file.buffer, {
+      filename: file.originalname,
+      contentType: contentType
+    });
+
+    const response = await axios.post(
+      `${META_API_BASE_URL}/${normalizedId}/advideos`,
+      formData,
+      { headers: formData.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity }
+    );
+
+    console.log('Video file upload response:', JSON.stringify(response.data, null, 2));
+
+    res.json({
+      success: true,
+      data: {
+        videoId: response.data.id,
+        ...response.data
+      }
+    });
+  } catch (error) {
+    console.error('Video file upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+    const errorData = error.response?.data?.error;
+    let errorMsg = errorData?.error_user_msg || errorData?.message || error.message;
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
 // Obtener páginas de Facebook del usuario
 app.get('/api/pages', async (req, res) => {
   try {
@@ -647,6 +806,113 @@ app.get('/api/pixels/:accountId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+// ============================================
+// AI CONTENT GENERATION ENDPOINT
+// ============================================
+
+// Generar contenido 5+5+5 con OpenAI
+app.post('/api/generate-content', async (req, res) => {
+  try {
+    const { prompt, category } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'El prompt es requerido'
+      });
+    }
+
+    console.log('Generating content with OpenAI for:', prompt.substring(0, 100) + '...');
+
+    const systemPrompt = `Eres un experto en marketing digital y copywriting para anuncios de Facebook/Instagram Ads.
+Tu tarea es generar contenido creativo y persuasivo para campañas publicitarias.
+
+IMPORTANTE:
+- Los títulos deben tener máximo 40 caracteres
+- Las descripciones deben tener máximo 125 caracteres
+- El contenido debe ser en español
+- Debe ser persuasivo y orientado a la acción
+- Adapta el tono según el tipo de negocio
+
+Responde ÚNICAMENTE en formato JSON válido, sin markdown ni texto adicional.`;
+
+    const userPrompt = `Genera contenido para una campaña de Facebook Ads basándote en esta descripción:
+
+"${prompt}"
+
+${category ? `Categoría de campaña: ${category}` : ''}
+
+Genera exactamente:
+- 5 títulos cortos y llamativos (máx 40 caracteres cada uno)
+- 5 descripciones persuasivas (máx 125 caracteres cada una)
+- 5 CTAs recomendados de esta lista: LEARN_MORE, SHOP_NOW, SIGN_UP, CONTACT_US, GET_QUOTE, SUBSCRIBE, BOOK_NOW, DOWNLOAD, GET_OFFER, SEND_MESSAGE, WHATSAPP_MESSAGE, CALL_NOW
+
+Responde en este formato JSON exacto:
+{
+  "headlines": ["título1", "título2", "título3", "título4", "título5"],
+  "descriptions": ["desc1", "desc2", "desc3", "desc4", "desc5"],
+  "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"],
+  "suggestedBudget": 50000,
+  "targetAudience": "descripción breve del público objetivo sugerido"
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
+    });
+
+    const responseText = completion.choices[0].message.content;
+    console.log('OpenAI response:', responseText);
+
+    // Parsear el JSON de la respuesta
+    let generatedContent;
+    try {
+      // Limpiar posibles caracteres extra
+      const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      generatedContent = JSON.parse(cleanJson);
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      return res.status(500).json({
+        success: false,
+        error: 'Error procesando la respuesta de IA',
+        rawResponse: responseText
+      });
+    }
+
+    // Validar que tenga los campos necesarios
+    if (!generatedContent.headlines || !generatedContent.descriptions || !generatedContent.ctas) {
+      return res.status(500).json({
+        success: false,
+        error: 'La respuesta de IA no tiene el formato esperado',
+        rawResponse: responseText
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        headlines: generatedContent.headlines.slice(0, 5),
+        descriptions: generatedContent.descriptions.slice(0, 5),
+        ctas: generatedContent.ctas.slice(0, 5),
+        suggestedBudget: generatedContent.suggestedBudget || 50000,
+        targetAudience: generatedContent.targetAudience || ''
+      }
+    });
+
+  } catch (error) {
+    console.error('OpenAI error:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error generando contenido con IA'
     });
   }
 });
