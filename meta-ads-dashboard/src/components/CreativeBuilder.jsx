@@ -230,7 +230,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [selectedVideoId, setSelectedVideoId] = useState(''); // ID de video seleccionado de la biblioteca
-  const [videoThumbnailHash, setVideoThumbnailHash] = useState(''); // Hash de miniatura para video ads
+  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState(''); // URL de miniatura automática del video
 
   // IA Content Generation
   const [aiPrompt, setAiPrompt] = useState(''); // Descripción para generar contenido con IA
@@ -329,16 +329,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       } else {
         result = await metaService.uploadVideoFile(selectedAccount, file);
         if (result.success) {
-          // Guardar videoId y limpiar imagen (el video reemplaza la imagen)
+          // Guardar videoId y thumbnail automático (URL o hash de fallback)
           setSelectedVideoId(result.data.videoId);
+          setVideoThumbnailUrl(result.data.thumbnailUrl || '');
           setImageUrl('');
-          setImageHash('');
-          setVideoThumbnailHash(''); // Necesita seleccionar miniatura
-          setUploadProgress(`Video "${file.name}" subido exitosamente (ID: ${result.data.videoId})`);
-          // Cargar la biblioteca de imágenes para que pueda seleccionar miniatura
-          if (mediaLibrary.images.length === 0) {
-            handleLoadMediaLibrary();
-          }
+          // Si no hay thumbnailUrl pero sí hay thumbnailHash (fallback), guardarlo
+          setImageHash(result.data.thumbnailHash || '');
+          const thumbInfo = result.data.thumbnailUrl ? '(miniatura automática)' :
+            result.data.thumbnailHash ? '(miniatura de respaldo)' : '';
+          setUploadProgress(`Video "${file.name}" subido exitosamente ${thumbInfo}`);
         }
       }
 
@@ -357,27 +356,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     setImageUrl(image.url || '');
     setImageHash(image.hash || '');
     setSelectedVideoId('');
-    setVideoThumbnailHash('');
+    setVideoThumbnailUrl('');
     setUploadProgress(`Imagen seleccionada: ${image.name || 'Sin nombre'}`);
   };
 
   // Seleccionar video de la biblioteca
   const handleSelectLibraryVideo = (video) => {
     setSelectedVideoId(video.id);
+    // Auto-tomar thumbnail del video
+    const thumbUrl = video.thumbnails?.data?.[0]?.uri || video.picture || '';
+    setVideoThumbnailUrl(thumbUrl);
     // Limpiar imagen principal (el video reemplaza la imagen como contenido)
     setImageUrl('');
     setImageHash('');
-    setVideoThumbnailHash(''); // Resetear miniatura al cambiar de video
     setUploadProgress(`Video seleccionado: ${video.title || 'Sin título'} (${video.length ? Math.round(video.length) + 's' : ''})`);
-    // Asegurar que las imágenes de la biblioteca estén cargadas para la miniatura
-    if (mediaLibrary.images.length === 0) {
-      handleLoadMediaLibrary();
-    }
-  };
-
-  // Seleccionar miniatura para video ad
-  const handleSelectVideoThumbnail = (image) => {
-    setVideoThumbnailHash(image.hash || '');
   };
 
   // Función para generar contenido con IA
@@ -599,7 +591,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         imageUrl: imageUrl.trim() || null,
         imageHash: imageHash || null,
         videoId: selectedVideoId || null,
-        videoThumbnailHash: videoThumbnailHash || null, // Miniatura para video ads
+        videoThumbnailUrl: videoThumbnailUrl || null, // Miniatura automática del video
         noImage: !imageUrl.trim() && !imageHash && !selectedVideoId,
         // Cuenta de Instagram para el anuncio
         igActorId: selectedIgAccount || null,
@@ -1030,68 +1022,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             <p className="hint" style={{ color: '#00aa00' }}>✅ Imagen lista para el anuncio</p>
           )}
           {selectedVideoId && (
-            <p className="hint" style={{ color: '#00aa00' }}>✅ Video seleccionado para el anuncio</p>
-          )}
-
-          {/* Selector de miniatura para video ads */}
-          {selectedVideoId && (
-            <div style={{ marginTop: '12px' }}>
-              <label style={{ fontWeight: 'bold', fontSize: '14px', display: 'block', marginBottom: '6px' }}>
-                Miniatura del video (requerida)
-              </label>
-              <p className="hint" style={{ marginBottom: '8px' }}>
-                Selecciona una imagen de tu biblioteca como miniatura del video ad.
-              </p>
-              {mediaLibrary.images.length > 0 ? (
-                <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '10px', maxHeight: '200px', overflowY: 'auto' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px' }}>
-                    {mediaLibrary.images.map((img, i) => (
-                      <div
-                        key={img.hash || i}
-                        onClick={() => handleSelectVideoThumbnail(img)}
-                        style={{
-                          cursor: 'pointer',
-                          border: videoThumbnailHash === img.hash ? '3px solid #1877f2' : '2px solid #eee',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          position: 'relative',
-                          aspectRatio: '1'
-                        }}
-                      >
-                        <img
-                          src={img.url}
-                          alt={img.name || 'Miniatura'}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                        {videoThumbnailHash === img.hash && (
-                          <div style={{
-                            position: 'absolute', top: '4px', right: '4px',
-                            background: '#1877f2', color: 'white', borderRadius: '50%',
-                            width: '20px', height: '20px', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', fontSize: '12px'
-                          }}>✓</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="hint" style={{ color: '#cc6600' }}>
-                  No hay imagenes en la biblioteca. Sube una imagen primero usando la pestana "Subir archivo".
-                </p>
-              )}
-              {!videoThumbnailHash && (
-                <p className="hint" style={{ color: '#cc6600', marginTop: '6px' }}>
-                  ⚠️ Debes seleccionar una miniatura para crear el video ad.
-                </p>
-              )}
-              {videoThumbnailHash && (
-                <p className="hint" style={{ color: '#00aa00', marginTop: '6px' }}>
-                  ✅ Miniatura seleccionada
-                </p>
-              )}
-            </div>
+            <p className="hint" style={{ color: '#00aa00' }}>
+              ✅ Video seleccionado para el anuncio
+              {videoThumbnailUrl && ' (miniatura automática)'}
+            </p>
           )}
         </div>
 
@@ -1430,21 +1364,21 @@ function DraftStep({ job, onComplete, onBack }) {
 
       } else {
         // Campaña estándar (website, traffic, etc.)
-        // Crear Campaign + AdSet + Creative + Ad completo
-        // La imagen es OPCIONAL - si no hay, Meta usa la vista previa del link
+        // 1 Campaign + 1 AdSet (Dynamic Creative) + 1 Creative (5+5+5) + 1 Ad
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
         if (job.videoId) {
-          addLog(`Video: Sí (de biblioteca)`);
-          addLog(`Miniatura: ${job.videoThumbnailHash ? 'Sí' : 'No seleccionada'}`);
+          addLog(`Video: Sí`);
+          addLog(`Miniatura: ${job.videoThumbnailUrl ? 'Automática' : job.imageHash ? 'Imagen de respaldo' : 'Se resolverá automáticamente'}`);
         } else {
           addLog(`Imagen: ${job.imageUrl || job.imageHash ? 'Sí' : 'No (se usará vista previa del link)'}`);
         }
         if (job.igActorId) addLog(`Instagram: @${job.igUsername || 'vinculada'}`);
-        const numVariations = Math.min(job.headlines?.filter(h => h?.trim()).length || 1, 5);
-        addLog(`Variaciones: ${numVariations} título(s), ${job.descriptions?.filter(d => d?.trim()).length || 0} descripción(es)`);
+        const numTitles = job.headlines?.filter(h => h?.trim()).length || 0;
+        const numDescs = job.descriptions?.filter(d => d?.trim()).length || 0;
+        const numCtas = [...new Set(job.ctas || [])].length;
+        addLog(`Contenido: ${numTitles} títulos + ${numDescs} descripciones + ${numCtas} CTAs`);
 
-        addLog(`Creando Campaign + AdSet + ${numVariations} Creative(s) + ${numVariations} Ad(s)...`);
-        addLog(`CTA: ${job.ctas?.[0] || 'LEARN_MORE'}`);
+        addLog('Creando Campaign + AdSet + 1 Creative (5+5+5) + 1 Ad...');
 
         result = await metaService.createCampaignWithAd(job.adAccountId, {
           campaignName: job.campaignName,
@@ -1460,10 +1394,10 @@ function DraftStep({ job, onComplete, onBack }) {
           imageUrl: job.imageUrl || null,
           imageHash: job.imageHash || null,
           videoId: job.videoId || null,
-          videoThumbnailHash: job.videoThumbnailHash || null,
+          videoThumbnailUrl: job.videoThumbnailUrl || null,
           titles: job.headlines || [],
           bodies: job.descriptions || [],
-          descriptions: job.headlines || [],
+          descriptions: job.descriptions || [],
           callToActionTypes: job.ctas || ['LEARN_MORE'],
           linkUrl: job.linkUrl,
           endDate: job.endDate,
@@ -1473,10 +1407,9 @@ function DraftStep({ job, onComplete, onBack }) {
 
       if (result.success) {
         const hasCreative = result.creative && result.ad;
-        const totalAds = result.ads?.length || (result.ad ? 1 : 0);
 
         if (hasCreative) {
-          addLog(`✅ ¡Campaña completa creada! ${totalAds} anuncio(s) creados.`);
+          addLog('✅ ¡Campaña completa creada! 1 anuncio con 5+5+5.');
         } else {
           addLog('✅ ¡Campaña y Ad Set creados exitosamente!');
           addLog('📋 El contenido 5+5+5 está listo para copiar');
@@ -1489,9 +1422,7 @@ function DraftStep({ job, onComplete, onBack }) {
           creativeId: result.creative?.id || null,
           adId: result.ad?.id || null,
           adName: job.adName,
-          totalAdsCreated: totalAds,
-          creatives: result.creatives || [],
-          ads: result.ads || [],
+          totalAdsCreated: 1,
           dailyBudgetCOP: job.dailyBudgetCOP,
           savedAudienceName: job.savedAudienceName,
           pageName: job.pageName,
@@ -1927,18 +1858,16 @@ function DraftStep({ job, onComplete, onBack }) {
           <p><strong>Se creará en Meta Ads:</strong></p>
           <ul>
             <li><strong>1 Campaña</strong> - Objetivo: {job.objective || 'Tráfico'} (PAUSADA)</li>
-            <li><strong>1 Ad Set</strong> - Optimización: {job.optimizationGoal || 'Landing Page Views'}</li>
-            <li><strong>{Math.min(job.headlines?.filter(h => h?.trim()).length || 1, 5)} Creative(s)</strong> - {job.imageUrl ? 'Con imagen personalizada' : 'Usando vista previa del link'}</li>
-            <li><strong>{Math.min(job.headlines?.filter(h => h?.trim()).length || 1, 5)} Anuncio(s)</strong> - Cada uno con un título/descripción diferente</li>
+            <li><strong>1 Ad Set</strong> - Dynamic Creative - {job.optimizationGoal || 'Landing Page Views'}</li>
+            <li><strong>1 Creative</strong> - {job.headlines?.filter(h => h?.trim()).length || 0} títulos + {job.descriptions?.filter(d => d?.trim()).length || 0} descripciones + {[...new Set(job.ctas || [])].length} CTAs</li>
+            <li><strong>1 Anuncio</strong> - {job.videoId ? 'Con video' : job.imageUrl || job.imageHash ? 'Con imagen' : 'Vista previa del link'}</li>
           </ul>
-          {job.headlines?.filter(h => h?.trim()).length > 1 && (
-            <p style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
-              💡 Se creará un anuncio por cada variación de título. Meta optimizará automáticamente el mejor.
-            </p>
-          )}
+          <p style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
+            💡 Meta probará automáticamente las diferentes combinaciones de títulos, descripciones y CTAs para encontrar la mejor.
+          </p>
           {job.igActorId && (
             <p style={{ fontSize: '13px', marginTop: '5px', color: '#666' }}>
-              📸 Instagram: @{job.igUsername || 'vinculada'} - Los anuncios aparecerán también en Instagram.
+              📸 Instagram: @{job.igUsername || 'vinculada'} - El anuncio aparecerá también en Instagram.
             </p>
           )}
         </div>

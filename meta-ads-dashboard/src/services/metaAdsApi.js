@@ -674,7 +674,8 @@ class MetaAdsService {
     optimizationGoal = 'LINK_CLICKS',
     targeting,
     status = 'PAUSED',
-    endTime = null // Fecha de fin en formato ISO o timestamp UNIX
+    endTime = null, // Fecha de fin en formato ISO o timestamp UNIX
+    isDynamicCreative = false // Para Asset Feed Spec (5+5+5 en 1 anuncio)
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -698,6 +699,11 @@ class MetaAdsService {
       // NO enviamos bid_strategy cuando usamos CBO - se hereda de la campaña
       formData.append('targeting', JSON.stringify(targeting));
       formData.append('status', status);
+
+      // Dynamic Creative permite 5+5+5 (múltiples títulos, descripciones, CTAs) en 1 anuncio
+      if (isDynamicCreative) {
+        formData.append('is_dynamic_creative', 'true');
+      }
 
       // Agregar fecha de fin si está especificada
       if (endTime) {
@@ -835,7 +841,8 @@ class MetaAdsService {
     name,
     pageId,
     videoId,
-    imageHash, // thumbnail
+    imageHash = null, // thumbnail hash (prioridad)
+    imageUrl = null, // thumbnail URL (alternativa automática)
     primaryText,
     headline,
     description,
@@ -847,22 +854,52 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
       // Estructura correcta para video ads con objetivo de tráfico
-      // imageHash (thumbnail) es REQUERIDO por Meta para video ads
-      const objectStorySpec = {
-        page_id: pageId,
-        video_data: {
-          video_id: videoId,
-          image_hash: imageHash, // Miniatura seleccionada por el usuario (requerida)
-          message: primaryText,
-          title: headline,
-          link_description: description,
-          call_to_action: {
-            type: callToAction,
-            value: {
-              link: linkUrl
-            }
+      // Meta requiere miniatura: image_hash O image_url
+      const videoData = {
+        video_id: videoId,
+        message: primaryText,
+        title: headline,
+        link_description: description,
+        call_to_action: {
+          type: callToAction,
+          value: {
+            link: linkUrl
           }
         }
+      };
+
+      // Priorizar image_hash sobre image_url
+      // Si no hay ninguno, obtener thumbnail automáticamente del video via servidor proxy
+      if (imageHash) {
+        videoData.image_hash = imageHash;
+      } else if (imageUrl) {
+        videoData.image_url = imageUrl;
+      } else {
+        // Fallback: obtener thumbnail del video o imagen de respaldo via servidor
+        console.log('No thumbnail provided, fetching from server proxy for video:', videoId);
+        try {
+          const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videoId}`, {
+            params: { adAccountId: normalizedId }
+          });
+          const autoThumbUrl = thumbResponse.data?.data?.thumbnailUrl || '';
+          const autoThumbHash = thumbResponse.data?.data?.thumbnailHash || '';
+          if (autoThumbUrl) {
+            console.log('Auto-fetched video thumbnail via server:', autoThumbUrl);
+            videoData.image_url = autoThumbUrl;
+          } else if (autoThumbHash) {
+            console.log('Using fallback image hash from server:', autoThumbHash);
+            videoData.image_hash = autoThumbHash;
+          } else {
+            console.warn('Server could not obtain any thumbnail for video:', videoId);
+          }
+        } catch (thumbErr) {
+          console.warn('Failed to fetch video thumbnail via server:', thumbErr.message);
+        }
+      }
+
+      const objectStorySpec = {
+        page_id: pageId,
+        video_data: videoData
       };
 
       if (igActorId) {
@@ -1084,15 +1121,21 @@ class MetaAdsService {
     }
   }
 
-  // Crear Ad Creative con Asset Feed Spec (múltiples títulos, descripciones y CTAs)
-  // Usa URL de imagen directamente (sin necesidad de subir)
+  // Crear Ad Creative con Asset Feed Spec (1 anuncio con 5+5+5)
+  // Soporta imagen O video. Meta prueba combinaciones y muestra la mejor.
   async createAdCreativeWithAssetFeedSpec(adAccountId, {
     name,
     pageId,
-    imageHash = null, // Opcional - si se subió la imagen
-    imageUrl = null,  // URL directa de la imagen (sin subir)
+    // Imagen
+    imageHash = null,
+    imageUrl = null,
+    // Video
+    videoId = null,
+    thumbnailHash = null, // hash de miniatura para video
+    thumbnailUrl = null,  // URL de miniatura para video
+    // Contenido 5+5+5
     titles, // Array de títulos (max 5)
-    bodies, // Array de descripciones/textos primarios (max 5)
+    bodies, // Array de textos primarios (max 5)
     descriptions, // Array de descripciones link (max 5)
     callToActionTypes, // Array de CTAs (max 5)
     linkUrl,
@@ -1101,17 +1144,29 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      // Asset Feed Spec para Dynamic Creative Optimization
-      // Usar URL directa si no hay hash, o hash si está disponible
+      // Asset Feed Spec - Dynamic Creative (5+5+5 en 1 solo anuncio)
       const assetFeedSpec = {
-        images: imageHash ? [{ hash: imageHash }] : [{ url: imageUrl }],
         bodies: bodies.slice(0, 5).map(text => ({ text })),
         titles: titles.slice(0, 5).map(text => ({ text })),
         descriptions: descriptions.slice(0, 5).map(text => ({ text })),
-        call_to_action_types: [...new Set(callToActionTypes.slice(0, 5))], // Unique CTAs
-        link_urls: [{ website_url: linkUrl }],
-        ad_formats: ['SINGLE_IMAGE']
+        call_to_action_types: [...new Set(callToActionTypes.slice(0, 5))],
+        link_urls: [{ website_url: linkUrl }]
       };
+
+      // Video o imagen
+      if (videoId) {
+        const videoEntry = { video_id: videoId };
+        if (thumbnailHash) {
+          videoEntry.thumbnail_hash = thumbnailHash;
+        } else if (thumbnailUrl) {
+          videoEntry.thumbnail_url = thumbnailUrl;
+        }
+        assetFeedSpec.videos = [videoEntry];
+        assetFeedSpec.ad_formats = ['SINGLE_VIDEO'];
+      } else {
+        assetFeedSpec.images = imageHash ? [{ hash: imageHash }] : [{ url: imageUrl }];
+        assetFeedSpec.ad_formats = ['SINGLE_IMAGE'];
+      }
 
       const objectStorySpec = {
         page_id: pageId
@@ -1121,15 +1176,13 @@ class MetaAdsService {
         objectStorySpec.instagram_actor_id = igActorId;
       }
 
-      console.log('Creating Asset Feed Spec creative:', {
-        name,
-        pageId,
-        imageHash: imageHash || 'N/A (using URL)',
-        imageUrl: imageUrl || 'N/A (using hash)',
-        titles: titles.length,
-        bodies: bodies.length,
-        descriptions: descriptions.length,
-        callToActionTypes
+      console.log('Creating Asset Feed Spec creative (5+5+5):', {
+        name, pageId,
+        type: videoId ? 'VIDEO' : 'IMAGE',
+        videoId: videoId || 'N/A',
+        thumbnailHash: thumbnailHash || 'N/A',
+        titles: titles.length, bodies: bodies.length,
+        descriptions: descriptions.length, callToActionTypes
       });
       console.log('assetFeedSpec:', JSON.stringify(assetFeedSpec, null, 2));
 
@@ -1151,7 +1204,11 @@ class MetaAdsService {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Asset Feed Creative creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-      const errorMsg = error.response?.data?.error?.message || error.message;
+      const errorData = error.response?.data?.error;
+      let errorMsg = errorData?.message || error.message;
+      if (errorData?.error_user_title) {
+        errorMsg = `${errorData.error_user_title}: ${errorData.error_user_msg || errorMsg}`;
+      }
       return { success: false, error: errorMsg };
     }
   }
@@ -1218,8 +1275,8 @@ class MetaAdsService {
     }
   }
 
-  // Crear Campaign + AdSet + Creative + Ad completo
-  // La imagen es OPCIONAL - si no se proporciona, Meta usa la vista previa del link
+  // Crear Campaign + AdSet + 1 Creative (5+5+5) + 1 Ad
+  // Usa Asset Feed Spec para meter 5 títulos, 5 descripciones y 5 CTAs en 1 solo anuncio
   async createCampaignWithAd(adAccountId, {
     // Campaign
     campaignName,
@@ -1231,18 +1288,19 @@ class MetaAdsService {
     targeting,
     optimizationGoal = 'LANDING_PAGE_VIEWS',
     billingEvent = 'IMPRESSIONS',
-    endDate = null, // Fecha de fin opcional
+    endDate = null,
     // Creative & Ad
     adName,
     pageId,
-    imageUrl = null, // URL de imagen (OPCIONAL)
-    imageHash = null, // Hash de imagen subida a Meta (más confiable)
-    videoId = null, // ID de video de la biblioteca de Meta
-    videoThumbnailHash = null, // Hash de miniatura para video ads
-    titles, // Array de títulos
-    bodies, // Array de textos primarios (descripciones largas)
-    descriptions, // Array de descripciones cortas
-    callToActionTypes, // Array de CTAs
+    imageUrl = null,
+    imageHash = null,
+    videoId = null,
+    videoThumbnailHash = null,
+    videoThumbnailUrl = null,
+    titles,
+    bodies,
+    descriptions,
+    callToActionTypes,
     linkUrl,
     igActorId = null
   }) {
@@ -1271,8 +1329,8 @@ class MetaAdsService {
       }
       results.campaign = campaignResult.data;
 
-      // 2. Crear AdSet
-      console.log('Step 2/4: Creating ad set...');
+      // 2. Crear AdSet con Dynamic Creative habilitado (permite 5+5+5 en 1 anuncio)
+      console.log('Step 2/4: Creating ad set (Dynamic Creative)...');
       const adSetResult = await this.createAdSet(adAccountId, {
         name: adSetName || `${campaignName} - Ad Set`,
         campaignId: results.campaign.id,
@@ -1280,7 +1338,8 @@ class MetaAdsService {
         optimizationGoal,
         targeting,
         status: 'PAUSED',
-        endTime: endDate // Pasar fecha de fin si existe
+        endTime: endDate,
+        isDynamicCreative: true // Permite Asset Feed Spec (5+5+5)
       });
 
       if (!adSetResult.success) {
@@ -1289,95 +1348,75 @@ class MetaAdsService {
       }
       results.adSet = adSetResult.data;
 
-      // 3. Crear Creatives y Ads para cada variación de título/descripción
-      // Esto crea múltiples anuncios dentro del mismo AdSet para que Meta optimice
+      // 3. Resolver thumbnail para video (si es necesario)
       const validTitles = titles && titles.length > 0 ? titles.filter(t => t && t.trim()) : ['Conoce más'];
       const validBodies = bodies && bodies.length > 0 ? bodies.filter(b => b && b.trim()) : ['Descubre más'];
-      const cta = callToActionTypes && callToActionTypes.length > 0 ? callToActionTypes[0] : 'LEARN_MORE';
+      const validDescriptions = descriptions && descriptions.length > 0 ? descriptions.filter(d => d && d.trim()) : [''];
+      const validCTAs = callToActionTypes && callToActionTypes.length > 0 ? callToActionTypes : ['LEARN_MORE'];
 
-      const totalAds = Math.min(validTitles.length, 5); // Máximo 5 ads
-      console.log(`Step 3-4: Creating ${totalAds} creative(s) and ad(s)...`);
+      let resolvedThumbHash = videoThumbnailHash || null;
+      let resolvedThumbUrl = videoThumbnailUrl || null;
 
-      results.creatives = [];
-      results.ads = [];
-
-      for (let i = 0; i < totalAds; i++) {
-        const headline = validTitles[i] || validTitles[0];
-        const primaryText = validBodies[i] || validBodies[0];
-        const description = descriptions && descriptions[i] ? descriptions[i] : '';
-
-        console.log(`Creating creative ${i + 1}/${totalAds}: "${headline.substring(0, 30)}..."`);
-
-        let creativeResult;
-
-        if (videoId) {
-          // Crear creative con video de la biblioteca
-          creativeResult = await this.createAdCreativeWithVideo(adAccountId, {
-            name: `${adName} - Creative ${i + 1}`,
-            pageId,
-            videoId,
-            imageHash: videoThumbnailHash || imageHash, // Miniatura seleccionada por el usuario
-            primaryText,
-            headline,
-            description,
-            callToAction: cta,
-            linkUrl,
-            igActorId
+      // Si es video y no tenemos thumbnail, intentar obtenerlo del servidor
+      if (videoId && !resolvedThumbHash && !resolvedThumbUrl && !imageHash) {
+        console.log('No video thumbnail available, fetching via server proxy...');
+        try {
+          const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videoId}`, {
+            params: { adAccountId: this.normalizeAccountId(adAccountId) }
           });
-        } else {
-          // Crear creative estándar (con imagen o sin)
-          creativeResult = await this.createStandardAdCreative(adAccountId, {
-            name: `${adName} - Creative ${i + 1}`,
-            pageId,
-            imageUrl,
-            imageHash,
-            primaryText,
-            headline,
-            description,
-            linkUrl,
-            callToAction: cta,
-            igActorId
-          });
-        }
-
-        if (!creativeResult.success) {
-          // Si el primer creative falla, es un error crítico
-          if (i === 0) {
-            results.errors.push(`Creative: ${creativeResult.error}`);
-            return { success: false, ...results };
+          if (thumbResponse.data?.data?.thumbnailUrl) {
+            resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
+            console.log('Got thumbnail URL from proxy:', resolvedThumbUrl);
+          } else if (thumbResponse.data?.data?.thumbnailHash) {
+            resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
+            console.log('Got fallback thumbnail hash from proxy:', resolvedThumbHash);
           }
-          // Si fallan los siguientes, solo loguear y continuar
-          console.warn(`Creative ${i + 1} failed:`, creativeResult.error);
-          continue;
+        } catch (err) {
+          console.warn('Proxy thumbnail fetch failed:', err.message);
         }
-
-        results.creatives.push(creativeResult.data);
-
-        // Crear Ad para este creative
-        const adResult = await this.createAd(adAccountId, {
-          name: `${adName} ${totalAds > 1 ? `- Variación ${i + 1}` : ''}`,
-          adsetId: results.adSet.id,
-          creativeId: creativeResult.data.id,
-          status: 'PAUSED'
-        });
-
-        if (!adResult.success) {
-          if (i === 0) {
-            results.errors.push(`Ad: ${adResult.error}`);
-            return { success: false, ...results };
-          }
-          console.warn(`Ad ${i + 1} failed:`, adResult.error);
-          continue;
-        }
-
-        results.ads.push(adResult.data);
       }
 
-      // Para compatibilidad, también guardar el primero como creative/ad principal
-      results.creative = results.creatives[0] || null;
-      results.ad = results.ads[0] || null;
+      // 4. Crear 1 Creative con Asset Feed Spec (5+5+5)
+      console.log(`Step 3/4: Creating creative with ${validTitles.length} titles, ${validBodies.length} bodies, ${validCTAs.length} CTAs...`);
 
-      console.log(`Campaign created with ${results.ads.length} ad(s) successfully!`);
+      const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
+        name: `${adName} - Creative`,
+        pageId,
+        imageUrl: !videoId ? imageUrl : null,
+        imageHash: !videoId ? imageHash : null,
+        videoId: videoId || null,
+        thumbnailHash: resolvedThumbHash || imageHash || null,
+        thumbnailUrl: resolvedThumbUrl || null,
+        titles: validTitles,
+        bodies: validBodies,
+        descriptions: validDescriptions,
+        callToActionTypes: validCTAs,
+        linkUrl,
+        igActorId
+      });
+
+      if (!creativeResult.success) {
+        results.errors.push(`Creative: ${creativeResult.error}`);
+        return { success: false, ...results };
+      }
+      results.creative = creativeResult.data;
+
+      // 5. Crear 1 Ad
+      console.log('Step 4/4: Creating ad...');
+      const adResult = await this.createAd(adAccountId, {
+        name: adName,
+        adsetId: results.adSet.id,
+        creativeId: results.creative.id,
+        status: 'PAUSED'
+      });
+
+      if (!adResult.success) {
+        results.errors.push(`Ad: ${adResult.error}`);
+        return { success: false, ...results };
+      }
+      results.ad = adResult.data;
+
+      console.log('Campaign created: 1 Campaign + 1 AdSet + 1 Creative (5+5+5) + 1 Ad');
       return { success: true, ...results };
 
     } catch (error) {
