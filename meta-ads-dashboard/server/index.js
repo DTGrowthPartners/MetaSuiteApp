@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
+import sharp from 'sharp';
 
 // Configurar ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -617,7 +618,73 @@ app.post('/api/upload/video', async (req, res) => {
   }
 });
 
-// Subir imagen desde ARCHIVO a Meta Ads (multipart)
+// Helper: Auto-crop imagen a ratio 9:16 para Stories/Reels usando sharp
+async function autoCropImage9x16(imageBuffer) {
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    const { width, height } = metadata;
+
+    // Calcular si ya es ~9:16
+    const currentRatio = width / height;
+    const targetRatio = 9 / 16; // 0.5625
+
+    // Si ya es suficientemente vertical (dentro de 10% del ratio), no recortar
+    if (Math.abs(currentRatio - targetRatio) < 0.06) {
+      console.log(`Image already ~9:16 (${width}x${height}, ratio ${currentRatio.toFixed(3)}), skipping crop`);
+      return null;
+    }
+
+    // Calcular dimensiones del crop 9:16 centrado
+    let cropWidth, cropHeight;
+    if (currentRatio > targetRatio) {
+      // Imagen más ancha que 9:16 → recortar lados
+      cropHeight = height;
+      cropWidth = Math.round(height * targetRatio);
+    } else {
+      // Imagen más alta que 9:16 → recortar arriba/abajo
+      cropWidth = width;
+      cropHeight = Math.round(width / targetRatio);
+    }
+
+    const left = Math.round((width - cropWidth) / 2);
+    const top = Math.round((height - cropHeight) / 2);
+
+    console.log(`Auto-cropping ${width}x${height} → 9:16 crop: ${cropWidth}x${cropHeight} (offset: ${left},${top})`);
+
+    // Crop centrado + resize a max 1080px ancho (optimo para Stories/Reels)
+    const croppedBuffer = await sharp(imageBuffer)
+      .extract({ left, top, width: cropWidth, height: cropHeight })
+      .resize(1080, 1920, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    console.log(`9:16 crop generated: ${(croppedBuffer.length / 1024).toFixed(0)}KB`);
+    return croppedBuffer;
+  } catch (err) {
+    console.error('Auto-crop 9:16 failed:', err.message);
+    return null;
+  }
+}
+
+// Helper: Subir un buffer de imagen a Meta y retornar hash
+async function uploadImageBufferToMeta(normalizedAccountId, token, imageBuffer, filename, contentType) {
+  const formData = new FormData();
+  formData.append('access_token', token);
+  formData.append('filename', filename);
+  formData.append('source', imageBuffer, { filename, contentType });
+
+  const response = await axios.post(
+    `${META_API_BASE_URL}/${normalizedAccountId}/adimages`,
+    formData,
+    { headers: formData.getHeaders() }
+  );
+
+  const images = response.data.images;
+  const imageData = images ? Object.values(images)[0] : null;
+  return imageData;
+}
+
+// Subir imagen desde ARCHIVO a Meta Ads (multipart) + auto-crop 9:16
 app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
   try {
     const { adAccountId } = req.body;
@@ -644,39 +711,39 @@ app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
     }
 
     console.log(`Uploading image file to ${normalizedId}:`, file.originalname, file.size, 'bytes', 'contentType:', contentType);
-    console.log('Buffer size:', file.buffer.length, 'bytes');
 
-    // Usar file.buffer directamente (memoryStorage)
-    const formData = new FormData();
-    formData.append('access_token', token);
-    formData.append('filename', file.originalname);
-    formData.append('source', file.buffer, {
-      filename: file.originalname,
-      contentType: contentType
-    });
+    // 1. Subir imagen original a Meta
+    const originalData = await uploadImageBufferToMeta(normalizedId, token, file.buffer, file.originalname, contentType);
 
-    const response = await axios.post(
-      `${META_API_BASE_URL}/${normalizedId}/adimages`,
-      formData,
-      { headers: formData.getHeaders() }
-    );
-
-    console.log('Image file upload response:', JSON.stringify(response.data, null, 2));
-
-    const images = response.data.images;
-    const imageData = images ? Object.values(images)[0] : null;
-
-    if (!imageData?.hash) {
+    if (!originalData?.hash) {
       return res.status(500).json({ success: false, error: 'No se obtuvo image_hash de Meta' });
+    }
+
+    console.log('Original image uploaded:', originalData.hash);
+
+    // 2. Auto-crop a 9:16 para Stories/Reels
+    let hash9x16 = null;
+    try {
+      const croppedBuffer = await autoCropImage9x16(file.buffer);
+      if (croppedBuffer) {
+        const croppedFilename = `stories_${file.originalname.replace(/\.[^.]+$/, '.jpg')}`;
+        const croppedData = await uploadImageBufferToMeta(normalizedId, token, croppedBuffer, croppedFilename, 'image/jpeg');
+        if (croppedData?.hash) {
+          hash9x16 = croppedData.hash;
+          console.log('9:16 crop uploaded:', hash9x16);
+        }
+      }
+    } catch (cropErr) {
+      console.warn('Auto-crop 9:16 upload failed (non-blocking):', cropErr.message);
     }
 
     res.json({
       success: true,
       data: {
-        imageHash: imageData.hash,
-        url: imageData.url,
-        name: file.originalname,
-        images: response.data.images
+        imageHash: originalData.hash,
+        imageHash9x16: hash9x16,
+        url: originalData.url,
+        name: file.originalname
       }
     });
   } catch (error) {

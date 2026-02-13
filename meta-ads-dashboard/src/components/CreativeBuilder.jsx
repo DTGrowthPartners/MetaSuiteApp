@@ -232,6 +232,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     mediaSource: 'none', // 'none', 'library', 'upload'
     imageUrl: '',
     imageHash: '',
+    imageHash9x16: '',
     videoId: '',
     videoThumbnailUrl: '',
     uploadingFile: false,
@@ -380,9 +381,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           updateAd(adIndex, {
             imageUrl: result.data.url || '',
             imageHash: result.data.imageHash || '',
+            imageHash9x16: result.data.imageHash9x16 || '',
             videoId: '',
             videoThumbnailUrl: '',
-            uploadProgress: `Imagen subida. Analizando con IA...`,
+            uploadProgress: `Imagen subida${result.data.imageHash9x16 ? ' + 9:16 Stories/Reels' : ''}. Analizando con IA...`,
             uploadingFile: false
           });
           // Auto-analyze the uploaded image
@@ -636,6 +638,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         adName: ad.adName?.trim() || `${fullCampaignName} - Ad ${i + 1}`,
         imageUrl: ad.imageUrl?.trim() || null,
         imageHash: ad.imageHash || null,
+        imageHash9x16: ad.imageHash9x16 || null,
         videoId: ad.videoId || null,
         videoThumbnailUrl: ad.videoThumbnailUrl || null,
         headlines: ad.headlines.filter(h => h.trim() !== ''),

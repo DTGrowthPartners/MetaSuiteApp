@@ -1223,6 +1223,7 @@ class MetaAdsService {
     pageId,
     // Imagen
     imageHash = null,
+    imageHash9x16 = null, // Hash de imagen recortada 9:16 para Stories/Reels
     imageUrl = null,
     // Video
     videoId = null,
@@ -1258,6 +1259,32 @@ class MetaAdsService {
         }
         assetFeedSpec.videos = [videoEntry];
         assetFeedSpec.ad_formats = ['SINGLE_VIDEO'];
+      } else if (imageHash && imageHash9x16) {
+        // Imagen con versión 9:16 para Stories/Reels
+        assetFeedSpec.images = [
+          { hash: imageHash, adlabels: [{ name: 'feed_image' }] },
+          { hash: imageHash9x16, adlabels: [{ name: 'stories_image' }] }
+        ];
+        assetFeedSpec.ad_formats = ['SINGLE_IMAGE'];
+        assetFeedSpec.asset_customization_rules = [
+          {
+            customization_spec: {
+              publisher_platforms: ['facebook', 'instagram'],
+              facebook_positions: ['feed', 'marketplace', 'video_feeds', 'search', 'right_hand_column'],
+              instagram_positions: ['stream', 'explore', 'profile_feed']
+            },
+            image_label: { name: 'feed_image' }
+          },
+          {
+            customization_spec: {
+              publisher_platforms: ['facebook', 'instagram'],
+              facebook_positions: ['story', 'reels'],
+              instagram_positions: ['story', 'reels']
+            },
+            image_label: { name: 'stories_image' }
+          }
+        ];
+        console.log('Using asset_customization_rules: feed_image + stories_image (9:16)');
       } else {
         assetFeedSpec.images = imageHash ? [{ hash: imageHash }] : [{ url: imageUrl }];
         assetFeedSpec.ad_formats = ['SINGLE_IMAGE'];
@@ -1276,6 +1303,7 @@ class MetaAdsService {
         type: videoId ? 'VIDEO' : 'IMAGE',
         videoId: videoId || 'N/A',
         thumbnailHash: thumbnailHash || 'N/A',
+        imageHash9x16: imageHash9x16 || 'N/A',
         titles: titles.length, bodies: bodies.length,
         descriptions: descriptions.length, callToActionTypes
       });
@@ -2186,6 +2214,7 @@ class MetaAdsService {
             pageId,
             imageUrl: !ad.videoId ? ad.imageUrl : null,
             imageHash: !ad.videoId ? ad.imageHash : null,
+            imageHash9x16: !ad.videoId ? ad.imageHash9x16 : null,
             videoId: ad.videoId || null,
             thumbnailHash: resolvedThumbHash || null,
             thumbnailUrl: resolvedThumbUrl || null,
