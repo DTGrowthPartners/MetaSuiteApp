@@ -7,6 +7,11 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+
+// Configurar ffmpeg path
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const app = express();
 
@@ -21,8 +26,12 @@ const PORT = process.env.PORT || 3002;
 const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI';
 
 // OpenAI Configuration
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'TU_OPENAI_API_KEY_AQUI';
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+
+if (!OPENAI_API_KEY) {
+  console.warn('ADVERTENCIA: OPENAI_API_KEY no está configurada en las variables de entorno');
+}
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
 
@@ -913,6 +922,334 @@ Responde en este formato JSON exacto:
     res.status(500).json({
       success: false,
       error: error.message || 'Error generando contenido con IA'
+    });
+  }
+});
+
+// ============================================
+// AI MEDIA ANALYSIS ENDPOINTS
+// ============================================
+
+// Helper: Extract audio from video buffer using ffmpeg
+async function extractAudioFromBuffer(videoBuffer, filename) {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `input_${Date.now()}_${filename}`);
+  const outputPath = path.join(tmpDir, `audio_${Date.now()}.mp3`);
+
+  try {
+    // Write video buffer to temp file
+    fs.writeFileSync(inputPath, videoBuffer);
+
+    // Extract audio with ffmpeg
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .noVideo()
+        .audioCodec('libmp3lame')
+        .audioBitrate('64k')
+        .audioFrequency(16000)
+        .audioChannels(1)
+        .output(outputPath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
+
+    const audioBuffer = fs.readFileSync(outputPath);
+    return audioBuffer;
+  } finally {
+    // Cleanup temp files
+    try { fs.unlinkSync(inputPath); } catch (e) { /* ignore */ }
+    try { fs.unlinkSync(outputPath); } catch (e) { /* ignore */ }
+  }
+}
+
+// Helper: Extract a frame from video as JPEG (for vision fallback)
+async function extractFrameFromBuffer(videoBuffer, filename) {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `frame_input_${Date.now()}_${filename}`);
+  const outputPath = path.join(tmpDir, `frame_${Date.now()}.jpg`);
+
+  try {
+    fs.writeFileSync(inputPath, videoBuffer);
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .screenshots({
+          count: 1,
+          timemarks: ['1'],
+          filename: path.basename(outputPath),
+          folder: path.dirname(outputPath),
+          size: '640x?'
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    const frameBuffer = fs.readFileSync(outputPath);
+    return frameBuffer;
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch (e) { /* ignore */ }
+    try { fs.unlinkSync(outputPath); } catch (e) { /* ignore */ }
+  }
+}
+
+// Helper: Generate 5+5+5 content from transcription text
+async function generateContentFromText(transcription, adIndex, category) {
+  const angleVariations = [
+    'Enfócate en el beneficio principal y la propuesta de valor.',
+    'Enfócate en la urgencia y escasez. Usa un tono más directo.',
+    'Enfócate en la prueba social y credibilidad. Usa testimonios implícitos.',
+    'Enfócate en resolver un problema o dolor del cliente.',
+    'Enfócate en la emoción y aspiración. Haz que el cliente se imagine el resultado.',
+    'Enfócate en la curiosidad. Haz preguntas que enganchen.',
+    'Enfócate en la exclusividad y diferenciación.'
+  ];
+
+  const angle = angleVariations[adIndex % angleVariations.length];
+
+  const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads.
+Generas contenido persuasivo basándote en la transcripción/contenido de un video o imagen publicitario.
+
+REGLAS:
+- Títulos: máximo 40 caracteres cada uno
+- Descripciones: máximo 125 caracteres cada una
+- Todo en español
+- Persuasivo y orientado a la acción
+- Responde SOLO en JSON válido, sin markdown`;
+
+  const userPrompt = `Basándote en este contenido de un video/audio publicitario:
+
+"${transcription.substring(0, 2000)}"
+
+${category ? `Categoría: ${category}` : ''}
+
+Instrucción de ángulo: ${angle}
+
+Genera exactamente:
+- 5 títulos cortos y llamativos (máx 40 chars)
+- 5 descripciones persuasivas (máx 125 chars)
+- 5 CTAs de esta lista (SOLO estos son válidos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, DOWNLOAD, GET_OFFER, APPLY_NOW, CONTACT_US, GET_QUOTE
+
+JSON exacto:
+{
+  "headlines": ["t1", "t2", "t3", "t4", "t5"],
+  "descriptions": ["d1", "d2", "d3", "d4", "d5"],
+  "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
+}`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.7 + (adIndex * 0.05), // Slight variation per ad
+    max_tokens: 1000
+  });
+
+  const responseText = completion.choices[0].message.content;
+  const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(cleanJson);
+}
+
+// Helper: Generate 5+5+5 content from image (vision)
+async function generateContentFromImage(base64Image, adIndex, category) {
+  const angleVariations = [
+    'Enfócate en el beneficio principal y la propuesta de valor.',
+    'Enfócate en la urgencia y escasez. Usa un tono más directo.',
+    'Enfócate en la prueba social y credibilidad.',
+    'Enfócate en resolver un problema o dolor del cliente.',
+    'Enfócate en la emoción y aspiración.',
+    'Enfócate en la curiosidad. Haz preguntas que enganchen.',
+    'Enfócate en la exclusividad y diferenciación.'
+  ];
+
+  const angle = angleVariations[adIndex % angleVariations.length];
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Eres un experto copywriter de Facebook/Instagram Ads.
+Analizas imágenes publicitarias y generas contenido persuasivo.
+
+REGLAS:
+- Títulos: máximo 40 caracteres
+- Descripciones: máximo 125 caracteres
+- Todo en español
+- Responde SOLO en JSON válido, sin markdown`
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Analiza esta imagen publicitaria y genera contenido para un anuncio de Facebook Ads.
+
+${category ? `Categoría: ${category}` : ''}
+Instrucción de ángulo: ${angle}
+
+Genera exactamente en JSON:
+{
+  "headlines": ["t1", "t2", "t3", "t4", "t5"],
+  "descriptions": ["d1", "d2", "d3", "d4", "d5"],
+  "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
+}
+
+CTAs válidos (SOLO estos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, DOWNLOAD, GET_OFFER, APPLY_NOW, CONTACT_US, GET_QUOTE`
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`,
+              detail: 'low'
+            }
+          }
+        ]
+      }
+    ],
+    temperature: 0.7 + (adIndex * 0.05),
+    max_tokens: 1000
+  });
+
+  const responseText = completion.choices[0].message.content;
+  const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(cleanJson);
+}
+
+// POST /api/analyze-video - Transcribe video audio and generate 5+5+5
+app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No se recibió archivo de video' });
+    }
+
+    const adIndex = parseInt(req.body.adIndex) || 0;
+    const category = req.body.category || '';
+    const fileName = req.file.originalname || 'video.mp4';
+    const fileSize = req.file.size;
+
+    console.log(`Analyzing video: ${fileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB) for ad index ${adIndex}`);
+
+    let transcription = '';
+
+    try {
+      let audioBuffer;
+
+      if (fileSize <= 25 * 1024 * 1024) {
+        // File is small enough to send directly to Whisper
+        audioBuffer = req.file.buffer;
+        console.log('Video <= 25MB, sending directly to Whisper...');
+      } else {
+        // Extract audio first with ffmpeg
+        console.log('Video > 25MB, extracting audio with ffmpeg...');
+        audioBuffer = await extractAudioFromBuffer(req.file.buffer, fileName);
+        console.log(`Audio extracted: ${(audioBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+      }
+
+      // Create a File-like object for the OpenAI API
+      const audioFile = new File(
+        [audioBuffer],
+        fileSize <= 25 * 1024 * 1024 ? fileName : 'audio.mp3',
+        { type: fileSize <= 25 * 1024 * 1024 ? 'video/mp4' : 'audio/mpeg' }
+      );
+
+      const whisperResponse = await openai.audio.transcriptions.create({
+        model: 'whisper-1',
+        file: audioFile,
+        language: 'es'
+      });
+
+      transcription = whisperResponse.text || '';
+      console.log(`Transcription (${transcription.length} chars): ${transcription.substring(0, 200)}...`);
+    } catch (whisperError) {
+      console.warn('Whisper transcription failed:', whisperError.message);
+    }
+
+    // If transcription is too short, fall back to vision analysis of a frame
+    if (transcription.length < 20) {
+      console.log('No meaningful speech detected, falling back to vision analysis...');
+
+      try {
+        const frameBuffer = await extractFrameFromBuffer(req.file.buffer, fileName);
+        const base64Frame = frameBuffer.toString('base64');
+        const content = await generateContentFromImage(base64Frame, adIndex, category);
+
+        return res.json({
+          success: true,
+          data: {
+            headlines: content.headlines?.slice(0, 5) || [],
+            descriptions: content.descriptions?.slice(0, 5) || [],
+            ctas: content.ctas?.slice(0, 5) || [],
+            transcription: transcription || '(sin habla detectada)',
+            method: 'vision'
+          }
+        });
+      } catch (visionError) {
+        console.error('Vision fallback also failed:', visionError.message);
+        return res.status(500).json({
+          success: false,
+          error: 'No se pudo analizar el video (sin audio ni imagen)',
+          details: visionError.message
+        });
+      }
+    }
+
+    // Generate content from transcription
+    const content = await generateContentFromText(transcription, adIndex, category);
+
+    res.json({
+      success: true,
+      data: {
+        headlines: content.headlines?.slice(0, 5) || [],
+        descriptions: content.descriptions?.slice(0, 5) || [],
+        ctas: content.ctas?.slice(0, 5) || [],
+        transcription,
+        method: 'whisper'
+      }
+    });
+
+  } catch (error) {
+    console.error('Video analysis error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error analizando el video'
+    });
+  }
+});
+
+// POST /api/analyze-image - Analyze image with vision and generate 5+5+5
+app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No se recibió archivo de imagen' });
+    }
+
+    const adIndex = parseInt(req.body.adIndex) || 0;
+    const category = req.body.category || '';
+    const fileName = req.file.originalname || 'image.jpg';
+
+    console.log(`Analyzing image: ${fileName} for ad index ${adIndex}`);
+
+    const base64Image = req.file.buffer.toString('base64');
+    const content = await generateContentFromImage(base64Image, adIndex, category);
+
+    res.json({
+      success: true,
+      data: {
+        headlines: content.headlines?.slice(0, 5) || [],
+        descriptions: content.descriptions?.slice(0, 5) || [],
+        ctas: content.ctas?.slice(0, 5) || [],
+        method: 'vision'
+      }
+    });
+
+  } catch (error) {
+    console.error('Image analysis error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error analizando la imagen'
     });
   }
 });

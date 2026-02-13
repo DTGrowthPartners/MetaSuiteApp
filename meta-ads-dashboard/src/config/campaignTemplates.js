@@ -26,19 +26,17 @@ export const OPTIMIZATION_GOALS = {
 };
 
 // Opciones de CTA disponibles
+// CTAs compatibles con LINK_CLICKS + Dynamic Creative
 export const CTA_OPTIONS = [
   { value: 'LEARN_MORE', label: 'Más información' },
   { value: 'SHOP_NOW', label: 'Comprar' },
   { value: 'SIGN_UP', label: 'Registrarse' },
-  { value: 'GET_QUOTE', label: 'Obtener cotización' },
+  { value: 'SUBSCRIBE', label: 'Suscribirse' },
+  { value: 'DOWNLOAD', label: 'Descargar' },
+  { value: 'GET_OFFER', label: 'Obtener oferta' },
+  { value: 'APPLY_NOW', label: 'Aplicar ahora' },
   { value: 'CONTACT_US', label: 'Contactar' },
-  { value: 'WHATSAPP_MESSAGE', label: 'WhatsApp' },
-  { value: 'SEND_MESSAGE', label: 'Enviar mensaje' },
-  { value: 'CALL_NOW', label: 'Llamar ahora' },
-  { value: 'GET_DIRECTIONS', label: 'Cómo llegar' },
-  { value: 'ORDER_NOW', label: 'Pedir ahora' },
-  { value: 'BUY_NOW', label: 'Comprar ahora' },
-  { value: 'MESSAGE_PAGE', label: 'Enviar mensaje a página' }
+  { value: 'GET_QUOTE', label: 'Obtener cotización' }
 ];
 
 // Ubicaciones por plataforma

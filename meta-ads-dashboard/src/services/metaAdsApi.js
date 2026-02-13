@@ -35,6 +35,62 @@ class MetaAdsService {
     }
   }
 
+  // Analyze video file - transcribe audio and generate 5+5+5
+  async analyzeVideoFile(file, adIndex = 0, category = null) {
+    try {
+      console.log(`Analyzing video for ad ${adIndex}: ${file.name}`);
+      const formData = new globalThis.FormData();
+      formData.append('video', file);
+      formData.append('adIndex', adIndex.toString());
+      if (category) formData.append('category', category);
+
+      const response = await axios.post(`${BACKEND_API_URL}/analyze-video`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000 // 2 minutes for transcription
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.error };
+      }
+    } catch (error) {
+      console.error('Video analysis error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message
+      };
+    }
+  }
+
+  // Analyze image file - vision analysis and generate 5+5+5
+  async analyzeImageFile(file, adIndex = 0, category = null) {
+    try {
+      console.log(`Analyzing image for ad ${adIndex}: ${file.name}`);
+      const formData = new globalThis.FormData();
+      formData.append('image', file);
+      formData.append('adIndex', adIndex.toString());
+      if (category) formData.append('category', category);
+
+      const response = await axios.post(`${BACKEND_API_URL}/analyze-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000 // 1 minute
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.error };
+      }
+    } catch (error) {
+      console.error('Image analysis error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message
+      };
+    }
+  }
+
   // Normaliza el ID de cuenta para asegurar que tenga el prefijo 'act_'
   normalizeAccountId(accountId) {
     if (!accountId) return null;
@@ -647,9 +703,16 @@ class MetaAdsService {
           }
         }
       );
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Campaign creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      console.log('Campaign creation SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Campaign creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      console.error('Campaign creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
       const errorData = error.response?.data?.error;
       let errorMsg = errorData?.message || error.message;
 
@@ -735,9 +798,16 @@ class MetaAdsService {
           }
         }
       );
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('AdSet creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      console.log('AdSet creation SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('AdSet creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      console.error('AdSet creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
       const errorData = error.response?.data?.error;
       let errorMsg = errorData?.message || error.message;
 
@@ -1012,71 +1082,85 @@ class MetaAdsService {
           }
         }
       );
+      // Meta sometimes returns HTTP 200 with error in body
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Ad creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      console.log('Ad creation SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Ad creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-      const errorMsg = error.response?.data?.error?.message || error.message;
+      console.error('Ad creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      const errorMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
       return { success: false, error: errorMsg };
     }
   }
 
-  // Crear Ad Creative estándar (sin DCO)
-  // La imagen es OPCIONAL - si no se proporciona, Meta usa la vista previa del link
+  // Crear Ad Creative estándar (sin DCO) - Soporta imagen Y video
   async createStandardAdCreative(adAccountId, {
     name,
     pageId,
-    imageUrl = null, // URL directa de la imagen (OPCIONAL)
-    imageHash = null, // Hash de imagen ya subida a Meta (más confiable)
-    primaryText, // Texto principal del anuncio
-    headline, // Título
-    description = '', // Descripción del link
-    linkUrl, // URL de destino
+    imageUrl = null,
+    imageHash = null,
+    videoId = null,
+    thumbnailUrl = null,
+    primaryText,
+    headline,
+    description = '',
+    linkUrl,
     callToAction = 'LEARN_MORE',
     igActorId = null
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      // Estructura estándar para anuncio de link
-      const linkData = {
-        link: linkUrl,
-        message: primaryText,
-        name: headline, // Título del anuncio
-        call_to_action: {
-          type: callToAction
+      const objectStorySpec = { page_id: pageId };
+
+      if (videoId) {
+        // Video creative usando video_data
+        const videoData = {
+          video_id: videoId,
+          message: primaryText,
+          title: headline,
+          call_to_action: {
+            type: callToAction,
+            value: { link: linkUrl }
+          }
+        };
+        if (thumbnailUrl) videoData.image_url = thumbnailUrl;
+        if (description && description.trim()) videoData.link_description = description;
+        objectStorySpec.video_data = videoData;
+      } else {
+        // Image creative usando link_data
+        const linkData = {
+          link: linkUrl,
+          message: primaryText,
+          name: headline,
+          call_to_action: { type: callToAction }
+        };
+        if (imageHash) {
+          linkData.image_hash = imageHash;
+        } else if (imageUrl && imageUrl.trim()) {
+          linkData.picture = imageUrl;
         }
-      };
-
-      // Priorizar image_hash sobre picture URL (más confiable)
-      if (imageHash) {
-        linkData.image_hash = imageHash;
-      } else if (imageUrl && imageUrl.trim()) {
-        linkData.picture = imageUrl;
+        if (description && description.trim()) {
+          linkData.description = description;
+        }
+        objectStorySpec.link_data = linkData;
       }
 
-      // Agregar descripción si existe
-      if (description && description.trim()) {
-        linkData.description = description;
-      }
-
-      const objectStorySpec = {
-        page_id: pageId,
-        link_data: linkData
-      };
-
-      // Agregar cuenta de Instagram si está disponible
       if (igActorId) {
         objectStorySpec.instagram_actor_id = igActorId;
       }
 
       console.log('Creating standard creative:', {
-        name,
-        pageId,
-        imageUrl: imageUrl || '(usando vista previa del link)',
+        name, pageId,
+        type: videoId ? 'VIDEO' : 'IMAGE',
         headline,
         primaryText: primaryText?.substring(0, 50) + '...',
-        linkUrl,
-        callToAction
+        linkUrl, callToAction
       });
 
       const formData = new URLSearchParams();
@@ -1094,6 +1178,13 @@ class MetaAdsService {
         }
       );
 
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Standard creative FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      console.log('Standard creative SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Standard creative creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
@@ -1201,9 +1292,17 @@ class MetaAdsService {
           }
         }
       );
+      // Meta sometimes returns HTTP 200 with error in body
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Creative creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      console.log('Creative creation SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Asset Feed Creative creation error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      console.error('Creative creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
       const errorData = error.response?.data?.error;
       let errorMsg = errorData?.message || error.message;
       if (errorData?.error_user_title) {
@@ -1955,6 +2054,176 @@ class MetaAdsService {
       results.ad = adResult.data;
 
       return { success: true, ...results };
+
+    } catch (error) {
+      results.errors.push(`Unexpected: ${error.message}`);
+      return { success: false, ...results };
+    }
+  }
+
+  // ============================================
+  // MULTI-AD: Crear Campaign + N AdSets + N Creatives + N Ads
+  // ============================================
+  // adSetMode: 'single' = 1 AdSet compartido, 'per-ad' = 1 AdSet por anuncio
+  async createCampaignWithMultipleAds(adAccountId, {
+    campaignName,
+    objective = 'OUTCOME_TRAFFIC',
+    specialAdCategories = [],
+    dailyBudget,
+    // Shared targeting (used when adSetMode === 'single' or as default)
+    targeting,
+    optimizationGoal = 'LANDING_PAGE_VIEWS',
+    billingEvent = 'IMPRESSIONS',
+    endDate = null,
+    // Page & Instagram
+    pageId,
+    igActorId = null,
+    linkUrl = null,
+    // Multi-ad config
+    adSetMode = 'single', // 'single' | 'per-ad'
+    ads = [] // Array of { adName, imageUrl, imageHash, videoId, videoThumbnailUrl, headlines, descriptions, ctas, audienceId, audienceName, audienceTargeting }
+  }) {
+    // CTAs compatibles con LINK_CLICKS + Dynamic Creative
+    const VALID_LINK_CLICKS_CTAS = [
+      'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
+      'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'
+    ];
+
+    // Filtra CTAs inválidos, reemplaza con LEARN_MORE si queda vacío
+    const sanitizeCTAs = (ctas) => {
+      const filtered = (ctas || []).filter(c => VALID_LINK_CLICKS_CTAS.includes(c));
+      return filtered.length > 0 ? filtered : ['LEARN_MORE'];
+    };
+
+    const results = {
+      campaign: null,
+      adSets: [],
+      creatives: [],
+      ads: [],
+      errors: []
+    };
+
+    try {
+      // 1. Crear Campaña con CBO
+      console.log(`Creating campaign with CBO for ${ads.length} ads...`);
+      const campaignResult = await this.createCampaign(adAccountId, {
+        name: campaignName,
+        objective,
+        status: 'PAUSED',
+        specialAdCategories,
+        dailyBudget
+      });
+
+      if (!campaignResult.success) {
+        results.errors.push(`Campaign: ${campaignResult.error}`);
+        return { success: false, ...results };
+      }
+      results.campaign = campaignResult.data;
+
+      // ========================================================
+      // Dynamic Creative (5+5+5) requiere 1 Ad por AdSet (limitación de Meta).
+      // Ambos modos crean N AdSets con Dynamic Creative.
+      // 'single': mismo targeting para todos. 'per-ad': targeting diferente.
+      // Con CBO el presupuesto se distribuye automáticamente entre AdSets.
+      // ========================================================
+      {
+        const isSingleMode = adSetMode === 'single';
+        console.log(`Mode: ${isSingleMode ? 'MISMO PÚBLICO' : 'PÚBLICO POR ANUNCIO'} - ${ads.length} AdSets con Dynamic Creative (5+5+5)`);
+
+        for (let i = 0; i < ads.length; i++) {
+          const ad = ads[i];
+          console.log(`Creating adSet + creative + ad ${i + 1}/${ads.length}...`);
+
+          const adTargeting = isSingleMode ? targeting : (ad.audienceTargeting || targeting);
+          const adSetSuffix = ads.length === 1 ? '' : ` ${i + 1}`;
+          const audienceLabel = !isSingleMode && ad.audienceName ? ` (${ad.audienceName})` : '';
+
+          const adSetResult = await this.createAdSet(adAccountId, {
+            name: `${campaignName} - Ad Set${adSetSuffix}${audienceLabel}`,
+            campaignId: results.campaign.id,
+            billingEvent,
+            optimizationGoal,
+            targeting: adTargeting,
+            status: 'PAUSED',
+            endTime: endDate,
+            isDynamicCreative: true
+          });
+
+          if (!adSetResult.success) {
+            results.errors.push(`AdSet ${i + 1}: ${adSetResult.error}`);
+            continue;
+          }
+          results.adSets.push(adSetResult.data);
+
+          const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
+          const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
+          const validCTAs = sanitizeCTAs(ad.ctas);
+
+          // Resolver thumbnail si es video
+          let resolvedThumbUrl = ad.videoThumbnailUrl || null;
+          let resolvedThumbHash = ad.imageHash || null;
+          if (ad.videoId && !resolvedThumbHash && !resolvedThumbUrl) {
+            try {
+              const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${ad.videoId}`, {
+                params: { adAccountId: this.normalizeAccountId(adAccountId) }
+              });
+              if (thumbResponse.data?.data?.thumbnailUrl) {
+                resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
+              } else if (thumbResponse.data?.data?.thumbnailHash) {
+                resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
+              }
+            } catch (err) {
+              console.warn('Thumbnail fetch failed for ad', i, err.message);
+            }
+          }
+
+          const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
+            name: `${ad.adName || campaignName + ' Ad ' + (i + 1)} - Creative`,
+            pageId,
+            imageUrl: !ad.videoId ? ad.imageUrl : null,
+            imageHash: !ad.videoId ? ad.imageHash : null,
+            videoId: ad.videoId || null,
+            thumbnailHash: resolvedThumbHash || null,
+            thumbnailUrl: resolvedThumbUrl || null,
+            titles: validTitles,
+            bodies: validBodies,
+            descriptions: validBodies,
+            callToActionTypes: validCTAs,
+            linkUrl,
+            igActorId
+          });
+
+          if (!creativeResult.success) {
+            results.errors.push(`Creative ${i + 1}: ${creativeResult.error}`);
+            continue;
+          }
+          results.creatives.push(creativeResult.data);
+
+          const adResult = await this.createAd(adAccountId, {
+            name: ad.adName || `${campaignName} - Ad ${i + 1}`,
+            adsetId: adSetResult.data.id,
+            creativeId: creativeResult.data.id,
+            status: 'PAUSED'
+          });
+
+          if (!adResult.success) {
+            results.errors.push(`Ad ${i + 1}: ${adResult.error}`);
+            continue;
+          }
+          results.ads.push(adResult.data);
+        }
+      }
+
+      const totalCreated = results.ads.length;
+      const totalFailed = ads.length - totalCreated;
+      console.log(`Multi-ad campaign created: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads${totalFailed > 0 ? ` (${totalFailed} failed)` : ''}`);
+
+      return {
+        success: totalCreated > 0,
+        ...results,
+        totalCreated,
+        totalFailed
+      };
 
     } catch (error) {
       results.errors.push(`Unexpected: ${error.message}`);

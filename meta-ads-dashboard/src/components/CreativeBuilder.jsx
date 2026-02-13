@@ -10,9 +10,6 @@ import {
 } from '../config/campaignTemplates';
 import './CreativeBuilder.css';
 
-// Token de acceso de 3 meses con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
-const ACCESS_TOKEN = 'EAALFI7ZB5B9MBQrzKEhsGwlcsa820qgiSn6ZA4XlfCZBTNGZBfZAHY6UN4ttDdRKjsuO2EFEBM6DA4hdSR5NFfxniZBhrdkneOaSA6YwuUGjiMYn59UyQSKTfhPkahJF4ZBOvBeevWAWnYa46nXKzKvfWOcZAEdS6K9TGkST76XXOrPcshkgnPmZCmSt7ls4XHx95';
-
 // Prefijo para identificar campañas creadas por CARLOS
 const CAMPAIGN_PREFIX = 'CARLOS - ';
 
@@ -202,7 +199,7 @@ function TemplatePreview({ template, onClose }) {
 // ============================================
 // UPLOAD STEP COMPONENT - Configuración rápida post-plantilla
 // ============================================
-function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTemplates }) {
+function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTemplates, accessToken }) {
   // Obtener configuración de la plantilla (nueva estructura)
   const templateContent = selectedTemplate?.creativeContent || {};
   const templateAdSetConfig = selectedTemplate?.adSetConfig || {};
@@ -220,23 +217,50 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
   // Campos obligatorios para crear el anuncio
   const [linkUrl, setLinkUrl] = useState(''); // URL de destino
-  const [imageUrl, setImageUrl] = useState(''); // URL de imagen para el anuncio (opcional)
-  const [imageHash, setImageHash] = useState(''); // Hash de imagen subida a Meta
 
-  // Media selector
-  const [mediaSource, setMediaSource] = useState('none'); // 'none', 'library', 'upload', 'url'
+  // Media library (shared across all ads)
   const [mediaLibrary, setMediaLibrary] = useState({ images: [], videos: [] });
   const [loadingMedia, setLoadingMedia] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const [selectedVideoId, setSelectedVideoId] = useState(''); // ID de video seleccionado de la biblioteca
-  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState(''); // URL de miniatura automática del video
 
-  // IA Content Generation
-  const [aiPrompt, setAiPrompt] = useState(''); // Descripción para generar contenido con IA
-  const [generatingAI, setGeneratingAI] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [contentGenerated, setContentGenerated] = useState(false);
+  // (AI content is now auto-generated per-ad when media is uploaded)
+
+  // Multi-Ad System
+  const [adSetMode, setAdSetMode] = useState('single'); // 'single' = 1 AdSet, 'per-ad' = N AdSets
+  const createEmptyAd = (index) => ({
+    id: Date.now() + index,
+    adName: '',
+    mediaSource: 'none', // 'none', 'library', 'upload'
+    imageUrl: '',
+    imageHash: '',
+    videoId: '',
+    videoThumbnailUrl: '',
+    uploadingFile: false,
+    uploadProgress: '',
+    headlines: templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', ''],
+    descriptions: templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', ''],
+    ctas: templateContent.ctas || selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+    showEditContent: false,
+    analyzingMedia: false, // AI is analyzing the media
+    contentGenerated: false, // AI has generated content
+    // Per-ad audience (only used in 'per-ad' mode)
+    audienceId: '',
+    audienceName: '',
+    audienceTargeting: null,
+  });
+  const [ads, setAds] = useState([createEmptyAd(0)]);
+
+  const addAd = () => {
+    setAds(prev => [...prev, createEmptyAd(prev.length)]);
+  };
+
+  const removeAd = (index) => {
+    if (ads.length <= 1) return;
+    setAds(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAd = (index, updates) => {
+    setAds(prev => prev.map((ad, i) => i === index ? { ...ad, ...updates } : ad));
+  };
 
   // Campos dinámicos según tipo de campaña
   const [whatsappNumber, setWhatsappNumber] = useState(''); // Para campañas de WhatsApp
@@ -263,26 +287,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [loadingAudiences, setLoadingAudiences] = useState(false);
   const [audienceError, setAudienceError] = useState('');
 
-  // Creative Copy - Inicializado desde la plantilla (nueva estructura)
-  const [headlines, setHeadlines] = useState(
-    templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', '']
-  );
-  const [descriptions, setDescriptions] = useState(
-    templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', '']
-  );
-  const [ctas, setCtas] = useState(
-    templateContent.ctas || selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']
-  );
-
-  // Edición avanzada toggle
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // (headlines, descriptions, ctas are now per-ad in the ads array)
 
   // Cargar biblioteca de medios de Meta
   const handleLoadMediaLibrary = async () => {
     if (!selectedAccount) return;
     setLoadingMedia(true);
     try {
-      const metaService = new MetaAdsService(ACCESS_TOKEN);
+      const metaService = new MetaAdsService(accessToken);
       const [imgResult, vidResult] = await Promise.all([
         metaService.getAdImages(selectedAccount),
         metaService.getAdVideos(selectedAccount)
@@ -299,8 +311,52 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
   };
 
-  // Subir archivo desde dispositivo
-  const handleFileUpload = async (e) => {
+  // Helper: Auto-analyze media with AI and fill 5+5+5
+  const autoAnalyzeMedia = async (adIndex, file, isVideo) => {
+    updateAd(adIndex, {
+      analyzingMedia: true,
+      uploadProgress: `Analizando ${isVideo ? 'audio del video' : 'imagen'} con IA...`
+    });
+
+    try {
+      const metaService = new MetaAdsService(accessToken);
+      const category = selectedTemplate?.category || '';
+
+      let result;
+      if (isVideo) {
+        result = await metaService.analyzeVideoFile(file, adIndex, category);
+      } else {
+        result = await metaService.analyzeImageFile(file, adIndex, category);
+      }
+
+      if (result.success && result.data) {
+        updateAd(adIndex, {
+          headlines: result.data.headlines || ['', '', '', '', ''],
+          descriptions: result.data.descriptions || ['', '', '', '', ''],
+          ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+          analyzingMedia: false,
+          contentGenerated: true,
+          uploadProgress: `Contenido generado (${result.data.method === 'whisper' ? 'audio transcrito' : 'análisis visual'})`,
+          showEditContent: true
+        });
+        console.log(`Ad ${adIndex}: AI content generated via ${result.data.method}`);
+      } else {
+        updateAd(adIndex, {
+          analyzingMedia: false,
+          uploadProgress: `Media subida. IA: ${result.error || 'Error generando contenido'}`
+        });
+      }
+    } catch (err) {
+      console.error('Auto-analyze error:', err);
+      updateAd(adIndex, {
+        analyzingMedia: false,
+        uploadProgress: `Media subida. Error IA: ${err.message}`
+      });
+    }
+  };
+
+  // Subir archivo desde dispositivo (per-ad) + auto AI analysis
+  const handleAdFileUpload = async (adIndex, e) => {
     const file = e.target.files[0];
     if (!file || !selectedAccount) return;
 
@@ -308,104 +364,104 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     const isImage = file.type.startsWith('image/');
 
     if (!isImage && !isVideo) {
-      setUploadProgress('Error: Solo se aceptan imágenes (JPG, PNG) o videos (MP4)');
+      updateAd(adIndex, { uploadProgress: 'Error: Solo se aceptan imágenes (JPG, PNG) o videos (MP4)' });
       return;
     }
 
-    setUploadingFile(true);
-    setUploadProgress(`Subiendo ${file.name}...`);
+    updateAd(adIndex, { uploadingFile: true, uploadProgress: `Subiendo ${file.name}...` });
 
     try {
-      const metaService = new MetaAdsService(ACCESS_TOKEN);
+      const metaService = new MetaAdsService(accessToken);
       let result;
 
       if (isImage) {
         result = await metaService.uploadImageFile(selectedAccount, file);
         if (result.success) {
-          setImageUrl(result.data.url || '');
-          setImageHash(result.data.imageHash || '');
-          setUploadProgress(`Imagen "${file.name}" subida exitosamente`);
+          updateAd(adIndex, {
+            imageUrl: result.data.url || '',
+            imageHash: result.data.imageHash || '',
+            videoId: '',
+            videoThumbnailUrl: '',
+            uploadProgress: `Imagen subida. Analizando con IA...`,
+            uploadingFile: false
+          });
+          // Auto-analyze the uploaded image
+          autoAnalyzeMedia(adIndex, file, false);
+          return;
         }
       } else {
         result = await metaService.uploadVideoFile(selectedAccount, file);
         if (result.success) {
-          // Guardar videoId y thumbnail automático (URL o hash de fallback)
-          setSelectedVideoId(result.data.videoId);
-          setVideoThumbnailUrl(result.data.thumbnailUrl || '');
-          setImageUrl('');
-          // Si no hay thumbnailUrl pero sí hay thumbnailHash (fallback), guardarlo
-          setImageHash(result.data.thumbnailHash || '');
-          const thumbInfo = result.data.thumbnailUrl ? '(miniatura automática)' :
-            result.data.thumbnailHash ? '(miniatura de respaldo)' : '';
-          setUploadProgress(`Video "${file.name}" subido exitosamente ${thumbInfo}`);
+          updateAd(adIndex, {
+            videoId: result.data.videoId,
+            videoThumbnailUrl: result.data.thumbnailUrl || '',
+            imageUrl: '',
+            imageHash: result.data.thumbnailHash || '',
+            uploadProgress: `Video subido. Analizando audio con IA...`,
+            uploadingFile: false
+          });
+          // Auto-analyze the uploaded video
+          autoAnalyzeMedia(adIndex, file, true);
+          return;
         }
       }
 
       if (!result.success) {
-        setUploadProgress(`Error: ${result.error}`);
+        updateAd(adIndex, { uploadProgress: `Error: ${result.error}`, uploadingFile: false });
       }
     } catch (err) {
-      setUploadProgress(`Error: ${err.message}`);
-    } finally {
-      setUploadingFile(false);
+      updateAd(adIndex, { uploadProgress: `Error: ${err.message}`, uploadingFile: false });
     }
   };
 
-  // Seleccionar imagen de la biblioteca
-  const handleSelectLibraryImage = (image) => {
-    setImageUrl(image.url || '');
-    setImageHash(image.hash || '');
-    setSelectedVideoId('');
-    setVideoThumbnailUrl('');
-    setUploadProgress(`Imagen seleccionada: ${image.name || 'Sin nombre'}`);
+  // Seleccionar imagen de la biblioteca (per-ad)
+  // Note: Library items don't have the file blob, so we can't auto-analyze them.
+  // Content can be generated with the AI prompt instead.
+  const handleAdSelectLibraryImage = (adIndex, image) => {
+    updateAd(adIndex, {
+      imageUrl: image.url || '',
+      imageHash: image.hash || '',
+      videoId: '',
+      videoThumbnailUrl: '',
+      uploadProgress: `Imagen seleccionada: ${image.name || 'Sin nombre'}`
+    });
+    // Try to fetch the image URL and analyze it
+    if (image.url) {
+      fetchAndAnalyzeImageUrl(adIndex, image.url);
+    }
   };
 
-  // Seleccionar video de la biblioteca
-  const handleSelectLibraryVideo = (video) => {
-    setSelectedVideoId(video.id);
-    // Auto-tomar thumbnail del video
+  // Seleccionar video de la biblioteca (per-ad)
+  const handleAdSelectLibraryVideo = (adIndex, video) => {
     const thumbUrl = video.thumbnails?.data?.[0]?.uri || video.picture || '';
-    setVideoThumbnailUrl(thumbUrl);
-    // Limpiar imagen principal (el video reemplaza la imagen como contenido)
-    setImageUrl('');
-    setImageHash('');
-    setUploadProgress(`Video seleccionado: ${video.title || 'Sin título'} (${video.length ? Math.round(video.length) + 's' : ''})`);
+    updateAd(adIndex, {
+      videoId: video.id,
+      videoThumbnailUrl: thumbUrl,
+      imageUrl: '',
+      imageHash: '',
+      uploadProgress: `Video seleccionado: ${video.title || 'Sin título'}`
+    });
+    // For library videos, try to analyze the thumbnail image as fallback
+    if (thumbUrl) {
+      fetchAndAnalyzeImageUrl(adIndex, thumbUrl, 'video');
+    }
   };
 
-  // Función para generar contenido con IA
-  const handleGenerateWithAI = async () => {
-    if (!aiPrompt.trim()) {
-      setAiError('Por favor describe tu campaña para generar el contenido');
-      return;
-    }
-
-    setGeneratingAI(true);
-    setAiError('');
-
+  // Helper: Fetch image from URL and analyze it
+  const fetchAndAnalyzeImageUrl = async (adIndex, imageUrl, mediaType = 'imagen') => {
+    const label = mediaType === 'video' ? 'Analizando video con IA...' : 'Analizando imagen con IA...';
+    updateAd(adIndex, { analyzingMedia: true, uploadProgress: label });
     try {
-      const metaService = new MetaAdsService(ACCESS_TOKEN);
-      const result = await metaService.generateContentWithAI(aiPrompt, selectedTemplate?.category);
-
-      if (result.success) {
-        // Actualizar los campos con el contenido generado
-        setHeadlines(result.data.headlines || []);
-        setDescriptions(result.data.descriptions || []);
-        setCtas(result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']);
-
-        // Actualizar presupuesto sugerido si viene
-        if (result.data.suggestedBudget) {
-          setDailyBudget(result.data.suggestedBudget.toString());
-        }
-
-        setContentGenerated(true);
-        setShowAdvanced(true); // Mostrar el contenido generado
-      } else {
-        setAiError(result.error || 'Error generando contenido');
-      }
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const file = new File([blob], 'library-image.jpg', { type: blob.type || 'image/jpeg' });
+      await autoAnalyzeMedia(adIndex, file, false);
     } catch (err) {
-      setAiError(err.message || 'Error generando contenido con IA');
-    } finally {
-      setGeneratingAI(false);
+      console.warn('Could not fetch library image for analysis:', err.message);
+      updateAd(adIndex, {
+        analyzingMedia: false,
+        uploadProgress: 'Media seleccionada. Usa el generador de IA para el contenido.'
+      });
     }
   };
 
@@ -414,7 +470,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     const loadPages = async () => {
       setLoadingPages(true);
       try {
-        const metaService = new MetaAdsService(ACCESS_TOKEN);
+        const metaService = new MetaAdsService(accessToken);
         const result = await metaService.getPages();
         console.log('Pages loaded:', result);
         if (result.success && result.data) {
@@ -441,7 +497,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         return;
       }
       try {
-        const metaService = new MetaAdsService(ACCESS_TOKEN);
+        const metaService = new MetaAdsService(accessToken);
         const result = await metaService.getInstagramAccounts(selectedAccount);
         console.log('Instagram accounts loaded:', result);
         if (result.success && result.data.length > 0) {
@@ -472,7 +528,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       setLoadingAudiences(true);
       setAudienceError('');
       try {
-        const metaService = new MetaAdsService(ACCESS_TOKEN);
+        const metaService = new MetaAdsService(accessToken);
         const result = await metaService.getAllAudiences(selectedAccount);
 
         console.log('All audiences result:', result);
@@ -575,10 +631,25 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       // Determinar tipo de campaña basado en la plantilla
       const conversionLocation = templateAdSetConfig.conversionLocation || 'WEBSITE';
 
+      // Build ads array for multi-ad
+      const builtAds = ads.map((ad, i) => ({
+        adName: ad.adName?.trim() || `${fullCampaignName} - Ad ${i + 1}`,
+        imageUrl: ad.imageUrl?.trim() || null,
+        imageHash: ad.imageHash || null,
+        videoId: ad.videoId || null,
+        videoThumbnailUrl: ad.videoThumbnailUrl || null,
+        headlines: ad.headlines.filter(h => h.trim() !== ''),
+        descriptions: ad.descriptions.filter(d => d.trim() !== ''),
+        ctas: ad.ctas,
+        // Per-ad audience (for per-ad mode)
+        audienceId: ad.audienceId || null,
+        audienceName: ad.audienceName || null,
+        audienceTargeting: ad.audienceTargeting || null,
+      }));
+
       const jobData = {
         id: 'job_' + Date.now(),
         campaignName: fullCampaignName,
-        adName: `${CAMPAIGN_PREFIX}${campaignName.trim()}`,
         adAccountId: selectedAccount,
         adAccountName: selectedAccountData?.name || selectedAccount,
         dailyBudgetCOP: parseFloat(dailyBudget),
@@ -587,15 +658,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         pageName: selectedPageData?.name || selectedPage,
         // URL de destino (si aplica)
         linkUrl: linkUrl.trim() || null,
-        // Imagen/Video para el anuncio
-        imageUrl: imageUrl.trim() || null,
-        imageHash: imageHash || null,
-        videoId: selectedVideoId || null,
-        videoThumbnailUrl: videoThumbnailUrl || null, // Miniatura automática del video
-        noImage: !imageUrl.trim() && !imageHash && !selectedVideoId,
         // Cuenta de Instagram para el anuncio
         igActorId: selectedIgAccount || null,
         igUsername: igAccounts.find(ig => ig.id === selectedIgAccount)?.username || null,
+        // Multi-ad
+        adSetMode: adSetMode,
+        ads: builtAds,
+        totalAds: builtAds.length,
         // Campos dinámicos según tipo
         whatsappNumber: whatsappNumber.trim() || null,
         phoneNumber: phoneNumber.trim() || null,
@@ -609,10 +678,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         ageMin: ageMin,
         ageMax: ageMax,
         gender: gender, // 'all', 'male', 'female'
-        // Creative Copy (desde plantilla o editado)
-        headlines: headlines.filter(h => h.trim() !== ''),
-        descriptions: descriptions.filter(d => d.trim() !== ''),
-        ctas: ctas,
+        // Legacy fields from first ad (for WhatsApp/Messenger compat)
+        headlines: builtAds[0]?.headlines || [],
+        descriptions: builtAds[0]?.descriptions || [],
+        ctas: builtAds[0]?.ctas || [],
+        imageUrl: builtAds[0]?.imageUrl || null,
+        imageHash: builtAds[0]?.imageHash || null,
+        videoId: builtAds[0]?.videoId || null,
+        videoThumbnailUrl: builtAds[0]?.videoThumbnailUrl || null,
+        adName: builtAds[0]?.adName || fullCampaignName,
         // Configuración desde plantilla
         templateId: selectedTemplate?.id,
         templateName: selectedTemplate?.name,
@@ -782,256 +856,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </div>
         )}
 
-        {/* AI Content Generation */}
-        <div className="form-group ai-section">
-          <label>🤖 Genera el contenido con IA</label>
-          <textarea
-            placeholder="Describe tu campaña... Ej: Esta campaña es para una tienda de ropa deportiva llamada 'FitWear'. Quiero promocionar nuestra nueva colección de verano con descuentos del 30%. El público objetivo son personas de 25-45 años interesadas en fitness y moda deportiva."
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            rows={4}
-            style={{ resize: 'vertical' }}
-          />
-          <button
-            type="button"
-            className="ai-generate-btn"
-            onClick={handleGenerateWithAI}
-            disabled={generatingAI || !aiPrompt.trim()}
-          >
-            {generatingAI ? (
-              <>
-                <span className="spinner"></span>
-                Generando...
-              </>
-            ) : (
-              '✨ Generar 5+5+5 con IA'
-            )}
-          </button>
-          {aiError && <p className="hint" style={{ color: '#cc0000' }}>⚠️ {aiError}</p>}
-          {contentGenerated && <p className="hint" style={{ color: '#00aa00' }}>✅ Contenido generado. Revísalo en la sección de edición avanzada.</p>}
-          <p className="hint">La IA generará 5 títulos, 5 descripciones y 5 CTAs basados en tu descripción.</p>
-        </div>
-
-        {/* Selector de Medios para el Anuncio */}
+        {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
-          <label>🖼️ Imagen del Anuncio (Opcional)</label>
-
-          {/* Tabs de selección */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setMediaSource('none')}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', border: '2px solid',
-                borderColor: mediaSource === 'none' ? '#1877f2' : '#ddd',
-                background: mediaSource === 'none' ? '#e7f3ff' : 'white',
-                cursor: 'pointer', fontSize: '13px', fontWeight: mediaSource === 'none' ? 'bold' : 'normal'
-              }}
-            >
-              Sin imagen
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMediaSource('library'); handleLoadMediaLibrary(); }}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', border: '2px solid',
-                borderColor: mediaSource === 'library' ? '#1877f2' : '#ddd',
-                background: mediaSource === 'library' ? '#e7f3ff' : 'white',
-                cursor: 'pointer', fontSize: '13px', fontWeight: mediaSource === 'library' ? 'bold' : 'normal'
-              }}
-            >
-              📚 Biblioteca de Meta
-            </button>
-            <button
-              type="button"
-              onClick={() => setMediaSource('upload')}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', border: '2px solid',
-                borderColor: mediaSource === 'upload' ? '#1877f2' : '#ddd',
-                background: mediaSource === 'upload' ? '#e7f3ff' : 'white',
-                cursor: 'pointer', fontSize: '13px', fontWeight: mediaSource === 'upload' ? 'bold' : 'normal'
-              }}
-            >
-              📤 Subir archivo
-            </button>
-            <button
-              type="button"
-              onClick={() => setMediaSource('url')}
-              style={{
-                padding: '8px 16px', borderRadius: '8px', border: '2px solid',
-                borderColor: mediaSource === 'url' ? '#1877f2' : '#ddd',
-                background: mediaSource === 'url' ? '#e7f3ff' : 'white',
-                cursor: 'pointer', fontSize: '13px', fontWeight: mediaSource === 'url' ? 'bold' : 'normal'
-              }}
-            >
-              🔗 URL directa
-            </button>
-          </div>
-
-          {/* Biblioteca de Meta */}
-          {mediaSource === 'library' && (
-            <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '12px', maxHeight: '300px', overflowY: 'auto' }}>
-              {loadingMedia ? (
-                <p style={{ textAlign: 'center', color: '#666' }}>Cargando biblioteca...</p>
-              ) : (
-                <>
-                  {mediaLibrary.images.length === 0 && mediaLibrary.videos.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#999' }}>No hay medios en esta cuenta publicitaria</p>
-                  ) : (
-                    <>
-                      {mediaLibrary.images.length > 0 && (
-                        <div>
-                          <p style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
-                            Imágenes ({mediaLibrary.images.length})
-                          </p>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
-                            {mediaLibrary.images.map((img, i) => (
-                              <div
-                                key={img.hash || i}
-                                onClick={() => handleSelectLibraryImage(img)}
-                                style={{
-                                  cursor: 'pointer',
-                                  border: imageHash === img.hash ? '3px solid #1877f2' : '2px solid #eee',
-                                  borderRadius: '8px',
-                                  overflow: 'hidden',
-                                  position: 'relative',
-                                  aspectRatio: '1'
-                                }}
-                              >
-                                <img
-                                  src={img.url}
-                                  alt={img.name || 'Ad image'}
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
-                                {imageHash === img.hash && (
-                                  <div style={{
-                                    position: 'absolute', top: '4px', right: '4px',
-                                    background: '#1877f2', color: 'white', borderRadius: '50%',
-                                    width: '20px', height: '20px', display: 'flex',
-                                    alignItems: 'center', justifyContent: 'center', fontSize: '12px'
-                                  }}>✓</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {mediaLibrary.videos.length > 0 && (
-                        <div style={{ marginTop: '12px' }}>
-                          <p style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
-                            Videos ({mediaLibrary.videos.length})
-                          </p>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-                            {mediaLibrary.videos.map((vid, i) => {
-                              const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
-                              const isSelected = selectedVideoId === vid.id;
-                              return (
-                                <div
-                                  key={vid.id || i}
-                                  onClick={() => handleSelectLibraryVideo(vid)}
-                                  style={{
-                                    border: isSelected ? '3px solid #1877f2' : '2px solid #eee',
-                                    borderRadius: '8px',
-                                    overflow: 'hidden',
-                                    cursor: 'pointer',
-                                    background: isSelected ? '#e7f3ff' : 'white',
-                                    position: 'relative'
-                                  }}
-                                >
-                                  {thumbnail ? (
-                                    <img src={thumbnail} alt={vid.title} style={{ width: '100%', height: '80px', objectFit: 'cover' }} />
-                                  ) : (
-                                    <div style={{ width: '100%', height: '80px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
-                                      🎬
-                                    </div>
-                                  )}
-                                  <div style={{ padding: '6px 8px', fontSize: '11px' }}>
-                                    <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {vid.title || 'Sin título'}
-                                    </p>
-                                    {vid.length && <p style={{ color: '#666', margin: 0 }}>{Math.round(vid.length)}s</p>}
-                                  </div>
-                                  {isSelected && (
-                                    <div style={{
-                                      position: 'absolute', top: '4px', right: '4px',
-                                      background: '#1877f2', color: 'white', borderRadius: '50%',
-                                      width: '20px', height: '20px', display: 'flex',
-                                      alignItems: 'center', justifyContent: 'center', fontSize: '12px'
-                                    }}>✓</div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Subir archivo */}
-          {mediaSource === 'upload' && (
-            <div style={{ border: '2px dashed #ddd', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,video/mp4,video/mov"
-                onChange={handleFileUpload}
-                disabled={uploadingFile || !selectedAccount}
-                style={{ marginBottom: '10px' }}
-              />
-              <p className="hint">
-                {!selectedAccount
-                  ? '⚠️ Selecciona una cuenta publicitaria primero'
-                  : uploadingFile
-                    ? '⏳ ' + uploadProgress
-                    : 'JPG, PNG o MP4. Tamaño recomendado: 1200x628px para imágenes.'
-                }
-              </p>
-            </div>
-          )}
-
-          {/* URL directa */}
-          {mediaSource === 'url' && (
-            <div>
-              <input
-                type="url"
-                placeholder="https://ejemplo.com/imagen.jpg"
-                value={imageUrl}
-                onChange={(e) => { setImageUrl(e.target.value); setImageHash(''); }}
-              />
-              <p className="hint" style={{ fontSize: '12px', color: '#666' }}>
-                Pega una URL pública de imagen (JPG, PNG). Tamaño recomendado: 1200x628px para feed.
-              </p>
-            </div>
-          )}
-
-          {/* Estado actual */}
-          {uploadProgress && mediaSource !== 'none' && (
-            <p className="hint" style={{ color: imageUrl || imageHash ? '#00aa00' : '#cc6600', marginTop: '8px' }}>
-              {uploadProgress}
-            </p>
-          )}
-          {mediaSource === 'none' && (
-            <p className="hint">💡 Sin imagen/video, el anuncio usará la vista previa del link de destino.</p>
-          )}
-          {(imageUrl || imageHash) && (
-            <p className="hint" style={{ color: '#00aa00' }}>✅ Imagen lista para el anuncio</p>
-          )}
-          {selectedVideoId && (
-            <p className="hint" style={{ color: '#00aa00' }}>
-              ✅ Video seleccionado para el anuncio
-              {videoThumbnailUrl && ' (miniatura automática)'}
-            </p>
-          )}
-        </div>
-
-        {/* Audience Selection (Saved + Custom) */}
-        <div className="form-group">
-          <label>Público *</label>
+          <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
           <select
             value={selectedAudience}
             onChange={(e) => setSelectedAudience(e.target.value)}
@@ -1054,12 +881,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </select>
           {audienceError && (
             <p className="hint" style={{ color: '#cc6600' }}>
-              ⚠️ {audienceError}
+              {audienceError}
             </p>
           )}
           {selectedAudience && !audienceError && (
             <p className="hint success">
-              ✓ Público seleccionado: {allAudiences.find(a => a.id === selectedAudience)?.name}
+              Público seleccionado: {allAudiences.find(a => a.id === selectedAudience)?.name}
             </p>
           )}
         </div>
@@ -1083,7 +910,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Targeting Section: End Date, Age, Gender */}
         <div className="targeting-section">
-          <h4>🎯 Segmentación del Público</h4>
+          <h4>Segmentación del Público</h4>
 
           {/* End Date (Optional) */}
           <div className="targeting-row">
@@ -1131,123 +958,497 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   className={`gender-option ${gender === 'all' ? 'selected' : ''}`}
                   onClick={() => setGender('all')}
                 >
-                  <span className="icon">👥</span>
-                  Todos
+                  <span className="icon">Todos</span>
                 </div>
                 <div
                   className={`gender-option ${gender === 'male' ? 'selected' : ''}`}
                   onClick={() => setGender('male')}
                 >
-                  <span className="icon">👨</span>
-                  Hombres
+                  <span className="icon">Hombres</span>
                 </div>
                 <div
                   className={`gender-option ${gender === 'female' ? 'selected' : ''}`}
                   onClick={() => setGender('female')}
                 >
-                  <span className="icon">👩</span>
-                  Mujeres
+                  <span className="icon">Mujeres</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Advanced Edit Toggle */}
-        <div className="advanced-toggle">
-          <button
-            type="button"
-            className="toggle-advanced-btn"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            {showAdvanced ? '▼ Ocultar edición avanzada' : '▶ Editar contenido (opcional)'}
-          </button>
+        {/* ============ MULTI-AD SECTION ============ */}
+        <div className="section-divider" style={{ margin: '25px 0 15px' }}>
+          <span>Anuncios ({ads.length})</span>
         </div>
 
-        {/* Advanced Content Edit (Collapsed by default) */}
-        {showAdvanced && (
-          <div className="advanced-edit-section">
-            <div className="section-divider">
-              <span>Editar Contenido de la Plantilla</span>
-            </div>
-
-            {/* Headlines - 5 títulos */}
-            <div className="form-group">
-              <label>Títulos (5)</label>
-              {headlines.map((headline, index) => (
-                <input
-                  key={`headline-${index}`}
-                  type="text"
-                  placeholder={`Título ${index + 1}`}
-                  value={headline}
-                  onChange={(e) => {
-                    const newHeadlines = [...headlines];
-                    newHeadlines[index] = e.target.value;
-                    setHeadlines(newHeadlines);
-                  }}
-                  maxLength={40}
-                  style={{ marginBottom: '8px' }}
-                />
-              ))}
-            </div>
-
-            {/* Descriptions - 5 descripciones */}
-            <div className="form-group">
-              <label>Descripciones (5)</label>
-              {descriptions.map((desc, index) => (
-                <textarea
-                  key={`desc-${index}`}
-                  placeholder={`Descripción ${index + 1}`}
-                  value={desc}
-                  onChange={(e) => {
-                    const newDescriptions = [...descriptions];
-                    newDescriptions[index] = e.target.value;
-                    setDescriptions(newDescriptions);
-                  }}
-                  maxLength={125}
-                  rows={2}
-                  style={{ marginBottom: '8px', resize: 'vertical' }}
-                />
-              ))}
-            </div>
-
-            {/* CTAs - 5 call to actions */}
-            <div className="form-group">
-              <label>CTAs (5)</label>
-              {ctas.map((cta, index) => (
-                <select
-                  key={`cta-${index}`}
-                  value={cta}
-                  onChange={(e) => {
-                    const newCtas = [...ctas];
-                    newCtas[index] = e.target.value;
-                    setCtas(newCtas);
-                  }}
-                  style={{ marginBottom: '8px' }}
-                >
-                  {CTA_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ))}
-            </div>
-
-            {/* Reset to Template Button */}
+        {/* AdSet Mode Toggle */}
+        <div className="form-group" style={{ marginBottom: '15px' }}>
+          <label>Estructura de Ad Sets</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              className="reset-template-btn"
-              onClick={() => {
-                setHeadlines(selectedTemplate?.headlines || ['', '', '', '', '']);
-                setDescriptions(selectedTemplate?.descriptions || ['', '', '', '', '']);
-                setCtas(selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']);
+              onClick={() => setAdSetMode('single')}
+              style={{
+                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
+                borderColor: adSetMode === 'single' ? '#1877f2' : '#ddd',
+                background: adSetMode === 'single' ? '#e7f3ff' : 'white',
+                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'single' ? 'bold' : 'normal'
               }}
             >
-              Restaurar contenido original de la plantilla
+              Mismo público para todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdSetMode('per-ad')}
+              style={{
+                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
+                borderColor: adSetMode === 'per-ad' ? '#1877f2' : '#ddd',
+                background: adSetMode === 'per-ad' ? '#e7f3ff' : 'white',
+                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'per-ad' ? 'bold' : 'normal'
+              }}
+            >
+              Público diferente por anuncio
             </button>
           </div>
-        )}
+          <p className="hint">
+            {adSetMode === 'single'
+              ? 'Mismo público para todos. Se crea 1 Ad Set por anuncio (requerido por Meta para 5+5+5). CBO distribuye el presupuesto automáticamente.'
+              : 'Cada anuncio tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
+          </p>
+        </div>
+
+        {/* Ad Cards */}
+        <div className="ads-section">
+          {ads.map((ad, adIndex) => (
+            <div key={ad.id} className="ad-card" style={{
+              border: '2px solid #e0e0e0',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              background: '#fafafa'
+            }}>
+              {/* Ad Card Header */}
+              <div className="ad-card-header" style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '15px', color: '#333' }}>
+                  Anuncio {adIndex + 1}
+                </h4>
+                {ads.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAd(adIndex)}
+                    className="remove-ad-btn"
+                    style={{
+                      background: '#ff5252', color: 'white', border: 'none',
+                      borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px'
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                )}
+              </div>
+
+              {/* Ad Name */}
+              <div className="form-group" style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: '13px' }}>Nombre del anuncio</label>
+                <input
+                  type="text"
+                  placeholder={`Ad ${adIndex + 1}`}
+                  value={ad.adName}
+                  onChange={(e) => updateAd(adIndex, { adName: e.target.value })}
+                  style={{ fontSize: '13px' }}
+                />
+              </div>
+
+              {/* Per-ad Audience (only in per-ad mode) */}
+              {adSetMode === 'per-ad' && (
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px' }}>Público para este anuncio</label>
+                  <select
+                    value={ad.audienceId}
+                    onChange={(e) => {
+                      const aud = allAudiences.find(a => a.id === e.target.value);
+                      updateAd(adIndex, {
+                        audienceId: e.target.value,
+                        audienceName: aud?.name || '',
+                        audienceTargeting: aud?.targeting || null
+                      });
+                    }}
+                    style={{ fontSize: '13px' }}
+                  >
+                    <option value="">Usar público por defecto</option>
+                    {allAudiences.map((audience) => (
+                      <option key={audience.id} value={audience.id}>
+                        {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Media Source Tabs */}
+              <div className="form-group" style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: '13px' }}>Contenido (imagen/video)</label>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => updateAd(adIndex, { mediaSource: 'none' })}
+                    style={{
+                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
+                      borderColor: ad.mediaSource === 'none' ? '#1877f2' : '#ddd',
+                      background: ad.mediaSource === 'none' ? '#e7f3ff' : 'white',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'none' ? 'bold' : 'normal'
+                    }}
+                  >
+                    Vacío
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { updateAd(adIndex, { mediaSource: 'library' }); handleLoadMediaLibrary(); }}
+                    style={{
+                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
+                      borderColor: ad.mediaSource === 'library' ? '#1877f2' : '#ddd',
+                      background: ad.mediaSource === 'library' ? '#e7f3ff' : 'white',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'library' ? 'bold' : 'normal'
+                    }}
+                  >
+                    Biblioteca
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateAd(adIndex, { mediaSource: 'upload' })}
+                    style={{
+                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
+                      borderColor: ad.mediaSource === 'upload' ? '#1877f2' : '#ddd',
+                      background: ad.mediaSource === 'upload' ? '#e7f3ff' : 'white',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'upload' ? 'bold' : 'normal'
+                    }}
+                  >
+                    Subir archivo
+                  </button>
+                </div>
+
+                {/* Library Browser */}
+                {ad.mediaSource === 'library' && (
+                  <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '10px', maxHeight: '250px', overflowY: 'auto' }}>
+                    {loadingMedia ? (
+                      <p style={{ textAlign: 'center', color: '#666', fontSize: '13px' }}>Cargando biblioteca...</p>
+                    ) : (
+                      <>
+                        {mediaLibrary.images.length === 0 && mediaLibrary.videos.length === 0 ? (
+                          <p style={{ textAlign: 'center', color: '#999', fontSize: '13px' }}>No hay medios en esta cuenta</p>
+                        ) : (
+                          <>
+                            {mediaLibrary.images.length > 0 && (
+                              <div>
+                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px' }}>
+                                  Imágenes ({mediaLibrary.images.length})
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px' }}>
+                                  {mediaLibrary.images.map((img, i) => (
+                                    <div
+                                      key={img.hash || i}
+                                      onClick={() => handleAdSelectLibraryImage(adIndex, img)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        border: ad.imageHash === img.hash ? '3px solid #1877f2' : '2px solid #eee',
+                                        borderRadius: '6px',
+                                        overflow: 'hidden',
+                                        position: 'relative',
+                                        aspectRatio: '1'
+                                      }}
+                                    >
+                                      <img
+                                        src={img.url}
+                                        alt={img.name || 'Ad image'}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                      />
+                                      {ad.imageHash === img.hash && (
+                                        <div style={{
+                                          position: 'absolute', top: '2px', right: '2px',
+                                          background: '#1877f2', color: 'white', borderRadius: '50%',
+                                          width: '16px', height: '16px', display: 'flex',
+                                          alignItems: 'center', justifyContent: 'center', fontSize: '10px'
+                                        }}>v</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {mediaLibrary.videos.length > 0 && (
+                              <div style={{ marginTop: '10px' }}>
+                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px' }}>
+                                  Videos ({mediaLibrary.videos.length})
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '6px' }}>
+                                  {mediaLibrary.videos.map((vid, i) => {
+                                    const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
+                                    const isSelected = ad.videoId === vid.id;
+                                    return (
+                                      <div
+                                        key={vid.id || i}
+                                        onClick={() => handleAdSelectLibraryVideo(adIndex, vid)}
+                                        style={{
+                                          border: isSelected ? '3px solid #1877f2' : '2px solid #eee',
+                                          borderRadius: '6px',
+                                          overflow: 'hidden',
+                                          cursor: 'pointer',
+                                          background: isSelected ? '#e7f3ff' : 'white',
+                                          position: 'relative'
+                                        }}
+                                      >
+                                        {thumbnail ? (
+                                          <img src={thumbnail} alt={vid.title} style={{ width: '100%', height: '70px', objectFit: 'cover' }} />
+                                        ) : (
+                                          <div style={{ width: '100%', height: '70px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                                            V
+                                          </div>
+                                        )}
+                                        <div style={{ padding: '4px 6px', fontSize: '10px' }}>
+                                          <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {vid.title || 'Sin título'}
+                                          </p>
+                                          {vid.length && <p style={{ color: '#666', margin: 0 }}>{Math.round(vid.length)}s</p>}
+                                        </div>
+                                        {isSelected && (
+                                          <div style={{
+                                            position: 'absolute', top: '2px', right: '2px',
+                                            background: '#1877f2', color: 'white', borderRadius: '50%',
+                                            width: '16px', height: '16px', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px'
+                                          }}>v</div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Upload from device */}
+                {ad.mediaSource === 'upload' && (
+                  <div style={{ border: '2px dashed #ddd', borderRadius: '8px', padding: '15px', textAlign: 'center' }}>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/mov"
+                      onChange={(e) => handleAdFileUpload(adIndex, e)}
+                      disabled={ad.uploadingFile || !selectedAccount}
+                      style={{ marginBottom: '8px', fontSize: '12px' }}
+                    />
+                    <p className="hint" style={{ fontSize: '12px' }}>
+                      {!selectedAccount
+                        ? 'Selecciona una cuenta publicitaria primero'
+                        : ad.uploadingFile
+                          ? ad.uploadProgress
+                          : 'JPG, PNG o MP4.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Media & AI analysis status */}
+                {ad.analyzingMedia && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    background: '#e3f2fd', borderRadius: '6px', padding: '8px 12px', marginTop: '6px'
+                  }}>
+                    <span className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
+                    <span style={{ fontSize: '12px', color: '#1565c0' }}>
+                      {ad.uploadProgress || 'Analizando con IA...'}
+                    </span>
+                  </div>
+                )}
+                {!ad.analyzingMedia && ad.uploadProgress && ad.mediaSource !== 'none' && (
+                  <p className="hint" style={{ color: ad.contentGenerated ? '#00aa00' : ad.imageUrl || ad.imageHash || ad.videoId ? '#00aa00' : '#cc6600', marginTop: '6px', fontSize: '12px' }}>
+                    {ad.uploadProgress}
+                  </p>
+                )}
+                {ad.mediaSource === 'none' && (
+                  <p className="hint" style={{ fontSize: '12px' }}>Sin imagen/video, usará la vista previa del link.</p>
+                )}
+              </div>
+
+              {/* Content Summary & Edit Toggle */}
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => updateAd(adIndex, { showEditContent: !ad.showEditContent })}
+                  style={{
+                    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: ad.contentGenerated ? 'linear-gradient(135deg, #e8f5e9, #c8e6c9)' : '#f0f4f8',
+                    borderRadius: '10px', padding: '10px 14px', cursor: 'pointer',
+                    border: ad.contentGenerated ? '1px solid #81c784' : '1px solid #e0e0e0',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {ad.contentGenerated && (
+                      <span style={{
+                        background: '#4caf50', color: 'white', borderRadius: '4px',
+                        padding: '2px 6px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'
+                      }}>IA</span>
+                    )}
+                    <span style={{ fontSize: '13px', color: ad.contentGenerated ? '#1b5e20' : '#555', fontWeight: '500' }}>
+                      {ad.headlines.filter(h => h.trim()).length} Títulos + {ad.descriptions.filter(d => d.trim()).length} Descripciones + {[...new Set(ad.ctas)].length} CTAs
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '18px', color: '#888', transform: ad.showEditContent ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                    {ad.showEditContent ? 'v' : '>'}
+                  </span>
+                </button>
+
+                {/* Inline Content Editor */}
+                {ad.showEditContent && (
+                  <div style={{
+                    marginTop: '8px', padding: '16px', background: '#fff', borderRadius: '10px',
+                    border: '1px solid #e0e0e0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                  }}>
+                    {/* Headlines */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
+                      }}>
+                        <span style={{
+                          background: '#1877f2', color: 'white', borderRadius: '4px',
+                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
+                        }}>H</span>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                          Títulos ({ad.headlines.filter(h => h.trim()).length}/5)
+                        </label>
+                      </div>
+                      {ad.headlines.map((headline, hi) => (
+                        <div key={`ad${adIndex}-h${hi}`} style={{ position: 'relative', marginBottom: '6px' }}>
+                          <input
+                            type="text"
+                            placeholder={`Título ${hi + 1}`}
+                            value={headline}
+                            onChange={(e) => {
+                              const newHeadlines = [...ad.headlines];
+                              newHeadlines[hi] = e.target.value;
+                              updateAd(adIndex, { headlines: newHeadlines });
+                            }}
+                            maxLength={40}
+                            style={{
+                              fontSize: '13px', padding: '8px 40px 8px 10px',
+                              borderRadius: '6px', border: headline.trim() ? '1px solid #90caf9' : '1px solid #e0e0e0',
+                              background: headline.trim() ? '#f8fbff' : '#fff',
+                              width: '100%', boxSizing: 'border-box'
+                            }}
+                          />
+                          <span style={{
+                            position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                            fontSize: '10px', color: headline.length > 35 ? '#e53935' : '#bbb'
+                          }}>{headline.length}/40</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Descriptions */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
+                      }}>
+                        <span style={{
+                          background: '#ff9800', color: 'white', borderRadius: '4px',
+                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
+                        }}>D</span>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                          Descripciones ({ad.descriptions.filter(d => d.trim()).length}/5)
+                        </label>
+                      </div>
+                      {ad.descriptions.map((desc, di) => (
+                        <div key={`ad${adIndex}-d${di}`} style={{ position: 'relative', marginBottom: '6px' }}>
+                          <textarea
+                            placeholder={`Descripción ${di + 1}`}
+                            value={desc}
+                            onChange={(e) => {
+                              const newDescriptions = [...ad.descriptions];
+                              newDescriptions[di] = e.target.value;
+                              updateAd(adIndex, { descriptions: newDescriptions });
+                            }}
+                            maxLength={125}
+                            rows={2}
+                            style={{
+                              fontSize: '13px', padding: '8px 10px', resize: 'vertical',
+                              borderRadius: '6px', border: desc.trim() ? '1px solid #ffcc80' : '1px solid #e0e0e0',
+                              background: desc.trim() ? '#fffbf5' : '#fff',
+                              width: '100%', boxSizing: 'border-box'
+                            }}
+                          />
+                          <span style={{
+                            position: 'absolute', right: '8px', bottom: '8px',
+                            fontSize: '10px', color: desc.length > 115 ? '#e53935' : '#bbb'
+                          }}>{desc.length}/125</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* CTAs */}
+                    <div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
+                      }}>
+                        <span style={{
+                          background: '#9c27b0', color: 'white', borderRadius: '4px',
+                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
+                        }}>CTA</span>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                          Call to Actions ({[...new Set(ad.ctas)].length} únicos)
+                        </label>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        {ad.ctas.map((cta, ci) => (
+                          <select
+                            key={`ad${adIndex}-c${ci}`}
+                            value={cta}
+                            onChange={(e) => {
+                              const newCtas = [...ad.ctas];
+                              newCtas[ci] = e.target.value;
+                              updateAd(adIndex, { ctas: newCtas });
+                            }}
+                            style={{
+                              fontSize: '12px', padding: '7px 8px', borderRadius: '6px',
+                              border: '1px solid #e0e0e0', background: '#faf5ff', cursor: 'pointer'
+                            }}
+                          >
+                            {CTA_OPTIONS.map(option => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Add Another Ad Button */}
+          <button
+            type="button"
+            className="add-ad-btn"
+            onClick={addAd}
+            style={{
+              width: '100%', padding: '14px', border: '2px dashed #1877f2',
+              borderRadius: '12px', background: 'transparent', color: '#1877f2',
+              cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', marginBottom: '15px'
+            }}
+          >
+            + Agregar Otro Anuncio
+          </button>
+        </div>
 
         {error && <div className="error-message">⚠️ {error}</div>}
 
@@ -1262,7 +1463,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 // ============================================
 // DRAFT STEP COMPONENT - CREA CAMPAIGN + ADSET + CREATIVE + AD
 // ============================================
-function DraftStep({ job, onComplete, onBack }) {
+function DraftStep({ job, onComplete, onBack, accessToken }) {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
   const [draftData, setDraftData] = useState(null);
@@ -1283,7 +1484,7 @@ function DraftStep({ job, onComplete, onBack }) {
     setError('');
     setLogs([]);
 
-    const metaService = new MetaAdsService(ACCESS_TOKEN);
+    const metaService = new MetaAdsService(accessToken);
 
     try {
       addLog('Iniciando creación de campaña completa...');
@@ -1363,66 +1564,75 @@ function DraftStep({ job, onComplete, onBack }) {
         });
 
       } else {
-        // Campaña estándar (website, traffic, etc.)
-        // 1 Campaign + 1 AdSet (Dynamic Creative) + 1 Creative (5+5+5) + 1 Ad
+        // Campaña estándar (website, traffic, etc.) - MULTI-AD
+        const totalAds = job.ads?.length || 1;
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
-        if (job.videoId) {
-          addLog(`Video: Sí`);
-          addLog(`Miniatura: ${job.videoThumbnailUrl ? 'Automática' : job.imageHash ? 'Imagen de respaldo' : 'Se resolverá automáticamente'}`);
-        } else {
-          addLog(`Imagen: ${job.imageUrl || job.imageHash ? 'Sí' : 'No (se usará vista previa del link)'}`);
-        }
+        addLog(`Modo Ad Sets: ${job.adSetMode === 'per-ad' ? 'Un Ad Set por anuncio' : 'Un Ad Set compartido'}`);
+        addLog(`Total anuncios: ${totalAds}`);
         if (job.igActorId) addLog(`Instagram: @${job.igUsername || 'vinculada'}`);
-        const numTitles = job.headlines?.filter(h => h?.trim()).length || 0;
-        const numDescs = job.descriptions?.filter(d => d?.trim()).length || 0;
-        const numCtas = [...new Set(job.ctas || [])].length;
-        addLog(`Contenido: ${numTitles} títulos + ${numDescs} descripciones + ${numCtas} CTAs`);
 
-        addLog('Creando Campaign + AdSet + 1 Creative (5+5+5) + 1 Ad...');
+        // Log each ad's content
+        (job.ads || []).forEach((ad, i) => {
+          const numTitles = ad.headlines?.filter(h => h?.trim()).length || 0;
+          const numDescs = ad.descriptions?.filter(d => d?.trim()).length || 0;
+          const hasMedia = ad.videoId || ad.imageUrl || ad.imageHash;
+          addLog(`  Ad ${i + 1}: ${numTitles}t + ${numDescs}d | Media: ${hasMedia ? 'Sí' : 'No'}${ad.audienceName ? ' | Público: ' + ad.audienceName : ''}`);
+        });
 
-        result = await metaService.createCampaignWithAd(job.adAccountId, {
+        addLog(`Creando Campaign + ${totalAds} AdSet(s) + ${totalAds} Creative(s) + ${totalAds} Ad(s)...`);
+
+        result = await metaService.createCampaignWithMultipleAds(job.adAccountId, {
           campaignName: job.campaignName,
           objective,
           specialAdCategories: [],
-          adSetName: `${job.campaignName} - Ad Set`,
           dailyBudget: Math.round(job.dailyBudgetCOP),
           targeting,
           optimizationGoal,
           billingEvent,
-          adName: job.adName,
-          pageId: job.pageId,
-          imageUrl: job.imageUrl || null,
-          imageHash: job.imageHash || null,
-          videoId: job.videoId || null,
-          videoThumbnailUrl: job.videoThumbnailUrl || null,
-          titles: job.headlines || [],
-          bodies: job.descriptions || [],
-          descriptions: job.descriptions || [],
-          callToActionTypes: job.ctas || ['LEARN_MORE'],
-          linkUrl: job.linkUrl,
           endDate: job.endDate,
-          igActorId: job.igActorId || null
+          pageId: job.pageId,
+          igActorId: job.igActorId || null,
+          linkUrl: job.linkUrl,
+          adSetMode: job.adSetMode || 'single',
+          ads: job.ads || [{
+            adName: job.adName,
+            imageUrl: job.imageUrl,
+            imageHash: job.imageHash,
+            videoId: job.videoId,
+            videoThumbnailUrl: job.videoThumbnailUrl,
+            headlines: job.headlines || [],
+            descriptions: job.descriptions || [],
+            ctas: job.ctas || ['LEARN_MORE']
+          }]
         });
       }
 
       if (result.success) {
-        const hasCreative = result.creative && result.ad;
+        // Multi-ad result
+        const totalCreated = result.totalCreated || result.ads?.length || (result.ad ? 1 : 0);
+        const hasAds = totalCreated > 0;
 
-        if (hasCreative) {
-          addLog('✅ ¡Campaña completa creada! 1 anuncio con 5+5+5.');
+        if (hasAds) {
+          addLog(`Campaña creada: ${result.adSets?.length || 1} Ad Set(s) + ${totalCreated} anuncio(s).`);
+          if (result.totalFailed > 0) {
+            addLog(`${result.totalFailed} anuncio(s) fallaron.`);
+          }
         } else {
-          addLog('✅ ¡Campaña y Ad Set creados exitosamente!');
-          addLog('📋 El contenido 5+5+5 está listo para copiar');
+          addLog('Campaña y Ad Set creados. Anuncios pendientes.');
         }
 
         setDraftData({
           campaignId: result.campaign?.id,
           campaignName: job.campaignName,
-          adSetId: result.adSet?.id,
-          creativeId: result.creative?.id || null,
-          adId: result.ad?.id || null,
-          adName: job.adName,
-          totalAdsCreated: 1,
+          adSetId: result.adSets?.[0]?.id || result.adSet?.id,
+          adSets: result.adSets || (result.adSet ? [result.adSet] : []),
+          creativeId: result.creatives?.[0]?.id || result.creative?.id || null,
+          adId: result.ads?.[0]?.id || result.ad?.id || null,
+          ads: result.ads || (result.ad ? [result.ad] : []),
+          adName: job.ads?.[0]?.adName || job.adName,
+          totalAdsCreated: totalCreated,
+          totalAdSets: result.adSets?.length || 1,
+          adSetMode: job.adSetMode || 'single',
           dailyBudgetCOP: job.dailyBudgetCOP,
           savedAudienceName: job.savedAudienceName,
           pageName: job.pageName,
@@ -1438,14 +1648,15 @@ function DraftStep({ job, onComplete, onBack }) {
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
           ctas: job.ctas || [],
+          jobAds: job.ads || [],
           status: 'PAUSED',
           noImage: job.noImage || !job.imageUrl,
-          needsCreative: !hasCreative
+          needsCreative: !hasAds
         });
         setCreated(true);
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
-        addLog(`❌ Error: ${errorMessages}`);
+        addLog(`Error: ${errorMessages}`);
         setError(errorMessages);
       }
 
@@ -1458,28 +1669,26 @@ function DraftStep({ job, onComplete, onBack }) {
   };
 
   if (created && draftData) {
-    const adWasCreated = draftData.adId && draftData.creativeId;
+    const adWasCreated = draftData.totalAdsCreated > 0;
 
     return (
       <div className="draft-step">
         <div className="success-section">
-          <div className="success-icon">✅</div>
-          <h2>{adWasCreated ? '¡Campaña Completa Creada!' : '¡Campaña y Ad Set Creados!'}</h2>
+          <div className="success-icon">OK</div>
+          <h2>{adWasCreated
+            ? `Campaña Creada con ${draftData.totalAdsCreated} Anuncio(s)`
+            : 'Campaña y Ad Set Creados'
+          }</h2>
           <p>
             {adWasCreated
-              ? 'Tu campaña, conjunto de anuncios y anuncio han sido creados en Meta Ads Manager en estado PAUSADO.'
+              ? `Se crearon ${draftData.totalAdSets || 1} Ad Set(s) y ${draftData.totalAdsCreated} anuncio(s) en Meta Ads Manager en estado PAUSADO.`
               : 'Tu campaña y conjunto de anuncios han sido creados en Meta Ads Manager en estado PAUSADO.'
             }
           </p>
-          {!adWasCreated && (
-            <p style={{ color: '#f57c00', fontSize: '14px', marginTop: '10px' }}>
-              ⚠️ Solo falta crear el <strong>Anuncio</strong> manualmente en Meta Ads Manager con el contenido de abajo.
-            </p>
-          )}
 
           <div className="draft-details">
             <div className="draft-card">
-              <span className="card-icon">📊</span>
+              <span className="card-icon">C</span>
               <div>
                 <h4>Campaña</h4>
                 <p>{draftData.campaignName}</p>
@@ -1491,25 +1700,36 @@ function DraftStep({ job, onComplete, onBack }) {
             </div>
 
             <div className="draft-card">
-              <span className="card-icon">🎯</span>
+              <span className="card-icon">AS</span>
               <div>
-                <h4>Conjunto de Anuncios</h4>
+                <h4>Ad Set(s) ({draftData.totalAdSets || 1})</h4>
                 <p>Presupuesto: ${formatCOP(draftData.dailyBudgetCOP)} COP/día (CBO)</p>
-                <p className="hint">ID: {draftData.adSetId}</p>
-                <p className="hint">Público: {draftData.savedAudienceName || 'Colombia 18-65'}</p>
+                {draftData.adSets?.length > 0 ? (
+                  draftData.adSets.map((adSet, i) => (
+                    <p key={i} className="hint">Ad Set {i + 1} ID: {adSet.id}</p>
+                  ))
+                ) : (
+                  <p className="hint">ID: {draftData.adSetId}</p>
+                )}
+                <p className="hint">
+                  {draftData.adSetMode === 'per-ad'
+                    ? 'Modo: 1 Ad Set por anuncio'
+                    : `Público: ${draftData.savedAudienceName || 'Colombia 18-65'}`}
+                </p>
                 <span className="status-badge paused">PAUSADO</span>
               </div>
             </div>
 
             {adWasCreated ? (
               <div className="draft-card" style={{ background: '#e8f5e9', border: '2px solid #4caf50' }}>
-                <span className="card-icon">📢</span>
+                <span className="card-icon">Ad</span>
                 <div>
-                  <h4>Anuncios ({draftData.totalAdsCreated || 1})</h4>
-                  <p>{draftData.adName}</p>
+                  <h4>Anuncios ({draftData.totalAdsCreated})</h4>
                   {draftData.ads?.length > 0 ? (
                     draftData.ads.map((ad, i) => (
-                      <p key={i} className="hint">Ad {i + 1} ID: {ad.id}</p>
+                      <p key={i} className="hint">
+                        Ad {i + 1}: {draftData.jobAds?.[i]?.adName || `Ad ${i + 1}`} (ID: {ad.id})
+                      </p>
                     ))
                   ) : (
                     <p className="hint">ID: {draftData.adId}</p>
@@ -1523,7 +1743,7 @@ function DraftStep({ job, onComplete, onBack }) {
               </div>
             ) : (
               <div className="draft-card" style={{ background: '#fff3e0', border: '2px dashed #ff9800' }}>
-                <span className="card-icon">📢</span>
+                <span className="card-icon">Ad</span>
                 <div>
                   <h4>Anuncio (Pendiente)</h4>
                   <p style={{ color: '#e65100' }}>Crear manualmente en Meta Ads Manager</p>
@@ -1749,8 +1969,8 @@ function DraftStep({ job, onComplete, onBack }) {
             <p>{job.campaignName}</p>
           </div>
           <div className="summary-item">
-            <label>Nombre Anuncio</label>
-            <p>{job.adName}</p>
+            <label>Anuncios</label>
+            <p>{job.totalAds || 1} anuncio(s) | {job.adSetMode === 'per-ad' ? 'Ad Sets separados' : '1 Ad Set'}</p>
           </div>
           <div className="summary-item">
             <label>Presupuesto Diario (CBO)</label>
@@ -1809,65 +2029,65 @@ function DraftStep({ job, onComplete, onBack }) {
               <p>{job.phoneNumber}</p>
             </div>
           )}
-          {job.imageUrl ? (
-            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
-              <label>Imagen del Anuncio</label>
-              <p style={{ wordBreak: 'break-all' }}>{job.imageUrl}</p>
-            </div>
-          ) : (
-            <div className="summary-item" style={{ gridColumn: '1 / -1', background: '#e3f2fd' }}>
-              <label>🔗 Sin Imagen Personalizada</label>
-              <p>El anuncio usará la imagen de vista previa del link de destino.</p>
-            </div>
-          )}
+          <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+            <label>Media por Anuncio</label>
+            {job.ads?.map((ad, i) => (
+              <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
+                {ad.adName || `Ad ${i + 1}`}: {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
+              </p>
+            )) || <p>Sin media</p>}
+          </div>
         </div>
 
-        {/* Creative Copy Summary */}
-        {(job.headlines?.length > 0 || job.descriptions?.length > 0) && (
+        {/* Creative Copy Summary - Per Ad */}
+        {job.ads?.length > 0 && (
           <div className="creative-summary">
-            <h4>Contenido del Anuncio ({job.headlines?.length || 0} títulos, {job.descriptions?.length || 0} descripciones)</h4>
-            {job.headlines?.length > 0 && (
-              <div className="creative-list">
-                <label>Títulos</label>
-                <ul>
-                  {job.headlines.map((h, i) => <li key={i}>{h}</li>)}
-                </ul>
+            <h4>Contenido de los Anuncios ({job.ads.length})</h4>
+            {job.ads.map((ad, i) => (
+              <div key={i} style={{
+                background: '#f8f9fa', borderRadius: '8px', padding: '10px', marginBottom: '8px',
+                borderLeft: '3px solid #1877f2'
+              }}>
+                <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
+                  {ad.adName || `Ad ${i + 1}`}
+                  {ad.videoId ? ' (Video)' : ad.imageUrl || ad.imageHash ? ' (Imagen)' : ' (Sin media)'}
+                  {job.adSetMode === 'per-ad' && ad.audienceName ? ` - ${ad.audienceName}` : ''}
+                </p>
+                <p style={{ fontSize: '12px', color: '#666' }}>
+                  {ad.headlines?.length || 0} títulos + {ad.descriptions?.length || 0} descripciones + {[...new Set(ad.ctas || [])].length} CTAs
+                </p>
               </div>
-            )}
-            {job.descriptions?.length > 0 && (
-              <div className="creative-list">
-                <label>Descripciones</label>
-                <ul>
-                  {job.descriptions.map((d, i) => <li key={i}>{d}</li>)}
-                </ul>
-              </div>
-            )}
-            {job.ctas?.length > 0 && (
-              <div className="creative-list">
-                <label>CTAs</label>
-                <p>{[...new Set(job.ctas)].map(c => CTA_OPTIONS.find(o => o.value === c)?.label || c).join(', ')}</p>
-              </div>
-            )}
+            ))}
           </div>
         )}
       </div>
 
       <div className="info-box">
-        <span className="info-icon">ℹ️</span>
+        <span className="info-icon">i</span>
         <div>
           <p><strong>Se creará en Meta Ads:</strong></p>
           <ul>
             <li><strong>1 Campaña</strong> - Objetivo: {job.objective || 'Tráfico'} (PAUSADA)</li>
-            <li><strong>1 Ad Set</strong> - Dynamic Creative - {job.optimizationGoal || 'Landing Page Views'}</li>
-            <li><strong>1 Creative</strong> - {job.headlines?.filter(h => h?.trim()).length || 0} títulos + {job.descriptions?.filter(d => d?.trim()).length || 0} descripciones + {[...new Set(job.ctas || [])].length} CTAs</li>
-            <li><strong>1 Anuncio</strong> - {job.videoId ? 'Con video' : job.imageUrl || job.imageHash ? 'Con imagen' : 'Vista previa del link'}</li>
+            <li><strong>{job.adSetMode === 'per-ad' ? (job.ads?.length || 1) + ' Ad Sets' : '1 Ad Set'}</strong> - Dynamic Creative - {job.optimizationGoal || 'Landing Page Views'}</li>
+            <li><strong>{job.ads?.length || 1} Creative(s)</strong> - Cada uno con 5+5+5</li>
+            <li><strong>{job.ads?.length || 1} Anuncio(s)</strong></li>
           </ul>
+          {job.ads?.length > 1 && (
+            <div style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
+              {job.ads.map((ad, i) => (
+                <p key={i} style={{ margin: '3px 0' }}>
+                  Ad {i + 1}: {ad.adName || `Ad ${i + 1}`} | {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
+                  {job.adSetMode === 'per-ad' && ad.audienceName ? ` | ${ad.audienceName}` : ''}
+                </p>
+              ))}
+            </div>
+          )}
           <p style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
-            💡 Meta probará automáticamente las diferentes combinaciones de títulos, descripciones y CTAs para encontrar la mejor.
+            Meta probará automáticamente las diferentes combinaciones de títulos, descripciones y CTAs para encontrar la mejor.
           </p>
           {job.igActorId && (
             <p style={{ fontSize: '13px', marginTop: '5px', color: '#666' }}>
-              📸 Instagram: @{job.igUsername || 'vinculada'} - El anuncio aparecerá también en Instagram.
+              Instagram: @{job.igUsername || 'vinculada'} - Los anuncios aparecerán también en Instagram.
             </p>
           )}
         </div>
@@ -1906,7 +2126,7 @@ function DraftStep({ job, onComplete, onBack }) {
 // ============================================
 // MAIN CREATIVE BUILDER COMPONENT (Con sistema de plantillas)
 // ============================================
-export default function CreativeBuilder({ adAccounts }) {
+export default function CreativeBuilder({ adAccounts, accessToken }) {
   const [step, setStep] = useState('templates'); // templates, config, draft
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [currentJob, setCurrentJob] = useState(null);
@@ -1976,6 +2196,7 @@ export default function CreativeBuilder({ adAccounts }) {
             onJobCreated={handleJobCreated}
             selectedTemplate={selectedTemplate}
             onBackToTemplates={handleBackToTemplates}
+            accessToken={accessToken}
           />
         )}
         {step === 'draft' && currentJob && (
@@ -1983,6 +2204,7 @@ export default function CreativeBuilder({ adAccounts }) {
             job={currentJob}
             onComplete={handleComplete}
             onBack={handleBack}
+            accessToken={accessToken}
           />
         )}
       </div>
