@@ -606,6 +606,7 @@ class MetaAdsService {
 
       const formData = new FormData();
       formData.append('adAccountId', normalizedId);
+      formData.append('accessToken', this.accessToken);
       formData.append('image', file);
 
       const response = await axios.post(`${BACKEND_API_URL}/upload/image-file`, formData, {
@@ -630,6 +631,7 @@ class MetaAdsService {
 
       const formData = new FormData();
       formData.append('adAccountId', normalizedId);
+      formData.append('accessToken', this.accessToken);
       formData.append('video', file);
       formData.append('title', file.name);
 
@@ -840,6 +842,7 @@ class MetaAdsService {
 
         const response = await axios.post(`${BACKEND_API_URL}/upload/video`, {
           adAccountId: normalizedId,
+          accessToken: this.accessToken,
           videoUrl: videoSource,
           title
         });
@@ -884,6 +887,7 @@ class MetaAdsService {
 
         const response = await axios.post(`${BACKEND_API_URL}/upload/image`, {
           adAccountId: normalizedId,
+          accessToken: this.accessToken,
           imageUrl: imageSource
         });
 

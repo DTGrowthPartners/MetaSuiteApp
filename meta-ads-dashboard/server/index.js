@@ -35,6 +35,11 @@ if (!OPENAI_API_KEY) {
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
 
+// Helper: obtener token dinámico del request (query, body, header) o fallback al hardcodeado
+function getToken(req) {
+  return req.query?.accessToken || req.body?.accessToken || req.headers['x-access-token'] || ACCESS_TOKEN;
+}
+
 // Helper: detectar content-type desde extensión de archivo
 function getContentTypeFromExt(filename) {
   const ext = (filename || '').toLowerCase().split('.').pop();
@@ -67,7 +72,7 @@ const getAdAccounts = async () => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/me/adaccounts`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,account_status,business{id,name}'
       }
     });
@@ -83,7 +88,7 @@ const getBusinesses = async () => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/me/businesses`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,profile_picture_uri'
       }
     });
@@ -99,7 +104,7 @@ const getBusinessOwnedAdAccounts = async (businessId) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_ad_accounts`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,account_status',
         limit: 100
       }
@@ -115,7 +120,7 @@ const getBusinessClientAdAccounts = async (businessId) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/${businessId}/client_ad_accounts`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,account_status',
         limit: 100
       }
@@ -132,7 +137,7 @@ const getActiveCampaigns = async (adAccountId) => {
     const normalizedId = normalizeAccountId(adAccountId);
     const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,status,objective,daily_budget,lifetime_budget,budget_remaining,special_ad_categories,buying_type,configured_status',
         limit: 100
       }
@@ -149,7 +154,7 @@ const getActiveCampaigns = async (adAccountId) => {
 const getCampaignInsights = async (campaignId, datePreset = 'maximum') => {
   try {
     const params = {
-      access_token: ACCESS_TOKEN,
+      access_token: getToken(req),
       fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type,cost_per_result,website_ctr,inline_link_clicks,unique_actions,outbound_clicks'
     };
     if (datePreset !== 'maximum') {
@@ -308,7 +313,7 @@ app.post('/api/campaigns/:campaignId/status', async (req, res) => {
       null,
       {
         params: {
-          access_token: ACCESS_TOKEN,
+          access_token: getToken(req),
           status: status
         }
       }
@@ -439,6 +444,7 @@ app.get('/api/dashboard/summary', async (req, res) => {
 app.post('/api/upload/image', async (req, res) => {
   try {
     const { adAccountId, imageUrl } = req.body;
+    const token = getToken(req);
 
     if (!adAccountId) {
       return res.status(400).json({
@@ -473,7 +479,7 @@ app.post('/api/upload/image', async (req, res) => {
       null,
       {
         params: {
-          access_token: ACCESS_TOKEN,
+          access_token: token,
           url: imageUrl
         }
       }
@@ -526,6 +532,7 @@ app.post('/api/upload/image', async (req, res) => {
 app.post('/api/upload/video', async (req, res) => {
   try {
     const { adAccountId, videoUrl, title } = req.body;
+    const token = getToken(req);
 
     if (!adAccountId) {
       return res.status(400).json({
@@ -560,7 +567,7 @@ app.post('/api/upload/video', async (req, res) => {
       null,
       {
         params: {
-          access_token: ACCESS_TOKEN,
+          access_token: token,
           file_url: videoUrl,
           title: title || 'Video Creative'
         }
@@ -599,6 +606,7 @@ app.post('/api/upload/video', async (req, res) => {
 app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
   try {
     const { adAccountId } = req.body;
+    const token = getToken(req);
     const file = req.file;
 
     if (!adAccountId) {
@@ -625,7 +633,7 @@ app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
 
     // Usar file.buffer directamente (memoryStorage)
     const formData = new FormData();
-    formData.append('access_token', ACCESS_TOKEN);
+    formData.append('access_token', token);
     formData.append('filename', file.originalname);
     formData.append('source', file.buffer, {
       filename: file.originalname,
@@ -668,6 +676,7 @@ app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
 app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
   try {
     const { adAccountId, title } = req.body;
+    const token = getToken(req);
     const file = req.file;
 
     if (!adAccountId) {
@@ -694,7 +703,7 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
 
     // Usar file.buffer directamente (memoryStorage)
     const formData = new FormData();
-    formData.append('access_token', ACCESS_TOKEN);
+    formData.append('access_token', token);
     formData.append('title', title || file.originalname);
     formData.append('source', file.buffer, {
       filename: file.originalname,
@@ -729,7 +738,7 @@ app.get('/api/pages', async (req, res) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/me/accounts`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,access_token,instagram_business_account{id,username}'
       }
     });
@@ -757,7 +766,7 @@ app.get('/api/audiences/:accountId', async (req, res) => {
     // Obtener Saved Audiences
     const savedResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}/saved_audiences`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,targeting',
         limit: 100
       }
@@ -766,7 +775,7 @@ app.get('/api/audiences/:accountId', async (req, res) => {
     // Obtener Custom Audiences
     const customResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,subtype,description',
         limit: 100
       }
@@ -800,7 +809,7 @@ app.get('/api/pixels/:accountId', async (req, res) => {
 
     const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/adspixels`, {
       params: {
-        access_token: ACCESS_TOKEN,
+        access_token: getToken(req),
         fields: 'id,name,code,last_fired_time,is_unavailable'
       }
     });
