@@ -27,12 +27,18 @@ const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI
 
 // OpenAI Configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+let openai = null;
 
-if (!OPENAI_API_KEY) {
-  console.error('ERROR: OPENAI_API_KEY no está configurada en las variables de entorno. Las funciones de IA no funcionarán.');
+if (OPENAI_API_KEY) {
+  try {
+    openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    console.log('OpenAI API configurada correctamente');
+  } catch (err) {
+    console.error('ERROR al inicializar OpenAI:', err.message);
+  }
 } else {
-  console.log('OpenAI API configurada correctamente');
+  console.warn('ADVERTENCIA: OPENAI_API_KEY no está configurada. Las funciones de IA (5+5+5 automático) no funcionarán.');
+  console.warn('Configura la variable de entorno OPENAI_API_KEY para habilitar generación de contenido con IA.');
 }
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
@@ -71,11 +77,11 @@ const normalizeAccountId = (accountId) => {
 };
 
 // Obtener cuentas publicitarias del usuario
-const getAdAccounts = async () => {
+const getAdAccounts = async (token) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/me/adaccounts`, {
       params: {
-        access_token: getToken(req),
+        access_token: token,
         fields: 'id,name,account_status,business{id,name}'
       }
     });
@@ -87,11 +93,11 @@ const getAdAccounts = async () => {
 };
 
 // Obtener businesses del usuario
-const getBusinesses = async () => {
+const getBusinesses = async (token) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/me/businesses`, {
       params: {
-        access_token: getToken(req),
+        access_token: token,
         fields: 'id,name,profile_picture_uri'
       }
     });
@@ -103,11 +109,11 @@ const getBusinesses = async () => {
 };
 
 // Obtener cuentas propias de un business
-const getBusinessOwnedAdAccounts = async (businessId) => {
+const getBusinessOwnedAdAccounts = async (businessId, token) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_ad_accounts`, {
       params: {
-        access_token: getToken(req),
+        access_token: token,
         fields: 'id,name,account_status',
         limit: 100
       }
@@ -119,11 +125,11 @@ const getBusinessOwnedAdAccounts = async (businessId) => {
 };
 
 // Obtener cuentas de clientes de un business
-const getBusinessClientAdAccounts = async (businessId) => {
+const getBusinessClientAdAccounts = async (businessId, token) => {
   try {
     const response = await axios.get(`${META_API_BASE_URL}/${businessId}/client_ad_accounts`, {
       params: {
-        access_token: getToken(req),
+        access_token: token,
         fields: 'id,name,account_status',
         limit: 100
       }
@@ -135,12 +141,12 @@ const getBusinessClientAdAccounts = async (businessId) => {
 };
 
 // Obtener campañas activas de una cuenta
-const getActiveCampaigns = async (adAccountId) => {
+const getActiveCampaigns = async (adAccountId, token) => {
   try {
     const normalizedId = normalizeAccountId(adAccountId);
     const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
       params: {
-        access_token: getToken(req),
+        access_token: token,
         fields: 'id,name,status,objective,daily_budget,lifetime_budget,budget_remaining,special_ad_categories,buying_type,configured_status',
         limit: 100
       }
@@ -154,10 +160,10 @@ const getActiveCampaigns = async (adAccountId) => {
 };
 
 // Obtener insights de una campaña
-const getCampaignInsights = async (campaignId, datePreset = 'maximum') => {
+const getCampaignInsights = async (campaignId, datePreset = 'maximum', token) => {
   try {
     const params = {
-      access_token: getToken(req),
+      access_token: token,
       fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type,cost_per_result,website_ctr,inline_link_clicks,unique_actions,outbound_clicks'
     };
     if (datePreset !== 'maximum') {
@@ -171,11 +177,11 @@ const getCampaignInsights = async (campaignId, datePreset = 'maximum') => {
 };
 
 // Obtener campañas con insights
-const getCampaignsWithInsights = async (adAccountId, datePreset = 'maximum') => {
-  const campaigns = await getActiveCampaigns(adAccountId);
+const getCampaignsWithInsights = async (adAccountId, datePreset = 'maximum', token) => {
+  const campaigns = await getActiveCampaigns(adAccountId, token);
   const campaignsWithInsights = await Promise.all(
     campaigns.map(async (campaign) => {
-      const insights = await getCampaignInsights(campaign.id, datePreset);
+      const insights = await getCampaignInsights(campaign.id, datePreset, token);
       return { ...campaign, insights };
     })
   );
@@ -183,13 +189,13 @@ const getCampaignsWithInsights = async (adAccountId, datePreset = 'maximum') => 
 };
 
 // Obtener todas las cuentas de todos los businesses
-const getAllAdAccountsFromBusinesses = async () => {
-  const businesses = await getBusinesses();
+const getAllAdAccountsFromBusinesses = async (token) => {
+  const businesses = await getBusinesses(token);
   const allAccounts = [];
   const seenIds = new Set();
 
   for (const business of businesses) {
-    const ownedAccounts = await getBusinessOwnedAdAccounts(business.id);
+    const ownedAccounts = await getBusinessOwnedAdAccounts(business.id, token);
     for (const account of ownedAccounts) {
       if (!seenIds.has(account.id)) {
         seenIds.add(account.id);
@@ -202,7 +208,7 @@ const getAllAdAccountsFromBusinesses = async () => {
       }
     }
 
-    const clientAccounts = await getBusinessClientAdAccounts(business.id);
+    const clientAccounts = await getBusinessClientAdAccounts(business.id, token);
     for (const account of clientAccounts) {
       if (!seenIds.has(account.id)) {
         seenIds.add(account.id);
@@ -216,7 +222,7 @@ const getAllAdAccountsFromBusinesses = async () => {
     }
   }
 
-  const personalAccounts = await getAdAccounts();
+  const personalAccounts = await getAdAccounts(token);
   for (const account of personalAccounts) {
     if (!seenIds.has(account.id)) {
       seenIds.add(account.id);
@@ -241,14 +247,16 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'Meta Ads Dashboard API'
+    service: 'Meta Ads Dashboard API',
+    openaiConfigured: !!openai
   });
 });
 
 // Obtener todos los businesses
 app.get('/api/businesses', async (req, res) => {
   try {
-    const businesses = await getBusinesses();
+    const token = getToken(req);
+    const businesses = await getBusinesses(token);
     res.json({
       success: true,
       data: businesses,
@@ -262,7 +270,8 @@ app.get('/api/businesses', async (req, res) => {
 // Obtener todas las cuentas publicitarias
 app.get('/api/ad-accounts', async (req, res) => {
   try {
-    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses();
+    const token = getToken(req);
+    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses(token);
     res.json({
       success: true,
       data: {
@@ -284,8 +293,9 @@ app.get('/api/campaigns/:accountId', async (req, res) => {
   try {
     const { accountId } = req.params;
     const { date_preset = 'maximum' } = req.query;
+    const token = getToken(req);
 
-    const campaigns = await getCampaignsWithInsights(accountId, date_preset);
+    const campaigns = await getCampaignsWithInsights(accountId, date_preset, token);
     res.json({
       success: true,
       data: campaigns,
@@ -339,14 +349,15 @@ app.post('/api/campaigns/:campaignId/status', async (req, res) => {
 app.get('/api/dashboard', async (req, res) => {
   try {
     const { date_preset = 'maximum' } = req.query;
+    const token = getToken(req);
 
     // Obtener todas las cuentas
-    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses();
+    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses(token);
 
     // Obtener campañas de todas las cuentas
     const accountsWithCampaigns = await Promise.all(
       adAccounts.map(async (account) => {
-        const campaigns = await getCampaignsWithInsights(account.id, date_preset);
+        const campaigns = await getCampaignsWithInsights(account.id, date_preset, token);
         return {
           ...account,
           campaigns,
@@ -389,8 +400,9 @@ app.get('/api/dashboard', async (req, res) => {
 app.get('/api/dashboard/summary', async (req, res) => {
   try {
     const { date_preset = 'maximum' } = req.query;
+    const token = getToken(req);
 
-    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses();
+    const { businesses, adAccounts } = await getAllAdAccountsFromBusinesses(token);
 
     const summaryByBusiness = {};
 
@@ -409,7 +421,7 @@ app.get('/api/dashboard/summary', async (req, res) => {
         };
       }
 
-      const campaigns = await getCampaignsWithInsights(account.id, date_preset);
+      const campaigns = await getCampaignsWithInsights(account.id, date_preset, token);
       const accountSummary = {
         account_id: account.id,
         account_name: account.name,
@@ -838,6 +850,13 @@ app.get('/api/pixels/:accountId', async (req, res) => {
 // Generar contenido 5+5+5 con OpenAI
 app.post('/api/generate-content', async (req, res) => {
   try {
+    if (!openai) {
+      return res.status(503).json({
+        success: false,
+        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor.'
+      });
+    }
+
     const { prompt, category } = req.body;
 
     if (!prompt) {
@@ -1133,6 +1152,13 @@ CTAs válidos (SOLO estos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBS
 // POST /api/analyze-video - Transcribe video audio and generate 5+5+5
 app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
   try {
+    if (!openai) {
+      return res.status(503).json({
+        success: false,
+        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor para habilitar análisis de video.'
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No se recibió archivo de video' });
     }
@@ -1234,6 +1260,13 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
 // POST /api/analyze-image - Analyze image with vision and generate 5+5+5
 app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
   try {
+    if (!openai) {
+      return res.status(503).json({
+        success: false,
+        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor para habilitar análisis de imagen.'
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No se recibió archivo de imagen' });
     }
