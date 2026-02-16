@@ -1983,10 +1983,13 @@ class MetaAdsService {
     pageId,
     whatsappNumber,
     imageUrl,
+    imageHash = null,
     headlines = [],
     descriptions = [],
     primaryTexts = [],
-    callToAction = 'WHATSAPP_MESSAGE'
+    callToAction = 'WHATSAPP_MESSAGE',
+    objective = 'OUTCOME_ENGAGEMENT',
+    optimizationGoal = 'CONVERSATIONS'
   }) {
     const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
 
@@ -1995,7 +1998,7 @@ class MetaAdsService {
       console.log('Step 1/4: Creating campaign...');
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
-        objective: 'OUTCOME_ENGAGEMENT',
+        objective,
         status: 'PAUSED',
         dailyBudget
       });
@@ -2012,6 +2015,7 @@ class MetaAdsService {
         name: adSetName || `${campaignName} - Ad Set`,
         campaignId: results.campaign.id,
         targeting,
+        optimizationGoal,
         promotedObject: { page_id: pageId }
       });
 
@@ -2026,7 +2030,8 @@ class MetaAdsService {
       const creativeResult = await this.createCreativeForWhatsApp(adAccountId, {
         name: `${campaignName} - Creative`,
         pageId,
-        imageUrl, // Usar URL directa en lugar de imageHash
+        imageHash,
+        imageUrl,
         whatsappNumber,
         primaryText: primaryTexts[0] || descriptions[0] || 'Escríbenos por WhatsApp',
         headline: headlines[0] || 'Contáctanos',
@@ -2072,10 +2077,13 @@ class MetaAdsService {
     targeting,
     pageId,
     imageUrl,
+    imageHash = null,
     headlines = [],
     descriptions = [],
     primaryTexts = [],
-    callToAction = 'SEND_MESSAGE'
+    callToAction = 'SEND_MESSAGE',
+    objective = 'OUTCOME_ENGAGEMENT',
+    optimizationGoal = 'CONVERSATIONS'
   }) {
     const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
 
@@ -2084,7 +2092,7 @@ class MetaAdsService {
       console.log('Step 1/4: Creating campaign...');
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
-        objective: 'OUTCOME_ENGAGEMENT',
+        objective,
         status: 'PAUSED',
         dailyBudget
       });
@@ -2101,6 +2109,7 @@ class MetaAdsService {
         name: adSetName || `${campaignName} - Ad Set`,
         campaignId: results.campaign.id,
         targeting,
+        optimizationGoal,
         promotedObject: { page_id: pageId }
       });
 
@@ -2115,9 +2124,209 @@ class MetaAdsService {
       const creativeResult = await this.createCreativeForMessenger(adAccountId, {
         name: `${campaignName} - Creative`,
         pageId,
-        imageUrl, // Usar URL directa en lugar de imageHash
+        imageHash,
+        imageUrl,
         primaryText: primaryTexts[0] || descriptions[0] || 'Envíanos un mensaje',
         headline: headlines[0] || 'Contáctanos',
+        description: descriptions[0] || '',
+        callToAction
+      });
+
+      if (!creativeResult.success) {
+        results.errors.push(`Creative: ${creativeResult.error}`);
+        return { success: false, ...results };
+      }
+      results.creative = creativeResult.data;
+
+      // 4. Crear Ad
+      console.log('Step 4/4: Creating ad...');
+      const adResult = await this.createAd(adAccountId, {
+        name: adName || `${campaignName} - Ad`,
+        adsetId: results.adSet.id,
+        creativeId: results.creative.id,
+        status: 'PAUSED'
+      });
+
+      if (!adResult.success) {
+        results.errors.push(`Ad: ${adResult.error}`);
+        return { success: false, ...results };
+      }
+      results.ad = adResult.data;
+
+      return { success: true, ...results };
+
+    } catch (error) {
+      results.errors.push(`Unexpected: ${error.message}`);
+      return { success: false, ...results };
+    }
+  }
+
+  // Crear AdSet para Instagram Direct
+  async createAdSetForInstagramDM(adAccountId, {
+    name,
+    campaignId,
+    targeting,
+    optimizationGoal = 'CONVERSATIONS',
+    billingEvent = 'IMPRESSIONS',
+    status = 'PAUSED',
+    promotedObject = null
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('campaign_id', campaignId);
+      formData.append('billing_event', billingEvent);
+      formData.append('optimization_goal', optimizationGoal);
+      formData.append('targeting', JSON.stringify(targeting));
+      formData.append('status', status);
+      formData.append('destination_type', 'INSTAGRAM_DIRECT');
+
+      if (promotedObject) {
+        formData.append('promoted_object', JSON.stringify(promotedObject));
+      }
+
+      console.log('Creating Instagram DM AdSet with params:', {
+        name, campaignId, billingEvent, optimizationGoal, status,
+        destination_type: 'INSTAGRAM_DIRECT',
+        promotedObject
+      });
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adsets`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      const errData = error.response?.data?.error;
+      console.error('AdSet for Instagram DM FULL error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  // Crear Creative para Instagram Direct (usa URL de imagen directamente)
+  async createCreativeForInstagramDM(adAccountId, {
+    name,
+    pageId,
+    igActorId,
+    imageHash = null,
+    imageUrl = null,
+    primaryText,
+    headline,
+    description,
+    callToAction = 'SEND_MESSAGE'
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      const linkData = {
+        link: `https://ig.me/m/${igActorId}`,
+        message: primaryText,
+        name: headline,
+        description: description,
+        call_to_action: {
+          type: callToAction,
+          value: {
+            app_destination: 'INSTAGRAM_DIRECT'
+          }
+        }
+      };
+
+      if (imageHash) {
+        linkData.image_hash = imageHash;
+      } else if (imageUrl) {
+        linkData.picture = imageUrl;
+      }
+
+      const objectStorySpec = {
+        page_id: pageId,
+        instagram_actor_id: igActorId,
+        link_data: linkData
+      };
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Creative for Instagram DM error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Crear campaña completa para Instagram Direct
+  async createCampaignForInstagramDM(adAccountId, {
+    campaignName,
+    adSetName,
+    adName,
+    dailyBudget,
+    targeting,
+    pageId,
+    igActorId,
+    imageUrl,
+    imageHash = null,
+    headlines = [],
+    descriptions = [],
+    primaryTexts = [],
+    callToAction = 'SEND_MESSAGE',
+    objective = 'OUTCOME_ENGAGEMENT',
+    optimizationGoal = 'CONVERSATIONS'
+  }) {
+    const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
+
+    try {
+      // 1. Crear Campaña
+      console.log('Step 1/4: Creating Instagram DM campaign...');
+      const campaignResult = await this.createCampaign(adAccountId, {
+        name: campaignName,
+        objective,
+        status: 'PAUSED',
+        dailyBudget
+      });
+
+      if (!campaignResult.success) {
+        results.errors.push(`Campaign: ${campaignResult.error}`);
+        return { success: false, ...results };
+      }
+      results.campaign = campaignResult.data;
+
+      // 2. Crear AdSet para Instagram Direct
+      console.log('Step 2/4: Creating ad set for Instagram Direct...');
+      const adSetResult = await this.createAdSetForInstagramDM(adAccountId, {
+        name: adSetName || `${campaignName} - Ad Set`,
+        campaignId: results.campaign.id,
+        targeting,
+        optimizationGoal,
+        promotedObject: { page_id: pageId }
+      });
+
+      if (!adSetResult.success) {
+        results.errors.push(`AdSet: ${adSetResult.error}`);
+        return { success: false, ...results };
+      }
+      results.adSet = adSetResult.data;
+
+      // 3. Crear Creative para Instagram Direct
+      console.log('Step 3/4: Creating creative for Instagram Direct...');
+      const creativeResult = await this.createCreativeForInstagramDM(adAccountId, {
+        name: `${campaignName} - Creative`,
+        pageId,
+        igActorId,
+        imageHash,
+        imageUrl,
+        primaryText: primaryTexts[0] || descriptions[0] || 'Envíanos un DM',
+        headline: headlines[0] || 'Escríbenos',
         description: descriptions[0] || '',
         callToAction
       });
@@ -2172,7 +2381,10 @@ class MetaAdsService {
   }) {
     const VALID_LINK_CLICKS_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
-      'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'
+      'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE',
+      'BUY_NOW', 'ORDER_NOW', 'BOOK_TRAVEL',
+      'SEND_MESSAGE', 'WHATSAPP_MESSAGE',
+      'CALL_NOW', 'GET_DIRECTIONS'
     ];
 
     const sanitizeCTAs = (ctas) => {

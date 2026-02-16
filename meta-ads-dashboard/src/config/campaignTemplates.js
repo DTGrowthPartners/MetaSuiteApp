@@ -30,13 +30,20 @@ export const OPTIMIZATION_GOALS = {
 export const CTA_OPTIONS = [
   { value: 'LEARN_MORE', label: 'Más información' },
   { value: 'SHOP_NOW', label: 'Comprar' },
+  { value: 'BUY_NOW', label: 'Comprar ahora' },
+  { value: 'ORDER_NOW', label: 'Ordenar ahora' },
   { value: 'SIGN_UP', label: 'Registrarse' },
   { value: 'SUBSCRIBE', label: 'Suscribirse' },
   { value: 'DOWNLOAD', label: 'Descargar' },
   { value: 'GET_OFFER', label: 'Obtener oferta' },
   { value: 'APPLY_NOW', label: 'Aplicar ahora' },
   { value: 'CONTACT_US', label: 'Contactar' },
-  { value: 'GET_QUOTE', label: 'Obtener cotización' }
+  { value: 'GET_QUOTE', label: 'Obtener cotización' },
+  { value: 'WHATSAPP_MESSAGE', label: 'WhatsApp' },
+  { value: 'SEND_MESSAGE', label: 'Enviar mensaje' },
+  { value: 'CALL_NOW', label: 'Llamar ahora' },
+  { value: 'GET_DIRECTIONS', label: 'Cómo llegar' },
+  { value: 'BOOK_TRAVEL', label: 'Reservar' }
 ];
 
 // Ubicaciones por plataforma
@@ -242,27 +249,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        '¡Escríbenos ahora!',
-        'Atención personalizada',
-        'Respuesta inmediata',
-        'Chatea con nosotros',
-        'Te asesoramos gratis'
+        'Agenda tu cita ahora',
+        'Consulta gratis por WhatsApp',
+        'Respuesta en menos de 5 min',
+        'Asesoría personalizada',
+        'Escríbenos y te ayudamos'
       ],
       descriptions: [
-        'Escríbenos por WhatsApp y recibe atención inmediata.',
-        'Nuestro equipo está listo para ayudarte.',
-        'Resolvemos todas tus dudas al instante.',
-        'Cotización sin compromiso por WhatsApp.',
-        'Agenda tu cita por chat.'
+        'Escríbenos por WhatsApp y recibe asesoría inmediata de nuestro equipo.',
+        'Un mensaje es todo lo que necesitas. Te respondemos al instante.',
+        'Cotización personalizada sin compromiso. Solo envía un "Hola".',
+        'Nuestros expertos están listos para resolver tus dudas ahora.',
+        'Agenda, cotiza o pregunta lo que necesites por WhatsApp.'
       ],
       primaryTexts: [
-        '¿Tienes preguntas? ¡Escríbenos por WhatsApp y te respondemos al instante!',
-        'Atención personalizada a un clic de distancia. Escríbenos.',
-        '¡Hola! Estamos aquí para ayudarte. Envíanos un mensaje y te atendemos.',
-        'La forma más fácil de contactarnos. Un mensaje y listo.',
-        'Cotiza sin compromiso. Solo escríbenos y te damos toda la información.'
+        '¿Necesitas más información? Escríbenos por WhatsApp y un asesor te responde en menos de 5 minutos. Sin filas, sin esperas.',
+        '¡Es muy fácil! Solo envía un mensaje y nuestro equipo te da toda la información que necesitas. Atención inmediata.',
+        'Miles de personas ya nos contactaron por WhatsApp y resolvieron sus dudas en minutos. ¿Qué estás esperando?',
+        'Asesoría profesional a un clic de distancia. Escríbenos por WhatsApp y te guiamos paso a paso.',
+        'No pierdas tiempo buscando. Escríbenos directo por WhatsApp y te damos la mejor solución para lo que necesitas.'
       ],
-      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'GET_QUOTE', 'CONTACT_US']
+      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US']
     }
   },
 
@@ -272,9 +279,9 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'leads_whatsapp',
     name: 'Leads por WhatsApp',
-    icon: '💬',
+    icon: '📋',
     category: 'Clientes potenciales',
-    description: 'Captura leads a través de conversaciones en WhatsApp. Contacto directo.',
+    description: 'Captura leads calificados a través de WhatsApp. Meta optimiza para personas que probablemente te escriban.',
     objective: 'OUTCOME_LEADS',
     specialAdCategories: [],
     buyingType: 'AUCTION',
@@ -314,27 +321,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        'Cotiza por WhatsApp',
-        'Asesoría gratis',
-        'Escríbenos ahora',
-        'Información al instante',
-        'Consulta sin costo'
+        'Solicita tu presupuesto',
+        'Pide información gratis',
+        'Cotiza sin compromiso',
+        'Recibe asesoría experta',
+        'Tu consulta es gratis'
       ],
       descriptions: [
-        'Envíanos un mensaje y te cotizamos.',
-        'Asesoría personalizada por chat.',
-        'Respuesta inmediata garantizada.',
-        'Sin compromiso de compra.',
-        'Tu consulta es importante.'
+        'Envía un mensaje y recibe tu cotización personalizada en minutos.',
+        'Asesoría profesional gratuita. Solo escribe "Quiero info" por WhatsApp.',
+        'Te respondemos en menos de 5 minutos con toda la información.',
+        'Sin compromiso de compra. Pregunta lo que necesites.',
+        'Nuestro equipo de asesores te atiende ahora mismo.'
       ],
       primaryTexts: [
-        '¿Interesado? Escríbenos por WhatsApp y te damos toda la información.',
-        'Cotización personalizada en minutos. Solo envía un mensaje.',
-        'Nuestros asesores están listos para atenderte por WhatsApp.',
-        'La forma más fácil de obtener información. Un mensaje y listo.',
-        'No te quedes con dudas. Escríbenos y resolvemos todo.'
+        '¿Buscas la mejor opción? Solicita tu presupuesto por WhatsApp y recibe una cotización personalizada sin compromiso. Te respondemos al instante.',
+        'Más de 500 personas nos contactaron esta semana. Escríbenos por WhatsApp y descubre por qué somos la mejor opción para ti.',
+        '¡Atención! Estamos ofreciendo asesoría gratuita por WhatsApp. Envía un mensaje ahora y un experto te guía paso a paso.',
+        'No compres a ciegas. Primero escríbenos por WhatsApp, te damos toda la información y luego tú decides. Sin presión.',
+        'Recibe una propuesta personalizada en minutos. Solo envía un "Hola" por WhatsApp y nuestro equipo hace el resto.'
       ],
-      ctas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'WHATSAPP_MESSAGE', 'CONTACT_US', 'SEND_MESSAGE']
+      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'GET_QUOTE', 'WHATSAPP_MESSAGE', 'CONTACT_US']
     }
   },
 
@@ -346,7 +353,7 @@ export const CAMPAIGN_TEMPLATES = [
     name: 'Conversiones Web',
     icon: '💰',
     category: 'Ventas',
-    description: 'Genera ventas y conversiones en tu sitio web. Requiere Pixel de Meta.',
+    description: 'Genera ventas y conversiones en tu sitio web. Meta busca personas con alta intención de compra.',
     objective: 'OUTCOME_SALES',
     specialAdCategories: [],
     buyingType: 'AUCTION',
@@ -387,27 +394,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        '¡Compra ahora!',
-        'Oferta especial',
-        'Últimas unidades',
-        'Envío gratis',
-        'Precio exclusivo'
+        'Compra ahora y ahorra',
+        'Oferta por tiempo limitado',
+        'Últimas unidades disponibles',
+        'Envío gratis hoy',
+        'Descuento exclusivo online'
       ],
       descriptions: [
-        'Compra hoy con descuento especial.',
-        'Stock limitado, no te quedes sin el tuyo.',
-        'Envío gratis en tu primera compra.',
-        'Pago seguro garantizado.',
-        'Satisfacción garantizada o te devolvemos tu dinero.'
+        'Aprovecha este descuento especial antes de que se acabe. Compra segura.',
+        'Stock limitado. Miles ya compraron el suyo. No te quedes sin el tuyo.',
+        'Envío gratis en compras hoy. Pago seguro con todos los medios.',
+        'Garantía de satisfacción. Si no te gusta, te devolvemos tu dinero.',
+        'Precio exclusivo solo por esta semana. Ahorra hasta 50% en tu compra.'
       ],
       primaryTexts: [
-        '¡Oferta exclusiva! Compra ahora y recibe un descuento especial.',
-        'Miles de clientes satisfechos nos respaldan. ¿Qué esperas para unirte?',
-        'La calidad que buscas al precio que mereces. Compra hoy.',
-        'Stock limitado. No dejes que otros se lo lleven. Compra ahora.',
-        'Tu compra está protegida. Si no te gusta, te devolvemos el dinero.'
+        '¡Oferta flash! Solo por hoy con descuento especial. Compra ahora antes de que se agote. Envío rápido y pago seguro.',
+        'Miles de clientes satisfechos ya tienen el suyo. Calidad premium al mejor precio. ¿Qué esperas para comprar?',
+        'La mejor relación calidad-precio del mercado. Compra hoy y recíbelo en tu puerta. Satisfacción garantizada.',
+        '¡Últimas unidades! Este producto se agota rápido. Asegura el tuyo ahora con envío gratis y pago contra entrega.',
+        'Tu compra está 100% protegida. Pago seguro, envío rastreado y garantía de devolución. Compra con total confianza.'
       ],
-      ctas: ['SHOP_NOW', 'BUY_NOW', 'ORDER_NOW', 'GET_OFFER', 'SHOP_NOW']
+      ctas: ['SHOP_NOW', 'SHOP_NOW', 'BUY_NOW', 'GET_OFFER', 'ORDER_NOW']
     }
   },
 
@@ -419,7 +426,7 @@ export const CAMPAIGN_TEMPLATES = [
     name: 'Ventas por WhatsApp',
     icon: '💬',
     category: 'Ventas',
-    description: 'Cierra ventas a través de WhatsApp. Ideal para productos que requieren asesoría.',
+    description: 'Cierra ventas directamente por WhatsApp. Ideal para productos que necesitan asesoría antes de comprar.',
     objective: 'OUTCOME_SALES',
     specialAdCategories: [],
     buyingType: 'AUCTION',
@@ -459,27 +466,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        'Compra por WhatsApp',
-        'Pide el tuyo',
-        'Haz tu pedido',
-        'Compra fácil',
-        'Ordena ahora'
+        'Haz tu pedido ahora',
+        'Reserva el tuyo hoy',
+        'Compra fácil por WhatsApp',
+        'Pago contra entrega',
+        'Precio especial por chat'
       ],
       descriptions: [
-        'Escríbenos y haz tu pedido por WhatsApp.',
-        'Pago contra entrega disponible.',
-        'Envío a todo el país.',
-        'Atención personalizada.',
-        'Compra segura y fácil.'
+        'Escríbenos y te procesamos tu pedido al instante por WhatsApp.',
+        'Pago contra entrega o transferencia. Tú eliges cómo pagar.',
+        'Envío a todo el país. Tu pedido llega a la puerta de tu casa.',
+        'Atención personalizada. Te ayudamos a elegir la mejor opción.',
+        'Precio especial solo por WhatsApp. Escríbenos para conocerlo.'
       ],
       primaryTexts: [
-        '¿Te interesa? Escríbenos por WhatsApp y te ayudamos con tu compra.',
-        'Comprar nunca fue tan fácil. Un mensaje y listo.',
-        'Atención personalizada para tu pedido. Escríbenos ahora.',
-        'Resolvemos tus dudas y procesamos tu pedido por WhatsApp.',
-        'La forma más fácil de comprar. Envíanos un mensaje.'
+        '¡Haz tu pedido por WhatsApp! Es súper fácil: escríbenos, elige tu producto, y te lo enviamos. Pago contra entrega disponible.',
+        '¿Te gusta lo que ves? Escríbenos ahora por WhatsApp y te damos un precio especial. Stock limitado, no te quedes sin el tuyo.',
+        'Comprar por WhatsApp es más fácil de lo que piensas. Un mensaje, eliges tu talla/modelo, pagas y listo. Envío rápido.',
+        'Oferta exclusiva por WhatsApp. Escríbenos ahora y recibe un descuento especial en tu primera compra. No dejes pasar esta oportunidad.',
+        '¿Tienes dudas sobre el producto? Escríbenos por WhatsApp, te asesoramos y si quieres, haces tu pedido en el momento. Sin presión.'
       ],
-      ctas: ['WHATSAPP_MESSAGE', 'SHOP_NOW', 'WHATSAPP_MESSAGE', 'ORDER_NOW', 'GET_QUOTE']
+      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'SHOP_NOW', 'GET_QUOTE']
     }
   },
 
@@ -491,7 +498,7 @@ export const CAMPAIGN_TEMPLATES = [
     name: 'Mensajes WhatsApp',
     icon: '💬',
     category: 'Interacción',
-    description: 'Genera conversaciones en WhatsApp. Optimizado para iniciar chats.',
+    description: 'Maximiza conversaciones en WhatsApp. Meta optimiza para personas que probablemente inicien un chat.',
     objective: 'OUTCOME_ENGAGEMENT',
     specialAdCategories: [],
     buyingType: 'AUCTION',
@@ -531,27 +538,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        'Hablemos',
-        'Estamos en línea',
-        'Escríbenos',
-        'Chatea con nosotros',
-        'Te esperamos'
+        '¿Tienes dudas? Pregúntanos',
+        'Estamos en línea ahora',
+        'Un mensaje y te ayudamos',
+        'Chat directo con nosotros',
+        'Respuesta inmediata'
       ],
       descriptions: [
-        'Inicia una conversación con nosotros.',
-        'Respuesta rápida garantizada.',
-        'Atención personalizada.',
-        'Resolvemos tus dudas.',
-        'Siempre disponibles.'
+        'Estamos conectados ahora mismo. Escríbenos y te respondemos al instante.',
+        'Tu pregunta es importante. Nuestro equipo te atiende por WhatsApp.',
+        'Sin llamadas, sin correos. Solo un mensaje y te ayudamos.',
+        'Atención 100% personalizada por chat. Escríbenos ahora.',
+        'Siempre disponibles para ti. Envía un mensaje cuando quieras.'
       ],
       primaryTexts: [
-        '¿Tienes preguntas? Escríbenos por WhatsApp y te respondemos al instante.',
-        'Estamos aquí para ayudarte. Inicia una conversación ahora.',
-        'Tu consulta es importante. Escríbenos y te atendemos.',
-        'La comunicación directa que necesitas. Un mensaje y listo.',
-        'Conecta con nosotros. Te esperamos en WhatsApp.'
+        '¿Tienes preguntas? Estamos en línea ahora mismo. Escríbenos por WhatsApp y te respondemos al instante. Sin esperas.',
+        '¡Hola! Queremos ayudarte. Envíanos un mensaje por WhatsApp con tu consulta y nuestro equipo te atiende de inmediato.',
+        'La forma más rápida de comunicarte con nosotros. Un mensaje por WhatsApp y listo. Te esperamos.',
+        'No te quedes con la duda. Escríbenos por WhatsApp y te damos la información que necesitas. Es gratis y sin compromiso.',
+        'Conecta con nosotros al instante. Nuestro equipo está listo para atenderte por WhatsApp. ¡Escríbenos!'
       ],
-      ctas: ['WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US']
+      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US']
     }
   },
 
@@ -563,7 +570,7 @@ export const CAMPAIGN_TEMPLATES = [
     name: 'Mensajes Instagram',
     icon: '📸',
     category: 'Interacción',
-    description: 'Genera mensajes directos en Instagram. Para marcas con presencia en IG.',
+    description: 'Genera mensajes directos en Instagram. Meta optimiza para personas que abran conversación en tus DMs.',
     objective: 'OUTCOME_ENGAGEMENT',
     specialAdCategories: [],
     buyingType: 'AUCTION',
@@ -603,27 +610,27 @@ export const CAMPAIGN_TEMPLATES = [
     },
     creativeContent: {
       headlines: [
-        'DM para más info',
-        'Escríbenos en IG',
-        'Chatea con nosotros',
-        'Te respondemos',
-        'Mensaje directo'
+        'Escríbenos por DM',
+        'Desliza y escríbenos',
+        'Info por mensaje directo',
+        'DM para precio especial',
+        'Chatea con nosotros en IG'
       ],
       descriptions: [
-        'Envía un DM para más información.',
-        'Respuesta rápida por Instagram.',
-        'Atención personalizada en IG.',
-        'Te esperamos en los DMs.',
-        'Conecta con nosotros.'
+        'Envía un DM y te respondemos al instante con toda la información.',
+        'Atención personalizada por Instagram Direct. Te esperamos.',
+        'Solo escribe "Info" en nuestros DMs y te contamos todo.',
+        'Respuesta rápida garantizada. Nuestro equipo está en línea.',
+        'La forma más fácil de contactarnos. Un DM y listo.'
       ],
       primaryTexts: [
-        '¿Quieres saber más? Envíanos un DM y te contamos todo.',
-        'Atención personalizada por Instagram. Escríbenos ahora.',
-        'Tus preguntas, nuestras respuestas. Envía un mensaje directo.',
-        'La forma más fácil de contactarnos en Instagram.',
-        'Estamos en línea. Envía un DM y te atendemos.'
+        '¿Te interesa? Envíanos un DM y te contamos todo lo que necesitas saber. Respondemos en minutos, no en horas.',
+        'No sigas buscando. Escríbenos por DM en Instagram y nuestro equipo te da atención personalizada al instante.',
+        '¡Hola! Estamos activos en Instagram. Envía un mensaje directo con tu pregunta y te respondemos ya mismo.',
+        'Información exclusiva por DM. Escríbenos "Quiero saber más" y te enviamos todos los detalles al instante.',
+        'Miles de personas ya nos escribieron por DM y obtuvieron la mejor asesoría. ¡Te estamos esperando!'
       ],
-      ctas: ['SEND_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US', 'GET_QUOTE', 'SEND_MESSAGE']
+      ctas: ['SEND_MESSAGE', 'SEND_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US', 'GET_QUOTE']
     }
   }
 ];

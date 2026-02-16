@@ -1621,10 +1621,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           pageId: job.pageId,
           whatsappNumber: job.whatsappNumber,
           imageUrl: job.imageUrl,
+          imageHash: job.imageHash || null,
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
-          primaryTexts: job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'WHATSAPP_MESSAGE'
+          primaryTexts: job.primaryTexts || job.descriptions || [],
+          callToAction: job.ctas?.[0] || 'WHATSAPP_MESSAGE',
+          objective,
+          optimizationGoal
         });
 
       } else if (conversionLocation === 'MESSENGER') {
@@ -1638,10 +1641,34 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           targeting,
           pageId: job.pageId,
           imageUrl: job.imageUrl,
+          imageHash: job.imageHash || null,
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
-          primaryTexts: job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'SEND_MESSAGE'
+          primaryTexts: job.primaryTexts || job.descriptions || [],
+          callToAction: job.ctas?.[0] || 'SEND_MESSAGE',
+          objective,
+          optimizationGoal
+        });
+
+      } else if (conversionLocation === 'INSTAGRAM_DIRECT') {
+        addLog('Creando campaña para Instagram Direct...');
+
+        result = await metaService.createCampaignForInstagramDM(job.adAccountId, {
+          campaignName: job.campaignName,
+          adSetName: `${job.campaignName} - Ad Set`,
+          adName: job.adName,
+          dailyBudget: Math.round(job.dailyBudgetCOP),
+          targeting,
+          pageId: job.pageId,
+          igActorId: job.igActorId,
+          imageUrl: job.imageUrl,
+          imageHash: job.imageHash || null,
+          headlines: job.headlines || [],
+          descriptions: job.descriptions || [],
+          primaryTexts: job.primaryTexts || job.descriptions || [],
+          callToAction: job.ctas?.[0] || 'SEND_MESSAGE',
+          objective,
+          optimizationGoal
         });
 
       } else {
