@@ -364,10 +364,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
 
-    if (!isImage && !isVideo) {
-      updateAd(adIndex, { uploadProgress: 'Error: Solo se aceptan imágenes (JPG, PNG) o videos (MP4)' });
+    // Algunos navegadores no detectan .mov correctamente, verificar por extensión
+    const ext = file.name.toLowerCase().split('.').pop();
+    const videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff'];
+    const isVideoByExt = videoExts.includes(ext);
+    const isImageByExt = imageExts.includes(ext);
+
+    if (!isImage && !isVideo && !isVideoByExt && !isImageByExt) {
+      updateAd(adIndex, { uploadProgress: 'Error: Solo se aceptan imágenes (JPG, PNG, WebP) o videos (MP4, MOV)' });
       return;
     }
+
+    // Reclasificar si el MIME type falló pero la extensión es válida
+    const finalIsVideo = isVideo || isVideoByExt;
+    const finalIsImage = !finalIsVideo && (isImage || isImageByExt);
 
     updateAd(adIndex, { uploadingFile: true, uploadProgress: `Subiendo ${file.name}...` });
 
@@ -375,7 +386,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const metaService = new MetaAdsService(accessToken);
       let result;
 
-      if (isImage) {
+      if (finalIsImage) {
         result = await metaService.uploadImageFile(selectedAccount, file);
         if (result.success) {
           updateAd(adIndex, {
@@ -391,7 +402,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           autoAnalyzeMedia(adIndex, file, false);
           return;
         }
-      } else {
+      } else if (finalIsVideo) {
         result = await metaService.uploadVideoFile(selectedAccount, file);
         if (result.success) {
           updateAd(adIndex, {
@@ -1243,7 +1254,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   <div style={{ border: '2px dashed #ddd', borderRadius: '8px', padding: '15px', textAlign: 'center' }}>
                     <input
                       type="file"
-                      accept="image/jpeg,image/png,image/webp,video/mp4,video/mov"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.mov"
                       onChange={(e) => handleAdFileUpload(adIndex, e)}
                       disabled={ad.uploadingFile || !selectedAccount}
                       style={{ marginBottom: '8px', fontSize: '12px' }}

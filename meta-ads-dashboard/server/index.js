@@ -1254,10 +1254,11 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
       }
 
       // Create a File-like object for the OpenAI API
+      const mimeType = fileSize <= 25 * 1024 * 1024 ? (getContentTypeFromExt(fileName) || 'video/mp4') : 'audio/mpeg';
       const audioFile = new File(
         [audioBuffer],
         fileSize <= 25 * 1024 * 1024 ? fileName : 'audio.mp3',
-        { type: fileSize <= 25 * 1024 * 1024 ? 'video/mp4' : 'audio/mpeg' }
+        { type: mimeType }
       );
 
       const whisperResponse = await openai.audio.transcriptions.create({
