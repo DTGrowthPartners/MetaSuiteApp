@@ -515,7 +515,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
   }, [selectedPage, pages]);
 
-  // Cargar cuentas de Instagram desde la cuenta publicitaria + página
+  // Cargar cuentas de Instagram: primero desde la página (ya cargada), luego fallback a API
   useEffect(() => {
     const loadIgAccounts = async () => {
       if (!selectedAccount) {
@@ -523,44 +523,61 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         setSelectedIgAccount('');
         return;
       }
-      try {
-        const metaService = new MetaAdsService(accessToken);
-        const allIg = [];
-        const seenIds = new Set();
 
-        // 1. Buscar desde la cuenta publicitaria
-        const result = await metaService.getInstagramAccounts(selectedAccount);
-        if (result.success && result.data.length > 0) {
-          result.data.forEach(ig => {
-            if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
-          });
+      const allIg = [];
+      const seenIds = new Set();
+
+      // 1. Extraer IG directamente de los datos de la página (ya viene con getPages)
+      if (selectedPage && pages.length > 0) {
+        const page = pages.find(p => p.id === selectedPage);
+        if (page?.instagram_business_account) {
+          const igBiz = page.instagram_business_account;
+          console.log('Instagram from page data:', igBiz);
+          if (!seenIds.has(igBiz.id)) {
+            seenIds.add(igBiz.id);
+            allIg.push({ id: igBiz.id, username: igBiz.username, profile_pic: null });
+          }
         }
+      }
 
-        // 2. Buscar desde la página de Facebook seleccionada
-        if (selectedPage) {
-          const pageResult = await metaService.getInstagramAccountFromPage(selectedPage);
-          if (pageResult.success && pageResult.data.length > 0) {
-            pageResult.data.forEach(ig => {
+      // 2. Si no se encontró desde la página, buscar desde la cuenta publicitaria via API
+      if (allIg.length === 0) {
+        try {
+          const metaService = new MetaAdsService(accessToken);
+          const result = await metaService.getInstagramAccounts(selectedAccount);
+          console.log('Instagram from ad account API:', result);
+          if (result.success && result.data.length > 0) {
+            result.data.forEach(ig => {
               if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
             });
           }
-        }
 
-        console.log('Instagram accounts loaded:', allIg.length, allIg);
-        if (allIg.length > 0) {
-          setIgAccounts(allIg);
-          setSelectedIgAccount(prev => prev || allIg[0].id);
-        } else {
-          setIgAccounts([]);
-          setSelectedIgAccount('');
+          // 3. Último fallback: buscar desde la página via API
+          if (allIg.length === 0 && selectedPage) {
+            const pageResult = await metaService.getInstagramAccountFromPage(selectedPage);
+            console.log('Instagram from page API:', pageResult);
+            if (pageResult.success && pageResult.data.length > 0) {
+              pageResult.data.forEach(ig => {
+                if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error loading Instagram accounts:', err);
         }
-      } catch (err) {
-        console.error('Error loading Instagram accounts:', err);
+      }
+
+      console.log('Total Instagram accounts found:', allIg.length, allIg);
+      if (allIg.length > 0) {
+        setIgAccounts(allIg);
+        setSelectedIgAccount(prev => prev || allIg[0].id);
+      } else {
         setIgAccounts([]);
+        setSelectedIgAccount('');
       }
     };
     loadIgAccounts();
-  }, [selectedAccount, selectedPage]);
+  }, [selectedAccount, selectedPage, pages]);
 
   // Cargar todos los públicos cuando se selecciona una cuenta
   useEffect(() => {
