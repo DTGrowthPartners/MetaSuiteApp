@@ -1147,7 +1147,17 @@ JSON exacto:
 
   const responseText = completion.choices[0].message.content;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleanJson);
+  const parsed = JSON.parse(cleanJson);
+  // Ensure exactly 5 CTAs
+  const validCtas = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
+  if (!parsed.ctas || parsed.ctas.length < 5) {
+    parsed.ctas = parsed.ctas || [];
+    while (parsed.ctas.length < 5) {
+      const next = validCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
+      parsed.ctas.push(next);
+    }
+  }
+  return parsed;
 }
 
 // Helper: Generate 5+5+5 content from image (vision)
@@ -1213,7 +1223,17 @@ CTAs válidos (SOLO estos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBS
 
   const responseText = completion.choices[0].message.content;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleanJson);
+  const parsed = JSON.parse(cleanJson);
+  // Ensure exactly 5 CTAs
+  const validCtas = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
+  if (!parsed.ctas || parsed.ctas.length < 5) {
+    parsed.ctas = parsed.ctas || [];
+    while (parsed.ctas.length < 5) {
+      const next = validCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
+      parsed.ctas.push(next);
+    }
+  }
+  return parsed;
 }
 
 // POST /api/analyze-video - Transcribe video audio and generate 5+5+5
