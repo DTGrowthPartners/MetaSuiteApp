@@ -821,7 +821,7 @@ app.get('/api/pages', async (req, res) => {
     const response = await axios.get(`${META_API_BASE_URL}/me/accounts`, {
       params: {
         access_token: getToken(req),
-        fields: 'id,name,access_token,instagram_business_account{id,username}'
+        fields: 'id,name,access_token,website,instagram_business_account{id,username}'
       }
     });
 

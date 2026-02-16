@@ -504,6 +504,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     loadPages();
   }, []);
 
+  // Auto-fill linkUrl con el website de la página seleccionada
+  useEffect(() => {
+    if (!selectedPage || !pages.length) return;
+    const page = pages.find(p => p.id === selectedPage);
+    if (page?.website && !linkUrl) {
+      const url = page.website.startsWith('http') ? page.website : `https://${page.website}`;
+      setLinkUrl(url);
+      console.log('Auto-filled linkUrl from page website:', url);
+    }
+  }, [selectedPage, pages]);
+
   // Cargar cuentas de Instagram desde la cuenta publicitaria
   useEffect(() => {
     const loadIgAccounts = async () => {
