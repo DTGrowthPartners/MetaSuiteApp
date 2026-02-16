@@ -8,11 +8,15 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
 import sharp from 'sharp';
 
-// Configurar ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegStatic);
+// Configurar ffmpeg path - usar ffmpeg-static si existe, sino el del sistema
+try {
+  const ffmpegStatic = (await import('ffmpeg-static')).default;
+  if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
+} catch {
+  console.log('ffmpeg-static no disponible, usando ffmpeg del sistema');
+}
 
 const app = express();
 
@@ -1332,26 +1336,30 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
 
     let transcription = '';
 
+    // Whisper only supports: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+    const ext = fileName.toLowerCase().split('.').pop();
+    const whisperSupported = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
+    const needsAudioExtraction = !whisperSupported.includes(ext) || fileSize > 25 * 1024 * 1024;
+
     try {
       let audioBuffer;
 
-      if (fileSize <= 25 * 1024 * 1024) {
-        // File is small enough to send directly to Whisper
-        audioBuffer = req.file.buffer;
-        console.log('Video <= 25MB, sending directly to Whisper...');
-      } else {
-        // Extract audio first with ffmpeg
-        console.log('Video > 25MB, extracting audio with ffmpeg...');
+      if (needsAudioExtraction) {
+        // Extract audio with ffmpeg (MOV, AVI, MKV, or files > 25MB)
+        console.log(`Extracting audio with ffmpeg (format: ${ext}, size: ${(fileSize / 1024 / 1024).toFixed(1)}MB)...`);
         audioBuffer = await extractAudioFromBuffer(req.file.buffer, fileName);
         console.log(`Audio extracted: ${(audioBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+      } else {
+        // File is small enough and in a supported format - send directly
+        audioBuffer = req.file.buffer;
+        console.log('Video in supported format and <= 25MB, sending directly to Whisper...');
       }
 
       // Create a File-like object for the OpenAI API
-      const mimeType = fileSize <= 25 * 1024 * 1024 ? (getContentTypeFromExt(fileName) || 'video/mp4') : 'audio/mpeg';
       const audioFile = new File(
         [audioBuffer],
-        fileSize <= 25 * 1024 * 1024 ? fileName : 'audio.mp3',
-        { type: mimeType }
+        needsAudioExtraction ? 'audio.mp3' : fileName,
+        { type: needsAudioExtraction ? 'audio/mpeg' : (getContentTypeFromExt(fileName) || 'video/mp4') }
       );
 
       const whisperResponse = await openai.audio.transcriptions.create({
