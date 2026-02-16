@@ -816,8 +816,8 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
         timeout: 30000
       });
 
-      const { upload_session_id, start_offset: initialStart, end_offset: initialEnd } = startResponse.data;
-      console.log(`Chunked upload session: ${upload_session_id}, first chunk: ${initialStart}-${initialEnd}`);
+      const { upload_session_id, video_id: chunkedVideoId, start_offset: initialStart, end_offset: initialEnd } = startResponse.data;
+      console.log(`Chunked upload session: ${upload_session_id}, video_id: ${chunkedVideoId}, first chunk: ${initialStart}-${initialEnd}`);
 
       // Write buffer to temp file for chunked reading
       tmpFilePath = path.join(os.tmpdir(), `upload_${Date.now()}_${file.originalname}`);
@@ -865,7 +865,7 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
       }
 
       // Step 3: Finish upload
-      const finishResponse = await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
+      await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
         params: {
           access_token: token,
           upload_phase: 'finish',
@@ -875,8 +875,7 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
         timeout: 60000
       });
 
-      console.log('Chunked upload finish response:', JSON.stringify(finishResponse.data, null, 2));
-      videoId = finishResponse.data.video_id || finishResponse.data.id;
+      videoId = chunkedVideoId;
       console.log(`Chunked upload complete: video_id=${videoId} (${chunkNum} chunks)`);
 
     } else {
