@@ -225,7 +225,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   // (AI content is now auto-generated per-ad when media is uploaded)
 
   // Multi-Ad System
-  const [adSetMode, setAdSetMode] = useState('single'); // 'single' = 1 AdSet, 'per-ad' = N AdSets
+  const [adSetMode, setAdSetMode] = useState('dynamic'); // 'single' = 1 AdSet sin 5+5+5, 'dynamic' = N AdSets con 5+5+5 mismo público, 'per-ad' = N AdSets público diferente
   const createEmptyAd = (index) => ({
     id: Date.now() + index,
     adName: '',
@@ -1012,7 +1012,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* AdSet Mode Toggle */}
         <div className="form-group" style={{ marginBottom: '15px' }}>
-          <label>Estructura de Ad Sets</label>
+          <label>Estructura de Anuncios</label>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -1024,7 +1024,19 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'single' ? 'bold' : 'normal'
               }}
             >
-              Mismo público para todos
+              1 Ad Set (sin 5+5+5)
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdSetMode('dynamic')}
+              style={{
+                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
+                borderColor: adSetMode === 'dynamic' ? '#1877f2' : '#ddd',
+                background: adSetMode === 'dynamic' ? '#e7f3ff' : 'white',
+                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'dynamic' ? 'bold' : 'normal'
+              }}
+            >
+              5+5+5 por Ad (recomendado)
             </button>
             <button
               type="button"
@@ -1036,13 +1048,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'per-ad' ? 'bold' : 'normal'
               }}
             >
-              Público diferente por anuncio
+              Público diferente por Ad
             </button>
           </div>
           <p className="hint">
             {adSetMode === 'single'
-              ? 'Todos los anuncios van en 1 Ad Set con el mismo público. Cada ad tiene su propio Creative con 5+5+5.'
-              : 'Cada anuncio tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
+              ? 'Todos los ads en 1 Ad Set. Cada ad usa 1 título + 1 descripción + 1 CTA (el mejor generado por IA).'
+              : adSetMode === 'dynamic'
+              ? 'Cada ad tiene su propio Ad Set con Dynamic Creative 5+5+5 (Meta prueba 125 combinaciones por ad). Mismo público para todos. CBO distribuye el presupuesto.'
+              : 'Cada ad tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
           </p>
         </div>
 
@@ -1595,8 +1609,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         // Campaña estándar (website, traffic, etc.) - MULTI-AD
         const totalAds = job.ads?.length || 1;
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
-        const isSingleMode = (job.adSetMode || 'single') === 'single';
-        addLog(`Modo: ${isSingleMode ? `1 Ad Set → ${totalAds} Ads (mismo público)` : `${totalAds} Ad Sets con 5+5+5 (público diferente)`}`);
+        const mode = job.adSetMode || 'dynamic';
+        const modeLabel = mode === 'single' ? `1 Ad Set → ${totalAds} Ads (sin 5+5+5)`
+          : mode === 'dynamic' ? `${totalAds} Ad Sets con 5+5+5 (mismo público, CBO)`
+          : `${totalAds} Ad Sets con 5+5+5 (público diferente)`;
+        addLog(`Modo: ${modeLabel}`);
         addLog(`Total anuncios: ${totalAds}`);
         if (job.igActorId) addLog(`Instagram: @${job.igUsername || 'vinculada'}`);
 
@@ -1608,7 +1625,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           addLog(`  Ad ${i + 1}: ${numTitles}t + ${numDescs}d | Media: ${hasMedia ? 'Sí' : 'No'}${ad.audienceName ? ' | Público: ' + ad.audienceName : ''}`);
         });
 
-        const numAdSets = isSingleMode ? 1 : totalAds;
+        const numAdSets = mode === 'single' ? 1 : totalAds;
         addLog(`Creando Campaign + ${numAdSets} AdSet(s) + ${totalAds} Creative(s) + ${totalAds} Ad(s)...`);
 
         result = await metaService.createCampaignWithMultipleAds(job.adAccountId, {
@@ -2002,7 +2019,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           </div>
           <div className="summary-item">
             <label>Anuncios</label>
-            <p>{job.totalAds || 1} anuncio(s) | {job.adSetMode === 'per-ad' ? 'Ad Sets separados' : '1 Ad Set'}</p>
+            <p>{job.totalAds || 1} anuncio(s) | {job.adSetMode === 'single' ? '1 Ad Set' : `${job.totalAds || 1} Ad Sets${job.adSetMode === 'dynamic' ? ' con 5+5+5' : ' (público diferente)'}`}</p>
           </div>
           <div className="summary-item">
             <label>Presupuesto Diario (CBO)</label>
@@ -2100,8 +2117,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           <p><strong>Se creará en Meta Ads:</strong></p>
           <ul>
             <li><strong>1 Campaña</strong> - Objetivo: {job.objective || 'Tráfico'} (PAUSADA)</li>
-            <li><strong>{job.adSetMode === 'per-ad' ? (job.ads?.length || 1) + ' Ad Sets' : '1 Ad Set'}</strong> - Dynamic Creative - {job.optimizationGoal || 'Landing Page Views'}</li>
-            <li><strong>{job.ads?.length || 1} Creative(s)</strong> - Cada uno con 5+5+5</li>
+            <li><strong>{job.adSetMode === 'single' ? '1 Ad Set' : (job.ads?.length || 1) + ' Ad Sets'}</strong> - {job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}</li>
+            <li><strong>{job.ads?.length || 1} Creative(s)</strong>{job.adSetMode !== 'single' ? ' - Cada uno con 5+5+5' : ''}</li>
             <li><strong>{job.ads?.length || 1} Anuncio(s)</strong></li>
           </ul>
           {job.ads?.length > 1 && (

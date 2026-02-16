@@ -2292,18 +2292,49 @@ class MetaAdsService {
           await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
         }
 
+      } else if (adSetMode === 'dynamic') {
+        // ========================================================
+        // MODO DYNAMIC: N AdSets → N Ads con 5+5+5 (mismo público)
+        // Cada ad tiene su propio AdSet con Dynamic Creative.
+        // CBO distribuye el presupuesto automáticamente.
+        // ========================================================
+        console.log(`Mode: ${ads.length} ADSETS con 5+5+5 Dynamic Creative (mismo público)`);
+
+        for (let i = 0; i < ads.length; i++) {
+          console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}...`);
+
+          const adSetResult = await this.createAdSet(adAccountId, {
+            name: `${campaignName} - Ad Set ${i + 1}`,
+            campaignId: results.campaign.id,
+            billingEvent,
+            optimizationGoal,
+            targeting,
+            status: 'PAUSED',
+            endTime: endDate,
+            isDynamicCreative: true
+          });
+
+          if (!adSetResult.success) {
+            results.errors.push(`AdSet ${i + 1}: ${adSetResult.error}`);
+            continue;
+          }
+          results.adSets.push(adSetResult.data);
+
+          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
+        }
+
       } else {
         // ========================================================
-        // MODO PER-AD: N AdSets → N Ads (público diferente por ad)
+        // MODO PER-AD: N AdSets → N Ads con 5+5+5 (público diferente por ad)
         // ========================================================
-        console.log(`Mode: ${ads.length} ADSETS (público diferente por anuncio)`);
+        console.log(`Mode: ${ads.length} ADSETS con 5+5+5 (público diferente por anuncio)`);
 
         for (let i = 0; i < ads.length; i++) {
           const ad = ads[i];
           const adTargeting = ad.audienceTargeting || targeting;
           const audienceLabel = ad.audienceName ? ` (${ad.audienceName})` : '';
 
-          console.log(`Creating adSet + creative + ad ${i + 1}/${ads.length}...`);
+          console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}...`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
             name: `${campaignName} - Ad Set ${i + 1}${audienceLabel}`,
@@ -2322,7 +2353,7 @@ class MetaAdsService {
           }
           results.adSets.push(adSetResult.data);
 
-          await createDynamicCreativeAndAd(ad, i, adSetResult.data.id);
+          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
         }
       }
 
