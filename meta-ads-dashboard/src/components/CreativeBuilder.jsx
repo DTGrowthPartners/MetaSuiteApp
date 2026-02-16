@@ -515,7 +515,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
   }, [selectedPage, pages]);
 
-  // Cargar cuentas de Instagram desde la cuenta publicitaria
+  // Cargar cuentas de Instagram desde la cuenta publicitaria + página
   useEffect(() => {
     const loadIgAccounts = async () => {
       if (!selectedAccount) {
@@ -525,11 +525,31 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
       try {
         const metaService = new MetaAdsService(accessToken);
+        const allIg = [];
+        const seenIds = new Set();
+
+        // 1. Buscar desde la cuenta publicitaria
         const result = await metaService.getInstagramAccounts(selectedAccount);
-        console.log('Instagram accounts loaded:', result);
         if (result.success && result.data.length > 0) {
-          setIgAccounts(result.data);
-          setSelectedIgAccount(result.data[0].id);
+          result.data.forEach(ig => {
+            if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
+          });
+        }
+
+        // 2. Buscar desde la página de Facebook seleccionada
+        if (selectedPage) {
+          const pageResult = await metaService.getInstagramAccountFromPage(selectedPage);
+          if (pageResult.success && pageResult.data.length > 0) {
+            pageResult.data.forEach(ig => {
+              if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
+            });
+          }
+        }
+
+        console.log('Instagram accounts loaded:', allIg.length, allIg);
+        if (allIg.length > 0) {
+          setIgAccounts(allIg);
+          setSelectedIgAccount(prev => prev || allIg[0].id);
         } else {
           setIgAccounts([]);
           setSelectedIgAccount('');
@@ -540,7 +560,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
     };
     loadIgAccounts();
-  }, [selectedAccount]);
+  }, [selectedAccount, selectedPage]);
 
   // Cargar todos los públicos cuando se selecciona una cuenta
   useEffect(() => {
@@ -820,24 +840,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <p className="hint">La página desde la cual se publicará el anuncio</p>
         </div>
 
-        {/* Instagram Account Selection - cargadas desde la cuenta publicitaria */}
-        {igAccounts.length > 0 && (
-          <div className="form-group">
-            <label>Cuenta de Instagram</label>
-            <select
-              value={selectedIgAccount}
-              onChange={(e) => setSelectedIgAccount(e.target.value)}
-            >
-              <option value="">Sin Instagram</option>
-              {igAccounts.map((ig) => (
-                <option key={ig.id} value={ig.id}>
-                  @{ig.username}
-                </option>
-              ))}
-            </select>
-            <p className="hint">El anuncio aparecerá también en Instagram con esta cuenta</p>
-          </div>
-        )}
+        {/* Instagram Account Selection - cargadas desde la cuenta publicitaria + página */}
+        <div className="form-group">
+          <label>Cuenta de Instagram</label>
+          <select
+            value={selectedIgAccount}
+            onChange={(e) => setSelectedIgAccount(e.target.value)}
+          >
+            <option value="">{igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Sin Instagram'}</option>
+            {igAccounts.map((ig) => (
+              <option key={ig.id} value={ig.id}>
+                @{ig.username}
+              </option>
+            ))}
+          </select>
+          <p className="hint">
+            {igAccounts.length === 0
+              ? 'Vincula una cuenta de Instagram a tu página de Facebook para publicar en Instagram'
+              : 'El anuncio aparecerá también en Instagram con esta cuenta'}
+          </p>
+        </div>
 
         {/* Landing Page URL - Solo si es requerido */}
         {templateRequirements.website && (

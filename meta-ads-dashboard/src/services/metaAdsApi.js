@@ -560,6 +560,45 @@ class MetaAdsService {
     }
   }
 
+  // Obtener cuenta de Instagram vinculada a una página de Facebook
+  async getInstagramAccountFromPage(pageId) {
+    try {
+      console.log('Fetching Instagram account from page:', pageId);
+
+      // Primero intentar obtener instagram_business_account
+      const response = await axios.get(`${META_API_BASE_URL}/${pageId}`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'instagram_business_account{id,username,profile_picture_url}'
+        }
+      });
+
+      const igBusiness = response.data?.instagram_business_account;
+      if (igBusiness) {
+        console.log('Instagram business account found from page:', igBusiness.username);
+        return { success: true, data: [{
+          id: igBusiness.id,
+          username: igBusiness.username,
+          profile_pic: igBusiness.profile_picture_url || null
+        }] };
+      }
+
+      // Fallback: intentar /page_id/instagram_accounts
+      const response2 = await axios.get(`${META_API_BASE_URL}/${pageId}/instagram_accounts`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,username,profile_pic'
+        }
+      });
+
+      console.log('Instagram accounts from page:', response2.data);
+      return { success: true, data: response2.data.data || [] };
+    } catch (error) {
+      console.error('Error fetching Instagram from page:', error.response?.data?.error || error.message);
+      return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
+    }
+  }
+
   // Obtener imágenes de la biblioteca de medios de la cuenta publicitaria
   async getAdImages(adAccountId) {
     try {
