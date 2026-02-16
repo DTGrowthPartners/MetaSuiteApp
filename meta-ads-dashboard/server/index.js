@@ -799,46 +799,113 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
     const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
     console.log(`Uploading video file to ${normalizedId}: ${file.originalname} ${fileSizeMB}MB contentType: ${contentType}`);
 
-    const formData = new FormData();
-    formData.append('access_token', token);
-    formData.append('title', title || file.originalname);
+    const CHUNKED_THRESHOLD = 80 * 1024 * 1024; // 80MB - use chunked upload above this
+    let videoId;
 
-    // For large files (>50MB), write to disk and stream to avoid memory duplication
-    if (file.size > 50 * 1024 * 1024) {
+    if (file.size > CHUNKED_THRESHOLD) {
+      // === CHUNKED UPLOAD for large files (Meta Resumable Upload API) ===
+      console.log(`Using chunked upload for ${fileSizeMB}MB file...`);
+
+      // Step 1: Start upload session
+      const startResponse = await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
+        params: {
+          access_token: token,
+          upload_phase: 'start',
+          file_size: file.size
+        },
+        timeout: 30000
+      });
+
+      const { upload_session_id, start_offset: initialStart, end_offset: initialEnd } = startResponse.data;
+      console.log(`Chunked upload session: ${upload_session_id}, first chunk: ${initialStart}-${initialEnd}`);
+
+      // Write buffer to temp file for chunked reading
       tmpFilePath = path.join(os.tmpdir(), `upload_${Date.now()}_${file.originalname}`);
       fs.writeFileSync(tmpFilePath, file.buffer);
-      console.log(`Large file (${fileSizeMB}MB): streaming from temp file`);
-      formData.append('source', fs.createReadStream(tmpFilePath), {
-        filename: file.originalname,
-        contentType: contentType,
-        knownLength: file.size
+
+      // Step 2: Transfer chunks
+      let startOffset = parseInt(initialStart);
+      let endOffset = parseInt(initialEnd);
+      let chunkNum = 0;
+
+      while (startOffset < file.size) {
+        chunkNum++;
+        const chunkSize = endOffset - startOffset;
+        console.log(`  Chunk ${chunkNum}: bytes ${startOffset}-${endOffset} (${(chunkSize / 1024 / 1024).toFixed(1)}MB)`);
+
+        // Read chunk from temp file
+        const fd = fs.openSync(tmpFilePath, 'r');
+        const chunkBuffer = Buffer.alloc(chunkSize);
+        fs.readSync(fd, chunkBuffer, 0, chunkSize, startOffset);
+        fs.closeSync(fd);
+
+        const chunkForm = new FormData();
+        chunkForm.append('access_token', token);
+        chunkForm.append('upload_phase', 'transfer');
+        chunkForm.append('upload_session_id', upload_session_id);
+        chunkForm.append('start_offset', startOffset.toString());
+        chunkForm.append('video_file_chunk', chunkBuffer, {
+          filename: file.originalname,
+          contentType: 'application/octet-stream'
+        });
+
+        const transferResponse = await axios.post(
+          `${META_API_BASE_URL}/${normalizedId}/advideos`,
+          chunkForm,
+          {
+            headers: chunkForm.getHeaders(),
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 300000 // 5 min per chunk
+          }
+        );
+
+        startOffset = parseInt(transferResponse.data.start_offset);
+        endOffset = parseInt(transferResponse.data.end_offset);
+      }
+
+      // Step 3: Finish upload
+      const finishResponse = await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
+        params: {
+          access_token: token,
+          upload_phase: 'finish',
+          upload_session_id: upload_session_id,
+          title: title || file.originalname
+        },
+        timeout: 60000
       });
+
+      videoId = finishResponse.data.video_id;
+      console.log(`Chunked upload complete: video_id=${videoId} (${chunkNum} chunks)`);
+
     } else {
+      // === DIRECT UPLOAD for smaller files ===
+      const formData = new FormData();
+      formData.append('access_token', token);
+      formData.append('title', title || file.originalname);
       formData.append('source', file.buffer, {
         filename: file.originalname,
         contentType: contentType
       });
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/advideos`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 600000
+        }
+      );
+
+      videoId = response.data.id;
+      console.log('Direct upload response:', JSON.stringify(response.data, null, 2));
     }
-
-    const response = await axios.post(
-      `${META_API_BASE_URL}/${normalizedId}/advideos`,
-      formData,
-      {
-        headers: formData.getHeaders(),
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        timeout: 600000 // 10 minutes for large uploads
-      }
-    );
-
-    console.log('Video file upload response:', JSON.stringify(response.data, null, 2));
 
     res.json({
       success: true,
-      data: {
-        videoId: response.data.id,
-        ...response.data
-      }
+      data: { videoId }
     });
   } catch (error) {
     const status = error.response?.status || 'N/A';
