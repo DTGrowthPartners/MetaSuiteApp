@@ -1092,7 +1092,57 @@ async function extractFrameFromBuffer(videoBuffer, filename) {
 }
 
 // Helper: Generate 5+5+5 content from transcription text
-async function generateContentFromText(transcription, adIndex, category) {
+// Helper: generar contexto específico según tipo de campaña
+function getCampaignContext(objective, destType) {
+  if (destType === 'WEBSITE' || objective === 'OUTCOME_TRAFFIC') {
+    return {
+      focus: `CAMPAÑA DE TRÁFICO WEB - El objetivo es que el usuario HAGA CLIC y visite la página web.
+- Los títulos deben generar curiosidad o urgencia para que hagan clic
+- Las descripciones deben dar una razón clara para visitar el sitio (oferta, beneficio, solución)
+- Usa verbos de acción directos: "Descubre", "Conoce", "Visita", "Aprovecha", "Mira"
+- NO seas genérico. Sé específico sobre lo que encontrarán al hacer clic
+- Incluye llamados a la acción claros orientados al clic`,
+      ctas: 'LEARN_MORE, SHOP_NOW, SIGN_UP, GET_OFFER, APPLY_NOW, DOWNLOAD, SUBSCRIBE, GET_QUOTE, CONTACT_US',
+      preferredCtas: ['LEARN_MORE', 'SHOP_NOW', 'GET_OFFER']
+    };
+  }
+  if (destType === 'WHATSAPP' || objective === 'OUTCOME_ENGAGEMENT') {
+    return {
+      focus: `CAMPAÑA DE WHATSAPP/MENSAJES - El objetivo es que el usuario ESCRIBA por WhatsApp.
+- Los títulos deben invitar a la conversación directa
+- Las descripciones deben dar confianza y facilitar el primer contacto
+- Usa frases como "Escríbenos", "Pregunta sin compromiso", "Te asesoramos"`,
+      ctas: 'WHATSAPP_MESSAGE, SEND_MESSAGE, CONTACT_US, GET_QUOTE, LEARN_MORE',
+      preferredCtas: ['WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US']
+    };
+  }
+  if (objective === 'OUTCOME_LEADS') {
+    return {
+      focus: `CAMPAÑA DE GENERACIÓN DE LEADS - El objetivo es capturar datos del usuario.
+- Los títulos deben ofrecer algo de valor a cambio (descuento, info, demo)
+- Las descripciones deben minimizar el esfuerzo percibido: "en 30 segundos", "sin compromiso"`,
+      ctas: 'SIGN_UP, GET_QUOTE, LEARN_MORE, SUBSCRIBE, APPLY_NOW, DOWNLOAD, GET_OFFER, CONTACT_US',
+      preferredCtas: ['SIGN_UP', 'GET_QUOTE', 'SUBSCRIBE']
+    };
+  }
+  if (objective === 'OUTCOME_SALES') {
+    return {
+      focus: `CAMPAÑA DE VENTAS/CONVERSIONES - El objetivo es que el usuario COMPRE.
+- Los títulos deben destacar ofertas, precios o beneficios concretos
+- Las descripciones deben crear urgencia y mostrar valor: descuentos, envío gratis, tiempo limitado`,
+      ctas: 'SHOP_NOW, GET_OFFER, LEARN_MORE, SIGN_UP, SUBSCRIBE, DOWNLOAD, APPLY_NOW',
+      preferredCtas: ['SHOP_NOW', 'GET_OFFER', 'LEARN_MORE']
+    };
+  }
+  // Default genérico
+  return {
+    focus: `Genera contenido persuasivo orientado a la acción.`,
+    ctas: 'LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, DOWNLOAD, GET_OFFER, APPLY_NOW, CONTACT_US, GET_QUOTE',
+    preferredCtas: ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP']
+  };
+}
+
+async function generateContentFromText(transcription, adIndex, category, objective, templateName, destType) {
   const angleVariations = [
     'Enfócate en el beneficio principal y la propuesta de valor.',
     'Enfócate en la urgencia y escasez. Usa un tono más directo.',
@@ -1104,29 +1154,32 @@ async function generateContentFromText(transcription, adIndex, category) {
   ];
 
   const angle = angleVariations[adIndex % angleVariations.length];
+  const ctx = getCampaignContext(objective, destType);
 
-  const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads.
-Generas contenido persuasivo basándote en la transcripción/contenido de un video o imagen publicitario.
+  const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia en campañas de alto rendimiento.
 
-REGLAS:
-- Títulos: máximo 40 caracteres cada uno
-- Descripciones: máximo 125 caracteres cada una
+${ctx.focus}
+
+REGLAS ESTRICTAS:
+- Títulos: máximo 40 caracteres, concisos, impactantes y específicos (NO genéricos)
+- Descripciones: máximo 125 caracteres, con beneficio claro y llamado a la acción
 - Todo en español
-- Persuasivo y orientado a la acción
+- NO uses frases vacías como "Lo mejor te espera" o "No te lo pierdas". Sé ESPECÍFICO sobre el producto/servicio
 - Responde SOLO en JSON válido, sin markdown`;
 
   const userPrompt = `Basándote en este contenido de un video/audio publicitario:
 
 "${transcription.substring(0, 2000)}"
 
-${category ? `Categoría: ${category}` : ''}
+${category ? `Categoría del negocio: ${category}` : ''}
+${templateName ? `Tipo de campaña: ${templateName}` : ''}
 
 Instrucción de ángulo: ${angle}
 
 Genera exactamente:
-- 5 títulos cortos y llamativos (máx 40 chars)
-- 5 descripciones persuasivas (máx 125 chars)
-- 5 CTAs de esta lista (SOLO estos son válidos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, DOWNLOAD, GET_OFFER, APPLY_NOW, CONTACT_US, GET_QUOTE
+- 5 títulos cortos, concisos y llamativos (máx 40 chars) - que sean ESPECÍFICOS al producto/servicio del video
+- 5 descripciones persuasivas (máx 125 chars) - con beneficio concreto y llamado a la acción
+- 5 CTAs variados de esta lista: ${ctx.ctas}
 
 JSON exacto:
 {
@@ -1148,12 +1201,12 @@ JSON exacto:
   const responseText = completion.choices[0].message.content;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
-  // Ensure exactly 5 CTAs
-  const validCtas = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
+  // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
+  const fallbackCtas = [...ctx.preferredCtas, 'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
   if (!parsed.ctas || parsed.ctas.length < 5) {
     parsed.ctas = parsed.ctas || [];
     while (parsed.ctas.length < 5) {
-      const next = validCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
+      const next = fallbackCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
       parsed.ctas.push(next);
     }
   }
@@ -1161,7 +1214,7 @@ JSON exacto:
 }
 
 // Helper: Generate 5+5+5 content from image (vision)
-async function generateContentFromImage(base64Image, adIndex, category) {
+async function generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType) {
   const angleVariations = [
     'Enfócate en el beneficio principal y la propuesta de valor.',
     'Enfócate en la urgencia y escasez. Usa un tono más directo.',
@@ -1173,19 +1226,22 @@ async function generateContentFromImage(base64Image, adIndex, category) {
   ];
 
   const angle = angleVariations[adIndex % angleVariations.length];
+  const ctx = getCampaignContext(objective, destType);
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
-        content: `Eres un experto copywriter de Facebook/Instagram Ads.
-Analizas imágenes publicitarias y generas contenido persuasivo.
+        content: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia en campañas de alto rendimiento.
 
-REGLAS:
-- Títulos: máximo 40 caracteres
-- Descripciones: máximo 125 caracteres
+${ctx.focus}
+
+REGLAS ESTRICTAS:
+- Títulos: máximo 40 caracteres, concisos, impactantes y específicos (NO genéricos)
+- Descripciones: máximo 125 caracteres, con beneficio claro y llamado a la acción
 - Todo en español
+- NO uses frases vacías como "Lo mejor te espera" o "No te lo pierdas". Sé ESPECÍFICO sobre el producto/servicio
 - Responde SOLO en JSON válido, sin markdown`
       },
       {
@@ -1195,7 +1251,8 @@ REGLAS:
             type: 'text',
             text: `Analiza esta imagen publicitaria y genera contenido para un anuncio de Facebook Ads.
 
-${category ? `Categoría: ${category}` : ''}
+${category ? `Categoría del negocio: ${category}` : ''}
+${templateName ? `Tipo de campaña: ${templateName}` : ''}
 Instrucción de ángulo: ${angle}
 
 Genera exactamente en JSON:
@@ -1205,7 +1262,7 @@ Genera exactamente en JSON:
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
-CTAs válidos (SOLO estos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, DOWNLOAD, GET_OFFER, APPLY_NOW, CONTACT_US, GET_QUOTE`
+CTAs variados de esta lista: ${ctx.ctas}`
           },
           {
             type: 'image_url',
@@ -1224,12 +1281,12 @@ CTAs válidos (SOLO estos para LINK_CLICKS): LEARN_MORE, SHOP_NOW, SIGN_UP, SUBS
   const responseText = completion.choices[0].message.content;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
-  // Ensure exactly 5 CTAs
-  const validCtas = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
+  // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
+  const fallbackCtas = [...ctx.preferredCtas, 'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'];
   if (!parsed.ctas || parsed.ctas.length < 5) {
     parsed.ctas = parsed.ctas || [];
     while (parsed.ctas.length < 5) {
-      const next = validCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
+      const next = fallbackCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
       parsed.ctas.push(next);
     }
   }
@@ -1252,10 +1309,13 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
 
     const adIndex = parseInt(req.body.adIndex) || 0;
     const category = req.body.category || '';
+    const objective = req.body.objective || '';
+    const templateName = req.body.templateName || '';
+    const destType = req.body.destType || '';
     const fileName = req.file.originalname || 'video.mp4';
     const fileSize = req.file.size;
 
-    console.log(`Analyzing video: ${fileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB) for ad index ${adIndex}`);
+    console.log(`Analyzing video: ${fileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB) for ad index ${adIndex}, objective: ${objective}, dest: ${destType}`);
 
     let transcription = '';
 
@@ -1300,7 +1360,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
       try {
         const frameBuffer = await extractFrameFromBuffer(req.file.buffer, fileName);
         const base64Frame = frameBuffer.toString('base64');
-        const content = await generateContentFromImage(base64Frame, adIndex, category);
+        const content = await generateContentFromImage(base64Frame, adIndex, category, objective, templateName, destType);
 
         return res.json({
           success: true,
@@ -1323,7 +1383,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
     }
 
     // Generate content from transcription
-    const content = await generateContentFromText(transcription, adIndex, category);
+    const content = await generateContentFromText(transcription, adIndex, category, objective, templateName, destType);
 
     res.json({
       success: true,
@@ -1361,12 +1421,15 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
 
     const adIndex = parseInt(req.body.adIndex) || 0;
     const category = req.body.category || '';
+    const objective = req.body.objective || '';
+    const templateName = req.body.templateName || '';
+    const destType = req.body.destType || '';
     const fileName = req.file.originalname || 'image.jpg';
 
-    console.log(`Analyzing image: ${fileName} for ad index ${adIndex}`);
+    console.log(`Analyzing image: ${fileName} for ad index ${adIndex}, objective: ${objective}, dest: ${destType}`);
 
     const base64Image = req.file.buffer.toString('base64');
-    const content = await generateContentFromImage(base64Image, adIndex, category);
+    const content = await generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType);
 
     res.json({
       success: true,

@@ -36,13 +36,16 @@ class MetaAdsService {
   }
 
   // Analyze video file - transcribe audio and generate 5+5+5
-  async analyzeVideoFile(file, adIndex = 0, category = null) {
+  async analyzeVideoFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '') {
     try {
       console.log(`Analyzing video for ad ${adIndex}: ${file.name}`);
       const formData = new globalThis.FormData();
       formData.append('video', file);
       formData.append('adIndex', adIndex.toString());
       if (category) formData.append('category', category);
+      if (objective) formData.append('objective', objective);
+      if (templateName) formData.append('templateName', templateName);
+      if (destType) formData.append('destType', destType);
 
       const response = await axios.post(`${BACKEND_API_URL}/analyze-video`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -64,13 +67,16 @@ class MetaAdsService {
   }
 
   // Analyze image file - vision analysis and generate 5+5+5
-  async analyzeImageFile(file, adIndex = 0, category = null) {
+  async analyzeImageFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '') {
     try {
       console.log(`Analyzing image for ad ${adIndex}: ${file.name}`);
       const formData = new globalThis.FormData();
       formData.append('image', file);
       formData.append('adIndex', adIndex.toString());
       if (category) formData.append('category', category);
+      if (objective) formData.append('objective', objective);
+      if (templateName) formData.append('templateName', templateName);
+      if (destType) formData.append('destType', destType);
 
       const response = await axios.post(`${BACKEND_API_URL}/analyze-image`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

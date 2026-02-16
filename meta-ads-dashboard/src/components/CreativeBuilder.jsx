@@ -322,12 +322,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     try {
       const metaService = new MetaAdsService(accessToken);
       const category = selectedTemplate?.category || '';
+      const objective = selectedTemplate?.objective || '';
+      const templateName = selectedTemplate?.name || '';
+      const destType = templateAdConfig.destinationConfig?.type || '';
 
       let result;
       if (isVideo) {
-        result = await metaService.analyzeVideoFile(file, adIndex, category);
+        result = await metaService.analyzeVideoFile(file, adIndex, category, objective, templateName, destType);
       } else {
-        result = await metaService.analyzeImageFile(file, adIndex, category);
+        result = await metaService.analyzeImageFile(file, adIndex, category, objective, templateName, destType);
       }
 
       if (result.success && result.data) {
