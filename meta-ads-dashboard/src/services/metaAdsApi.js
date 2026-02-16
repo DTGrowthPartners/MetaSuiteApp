@@ -1800,6 +1800,13 @@ class MetaAdsService {
         formData.append('promoted_object', JSON.stringify(promotedObject));
       }
 
+      console.log('Creating WhatsApp AdSet with params:', {
+        name, campaignId, billingEvent, optimizationGoal, status,
+        destination_type: 'WHATSAPP',
+        promotedObject,
+        targeting: JSON.stringify(targeting).substring(0, 200)
+      });
+
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adsets`,
         formData,
@@ -1807,8 +1814,10 @@ class MetaAdsService {
       );
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('AdSet for WhatsApp error:', error.response?.data || error.message);
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      const errData = error.response?.data?.error;
+      console.error('AdSet for WhatsApp FULL error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
     }
   }
 
