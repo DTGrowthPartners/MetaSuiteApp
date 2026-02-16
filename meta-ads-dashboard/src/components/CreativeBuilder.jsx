@@ -1364,7 +1364,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                               newHeadlines[hi] = e.target.value;
                               updateAd(adIndex, { headlines: newHeadlines });
                             }}
-                            maxLength={40}
+                            maxLength={55}
                             style={{
                               fontSize: '13px', padding: '8px 40px 8px 10px',
                               borderRadius: '6px', border: headline.trim() ? '1px solid #90caf9' : '1px solid #e0e0e0',
@@ -1374,8 +1374,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           />
                           <span style={{
                             position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-                            fontSize: '10px', color: headline.length > 35 ? '#e53935' : '#bbb'
-                          }}>{headline.length}/40</span>
+                            fontSize: '10px', color: headline.length > 50 ? '#e53935' : '#bbb'
+                          }}>{headline.length}/55</span>
                         </div>
                       ))}
                     </div>
@@ -1390,21 +1390,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
                         }}>D</span>
                         <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
-                          Descripciones ({ad.descriptions.filter(d => d.trim()).length}/5)
+                          Textos Principales ({ad.descriptions.filter(d => d.trim()).length}/5)
                         </label>
                       </div>
                       {ad.descriptions.map((desc, di) => (
                         <div key={`ad${adIndex}-d${di}`} style={{ position: 'relative', marginBottom: '6px' }}>
                           <textarea
-                            placeholder={`Descripción ${di + 1}`}
+                            placeholder={`Texto principal ${di + 1} - Escribe un texto atractivo con emojis y beneficios`}
                             value={desc}
                             onChange={(e) => {
                               const newDescriptions = [...ad.descriptions];
                               newDescriptions[di] = e.target.value;
                               updateAd(adIndex, { descriptions: newDescriptions });
                             }}
-                            maxLength={125}
-                            rows={2}
+                            maxLength={500}
+                            rows={3}
                             style={{
                               fontSize: '13px', padding: '8px 10px', resize: 'vertical',
                               borderRadius: '6px', border: desc.trim() ? '1px solid #ffcc80' : '1px solid #e0e0e0',
@@ -1414,8 +1414,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           />
                           <span style={{
                             position: 'absolute', right: '8px', bottom: '8px',
-                            fontSize: '10px', color: desc.length > 115 ? '#e53935' : '#bbb'
-                          }}>{desc.length}/125</span>
+                            fontSize: '10px', color: desc.length > 280 ? '#e53935' : '#bbb'
+                          }}>{desc.length}/500</span>
                         </div>
                       ))}
                     </div>

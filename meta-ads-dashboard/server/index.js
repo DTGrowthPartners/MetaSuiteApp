@@ -985,7 +985,7 @@ Responde en este formato JSON exacto:
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 2000
     });
 
     const responseText = completion.choices[0].message.content;
@@ -1167,15 +1167,16 @@ async function generateContentFromText(transcription, adIndex, category, objecti
   const angle = angleVariations[adIndex % angleVariations.length];
   const ctx = getCampaignContext(objective, destType);
 
-  const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia en campañas de alto rendimiento.
+  const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
 
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- Títulos: máximo 40 caracteres, concisos, impactantes y específicos (NO genéricos)
-- Descripciones: máximo 125 caracteres, con beneficio claro y llamado a la acción
+- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Puedes usar 1-2 emojis por título para hacerlos más llamativos. Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con emojis estratégicos, beneficios claros y un llamado a la acción. Usa saltos implícitos con emojis para separar ideas. Ejemplo: "🔥 Transforma tu negocio con... ✅ Beneficio 1 ✅ Beneficio 2 👉 Haz clic ahora"
 - Todo en español
-- NO uses frases vacías como "Lo mejor te espera" o "No te lo pierdas". Sé ESPECÍFICO sobre el producto/servicio
+- Usa emojis de forma estratégica (🔥 ✅ 💪 🎯 ⚡ 👉 💰 🏆 ❤️ 🚀) para resaltar puntos clave
+- NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio
 - Responde SOLO en JSON válido, sin markdown`;
 
   const userPrompt = `Basándote en este contenido de un video/audio publicitario:
@@ -1188,14 +1189,14 @@ ${templateName ? `Tipo de campaña: ${templateName}` : ''}
 Instrucción de ángulo: ${angle}
 
 Genera exactamente:
-- 5 títulos cortos, concisos y llamativos (máx 40 chars) - que sean ESPECÍFICOS al producto/servicio del video
-- 5 descripciones persuasivas (máx 125 chars) - con beneficio concreto y llamado a la acción
+- 5 TÍTULOS llamativos (máx 55 chars) con emojis - que enganchen y generen curiosidad
+- 5 DESCRIPCIONES largas y persuasivas (150-300 chars cada una) - con emojis, beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Estas son el texto principal del anuncio, deben convencer al usuario de hacer clic
 - 5 CTAs variados de esta lista: ${ctx.ctas}
 
 JSON exacto:
 {
-  "headlines": ["t1", "t2", "t3", "t4", "t5"],
-  "descriptions": ["d1", "d2", "d3", "d4", "d5"],
+  "headlines": ["título con emoji", "título con emoji", "título con emoji", "título con emoji", "título con emoji"],
+  "descriptions": ["descripción larga y detallada con emojis y beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }`;
 
@@ -1206,7 +1207,7 @@ JSON exacto:
       { role: 'user', content: userPrompt }
     ],
     temperature: 0.7 + (adIndex * 0.05), // Slight variation per ad
-    max_tokens: 1000
+    max_tokens: 2000
   });
 
   const responseText = completion.choices[0].message.content;
@@ -1244,15 +1245,16 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
     messages: [
       {
         role: 'system',
-        content: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia en campañas de alto rendimiento.
+        content: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
 
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- Títulos: máximo 40 caracteres, concisos, impactantes y específicos (NO genéricos)
-- Descripciones: máximo 125 caracteres, con beneficio claro y llamado a la acción
+- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Puedes usar 1-2 emojis por título para hacerlos más llamativos. Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con emojis estratégicos, beneficios claros y un llamado a la acción. Usa emojis para separar ideas. Ejemplo: "🔥 Transforma tu negocio con... ✅ Beneficio 1 ✅ Beneficio 2 👉 Haz clic ahora"
 - Todo en español
-- NO uses frases vacías como "Lo mejor te espera" o "No te lo pierdas". Sé ESPECÍFICO sobre el producto/servicio
+- Usa emojis de forma estratégica (🔥 ✅ 💪 🎯 ⚡ 👉 💰 🏆 ❤️ 🚀) para resaltar puntos clave
+- NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio de la imagen
 - Responde SOLO en JSON válido, sin markdown`
       },
       {
@@ -1268,8 +1270,8 @@ Instrucción de ángulo: ${angle}
 
 Genera exactamente en JSON:
 {
-  "headlines": ["t1", "t2", "t3", "t4", "t5"],
-  "descriptions": ["d1", "d2", "d3", "d4", "d5"],
+  "headlines": ["título con emoji", "título con emoji", "título con emoji", "título con emoji", "título con emoji"],
+  "descriptions": ["descripción larga y detallada con emojis y beneficios (150-300 chars)...", "otra descripción persuasiva...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
@@ -1286,7 +1288,7 @@ CTAs variados de esta lista: ${ctx.ctas}`
       }
     ],
     temperature: 0.7 + (adIndex * 0.05),
-    max_tokens: 1000
+    max_tokens: 2000
   });
 
   const responseText = completion.choices[0].message.content;
