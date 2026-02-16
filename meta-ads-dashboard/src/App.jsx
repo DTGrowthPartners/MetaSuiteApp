@@ -78,54 +78,30 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#151C29',
-      padding: '20px'
-    }}>
-      <div style={{
-        background: '#1B2333',
-        borderRadius: '20px',
-        padding: '48px 40px',
-        maxWidth: '440px',
-        width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-        border: '1px solid #2A3441',
-        textAlign: 'center'
-      }}>
+    <div className="login-screen">
+      {/* Animated background orbs */}
+      <div className="login-bg-orb login-bg-orb-1" />
+      <div className="login-bg-orb login-bg-orb-2" />
+      <div className="login-bg-orb login-bg-orb-3" />
+
+      <div className="login-card">
         {/* Logo */}
-        <div style={{ marginBottom: '8px', fontSize: '48px' }}>📊</div>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#E2E8F0', marginBottom: '8px' }}>
-          Meta Suite
-        </h1>
-        <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '32px' }}>
-          Inicia sesión para administrar tus campañas
-        </p>
+        <div className="login-logo">
+          <div className="login-logo-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm13 0l4 8-4-1-4 1 4-8z" fill="url(#g1)" />
+              <defs><linearGradient id="g1" x1="3" y1="3" x2="21" y2="21"><stop stopColor="#4A9FFF"/><stop offset="1" stopColor="#7C5CFC"/></linearGradient></defs>
+            </svg>
+          </div>
+          <h1 className="login-title">Meta Suite</h1>
+        </div>
+        <p className="login-subtitle">Administra y optimiza tus campañas publicitarias</p>
 
         {/* Facebook Login Button */}
         <button
           onClick={handleFacebookLogin}
           disabled={loading || !fbReady}
-          style={{
-            width: '100%',
-            padding: '14px 24px',
-            fontSize: '16px',
-            fontWeight: '600',
-            color: 'white',
-            background: loading ? '#3B7ACC' : '#4A9FFF',
-            border: 'none',
-            borderRadius: '10px',
-            cursor: loading || !fbReady ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            transition: 'all 0.2s',
-            opacity: fbReady ? 1 : 0.6
-          }}
+          className="login-fb-btn"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -134,78 +110,30 @@ function LoginScreen({ onLogin }) {
         </button>
 
         {/* Divider */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          margin: '24px 0',
-          gap: '12px'
-        }}>
-          <div style={{ flex: 1, height: '1px', background: '#2A3441' }} />
-          <span style={{ color: '#64748B', fontSize: '13px' }}>o</span>
-          <div style={{ flex: 1, height: '1px', background: '#2A3441' }} />
+        <div className="login-divider">
+          <span>o</span>
         </div>
 
         {/* Manual Token Toggle */}
         {!showManual ? (
-          <button
-            onClick={() => setShowManual(true)}
-            style={{
-              width: '100%',
-              padding: '12px 24px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#94A3B8',
-              background: '#212B3D',
-              border: '1px solid #2A3441',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
+          <button onClick={() => setShowManual(true)} className="login-manual-btn">
             Usar Access Token manualmente
           </button>
         ) : (
-          <div style={{ textAlign: 'left' }}>
-            <label style={{ fontSize: '13px', color: '#94A3B8', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
-              Access Token de Meta
-            </label>
+          <div className="login-token-form">
+            <label>Access Token de Meta</label>
             <textarea
               value={manualToken}
               onChange={(e) => { setManualToken(e.target.value); setError(''); }}
               placeholder="Pega tu Access Token aquí..."
               rows={3}
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '13px',
-                border: '1px solid #2A3441',
-                borderRadius: '8px',
-                resize: 'vertical',
-                fontFamily: 'monospace',
-                marginBottom: '12px',
-                background: '#212B3D',
-                color: '#E2E8F0'
-              }}
             />
-            <button
-              onClick={handleManualLogin}
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'white',
-                background: '#4A9FFF',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
+            <button onClick={handleManualLogin} className="login-token-submit">
               Conectar con Token
             </button>
-            <p style={{ fontSize: '12px', color: '#64748B', marginTop: '8px' }}>
+            <p className="login-token-hint">
               Genera un token en{' '}
-              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" style={{ color: '#4A9FFF' }}>
+              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer">
                 Graph API Explorer
               </a>
               {' '}con permisos: ads_management, pages_show_list, business_management
@@ -214,20 +142,7 @@ function LoginScreen({ onLogin }) {
         )}
 
         {/* Error */}
-        {error && (
-          <div style={{
-            marginTop: '16px',
-            padding: '10px 14px',
-            background: 'rgba(248, 113, 113, 0.1)',
-            border: '1px solid rgba(248, 113, 113, 0.3)',
-            borderRadius: '8px',
-            color: '#F87171',
-            fontSize: '13px',
-            textAlign: 'left'
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="login-error">{error}</div>}
       </div>
     </div>
   );
@@ -357,11 +272,11 @@ function App() {
               style={{
                 padding: '6px 14px',
                 fontSize: '12px',
-                fontWeight: '600',
-                color: '#94A3B8',
-                background: '#212B3D',
-                border: '1px solid #2A3441',
-                borderRadius: '6px',
+                fontWeight: '500',
+                color: 'var(--text-muted)',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-xs)',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
               }}
