@@ -2157,13 +2157,8 @@ class MetaAdsService {
       }
       results.campaign = campaignResult.data;
 
-      // Helper: crear creative + ad para un ad entry
-      const createCreativeAndAd = async (ad, adIndex, adSetId) => {
-        const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
-        const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
-        const validCTAs = sanitizeCTAs(ad.ctas);
-
-        // Resolver thumbnail si es video
+      // Helper: resolver thumbnail de un video
+      const resolveThumbnail = async (ad, adIndex) => {
         let resolvedThumbUrl = ad.videoThumbnailUrl || null;
         let resolvedThumbHash = ad.imageHash || null;
         if (ad.videoId && !resolvedThumbHash && !resolvedThumbUrl) {
@@ -2171,15 +2166,21 @@ class MetaAdsService {
             const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${ad.videoId}`, {
               params: { adAccountId: this.normalizeAccountId(adAccountId) }
             });
-            if (thumbResponse.data?.data?.thumbnailUrl) {
-              resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
-            } else if (thumbResponse.data?.data?.thumbnailHash) {
-              resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
-            }
+            if (thumbResponse.data?.data?.thumbnailUrl) resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
+            else if (thumbResponse.data?.data?.thumbnailHash) resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
           } catch (err) {
             console.warn('Thumbnail fetch failed for ad', adIndex, err.message);
           }
         }
+        return { resolvedThumbUrl, resolvedThumbHash };
+      };
+
+      // Helper: crear Dynamic Creative (asset_feed_spec 5+5+5) + ad
+      const createDynamicCreativeAndAd = async (ad, adIndex, adSetId) => {
+        const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
+        const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
+        const validCTAs = sanitizeCTAs(ad.ctas);
+        const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, adIndex);
 
         const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
           name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
@@ -2219,16 +2220,57 @@ class MetaAdsService {
         return true;
       };
 
+      // Helper: crear Standard Creative (object_story_spec) + ad
+      const createStandardCreativeAndAd = async (ad, adIndex, adSetId) => {
+        const headline = (ad.headlines?.find(h => h?.trim()) || 'Conoce más');
+        const primaryText = (ad.descriptions?.find(d => d?.trim()) || 'Descubre más');
+        const cta = sanitizeCTAs(ad.ctas)[0] || 'LEARN_MORE';
+        const { resolvedThumbUrl } = await resolveThumbnail(ad, adIndex);
+
+        const creativeResult = await this.createStandardAdCreative(adAccountId, {
+          name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
+          pageId,
+          imageUrl: !ad.videoId ? ad.imageUrl : null,
+          imageHash: !ad.videoId ? ad.imageHash : null,
+          videoId: ad.videoId || null,
+          thumbnailUrl: resolvedThumbUrl || null,
+          primaryText,
+          headline,
+          description: ad.descriptions?.[1]?.trim() || '',
+          linkUrl,
+          callToAction: cta,
+          igActorId
+        });
+
+        if (!creativeResult.success) {
+          results.errors.push(`Creative ${adIndex + 1}: ${creativeResult.error}`);
+          return false;
+        }
+        results.creatives.push(creativeResult.data);
+
+        const adResult = await this.createAd(adAccountId, {
+          name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
+          adsetId: adSetId,
+          creativeId: creativeResult.data.id,
+          status: 'PAUSED'
+        });
+
+        if (!adResult.success) {
+          results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
+          return false;
+        }
+        results.ads.push(adResult.data);
+        return true;
+      };
+
       if (adSetMode === 'single') {
         // ========================================================
-        // MODO SINGLE: Intenta 1 AdSet → N Ads.
-        // Si Meta rechaza el 2do ad (Dynamic Creative limit),
-        // crea AdSets adicionales automáticamente.
+        // MODO SINGLE: 1 AdSet → N Ads (creatives estándar, todos en 1 Ad Set)
+        // Cada ad usa el mejor título, descripción y CTA de su 5+5+5.
         // ========================================================
-        console.log(`Mode: 1 ADSET → ${ads.length} ADS (cada uno con Dynamic Creative 5+5+5)`);
+        console.log(`Mode: 1 ADSET → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
 
-        // Crear primer AdSet
-        const firstAdSetResult = await this.createAdSet(adAccountId, {
+        const adSetResult = await this.createAdSet(adAccountId, {
           name: `${campaignName} - Ad Set`,
           campaignId: results.campaign.id,
           billingEvent,
@@ -2236,51 +2278,18 @@ class MetaAdsService {
           targeting,
           status: 'PAUSED',
           endTime: endDate,
-          isDynamicCreative: true
+          isDynamicCreative: false // Standard ads allow multiple per AdSet
         });
 
-        if (!firstAdSetResult.success) {
-          results.errors.push(`AdSet: ${firstAdSetResult.error}`);
+        if (!adSetResult.success) {
+          results.errors.push(`AdSet: ${adSetResult.error}`);
           return { success: false, ...results };
         }
-        results.adSets.push(firstAdSetResult.data);
+        results.adSets.push(adSetResult.data);
 
-        // Intentar crear todos los ads en el primer AdSet
-        let needsSeparateAdSets = false;
         for (let i = 0; i < ads.length; i++) {
-          console.log(`Creating creative + ad ${i + 1}/${ads.length}...`);
-          const ok = await createCreativeAndAd(ads[i], i, firstAdSetResult.data.id);
-
-          // Si el 2do+ ad falla, probablemente es por la limitación de 1 ad por Dynamic Creative AdSet
-          if (!ok && i > 0 && !needsSeparateAdSets) {
-            console.log('Dynamic Creative limit detected - switching to separate AdSets for remaining ads');
-            needsSeparateAdSets = true;
-          }
-
-          // Si ya detectamos la limitación, crear AdSet individual para este ad
-          if (!ok && needsSeparateAdSets) {
-            console.log(`Creating separate AdSet for ad ${i + 1}...`);
-            // Quitar el error anterior de Creative/Ad porque vamos a reintentar
-            const lastErrors = results.errors.splice(-2); // Remove last 2 errors (creative + ad or just ad)
-
-            const extraAdSetResult = await this.createAdSet(adAccountId, {
-              name: `${campaignName} - Ad Set ${results.adSets.length + 1}`,
-              campaignId: results.campaign.id,
-              billingEvent,
-              optimizationGoal,
-              targeting,
-              status: 'PAUSED',
-              endTime: endDate,
-              isDynamicCreative: true
-            });
-
-            if (!extraAdSetResult.success) {
-              results.errors.push(`AdSet ${results.adSets.length + 1}: ${extraAdSetResult.error}`);
-              continue;
-            }
-            results.adSets.push(extraAdSetResult.data);
-            await createCreativeAndAd(ads[i], i, extraAdSetResult.data.id);
-          }
+          console.log(`Creating standard creative + ad ${i + 1}/${ads.length} in shared AdSet...`);
+          await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
         }
 
       } else {
@@ -2313,7 +2322,7 @@ class MetaAdsService {
           }
           results.adSets.push(adSetResult.data);
 
-          await createCreativeAndAd(ad, i, adSetResult.data.id);
+          await createDynamicCreativeAndAd(ad, i, adSetResult.data.id);
         }
       }
 

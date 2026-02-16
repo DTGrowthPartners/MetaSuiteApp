@@ -1596,7 +1596,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const totalAds = job.ads?.length || 1;
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
         const isSingleMode = (job.adSetMode || 'single') === 'single';
-        addLog(`Modo: ${isSingleMode ? `1 Ad Set → ${totalAds} Ads` : `${totalAds} Ad Sets (público diferente)`}`);
+        addLog(`Modo: ${isSingleMode ? `1 Ad Set → ${totalAds} Ads (mismo público)` : `${totalAds} Ad Sets con 5+5+5 (público diferente)`}`);
         addLog(`Total anuncios: ${totalAds}`);
         if (job.igActorId) addLog(`Instagram: @${job.igUsername || 'vinculada'}`);
 
