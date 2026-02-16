@@ -610,7 +610,8 @@ class MetaAdsService {
       formData.append('image', file);
 
       const response = await axios.post(`${BACKEND_API_URL}/upload/image-file`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000 // 2 minutes
       });
 
       if (response.data.success) {
@@ -638,7 +639,8 @@ class MetaAdsService {
       const response = await axios.post(`${BACKEND_API_URL}/upload/video-file`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        maxBodyLength: Infinity,
+        timeout: 300000 // 5 minutes for large video uploads
       });
 
       if (response.data.success) {
