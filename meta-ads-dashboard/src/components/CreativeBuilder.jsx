@@ -947,7 +947,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             ))}
           </select>
           {audienceError && (
-            <p className="hint" style={{ color: '#cc6600' }}>
+            <p className="hint" style={{ color: '#F59E0B' }}>
               {audienceError}
             </p>
           )}
@@ -989,7 +989,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onChange={(e) => setEndDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
               />
-              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#666' }}>
+              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
                 Deja vacío para que la campaña corra indefinidamente
               </p>
             </div>
@@ -1058,8 +1058,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               onClick={() => setAdSetMode('single')}
               style={{
                 padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'single' ? '#1877f2' : '#ddd',
-                background: adSetMode === 'single' ? '#e7f3ff' : 'white',
+                borderColor: adSetMode === 'single' ? '#4A9FFF' : '#2A3441',
+                background: adSetMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                 cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'single' ? 'bold' : 'normal'
               }}
             >
@@ -1070,8 +1070,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               onClick={() => setAdSetMode('dynamic')}
               style={{
                 padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'dynamic' ? '#1877f2' : '#ddd',
-                background: adSetMode === 'dynamic' ? '#e7f3ff' : 'white',
+                borderColor: adSetMode === 'dynamic' ? '#4A9FFF' : '#2A3441',
+                background: adSetMode === 'dynamic' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                 cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'dynamic' ? 'bold' : 'normal'
               }}
             >
@@ -1082,8 +1082,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               onClick={() => setAdSetMode('per-ad')}
               style={{
                 padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'per-ad' ? '#1877f2' : '#ddd',
-                background: adSetMode === 'per-ad' ? '#e7f3ff' : 'white',
+                borderColor: adSetMode === 'per-ad' ? '#4A9FFF' : '#2A3441',
+                background: adSetMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                 cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'per-ad' ? 'bold' : 'normal'
               }}
             >
@@ -1103,17 +1103,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <div className="ads-section">
           {ads.map((ad, adIndex) => (
             <div key={ad.id} className="ad-card" style={{
-              border: '2px solid #e0e0e0',
+              border: '2px solid #2A3441',
               borderRadius: '12px',
               padding: '16px',
               marginBottom: '16px',
-              background: '#fafafa'
+              background: '#212B3D'
             }}>
               {/* Ad Card Header */}
               <div className="ad-card-header" style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'
               }}>
-                <h4 style={{ margin: 0, fontSize: '15px', color: '#333' }}>
+                <h4 style={{ margin: 0, fontSize: '15px', color: '#E2E8F0' }}>
                   Anuncio {adIndex + 1}
                 </h4>
                 {ads.length > 1 && (
@@ -1122,7 +1122,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     onClick={() => removeAd(adIndex)}
                     className="remove-ad-btn"
                     style={{
-                      background: '#ff5252', color: 'white', border: 'none',
+                      background: '#F87171', color: 'white', border: 'none',
                       borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px'
                     }}
                   >
@@ -1178,8 +1178,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     onClick={() => updateAd(adIndex, { mediaSource: 'none' })}
                     style={{
                       padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'none' ? '#1877f2' : '#ddd',
-                      background: ad.mediaSource === 'none' ? '#e7f3ff' : 'white',
+                      borderColor: ad.mediaSource === 'none' ? '#4A9FFF' : '#2A3441',
+                      background: ad.mediaSource === 'none' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                       cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'none' ? 'bold' : 'normal'
                     }}
                   >
@@ -1190,8 +1190,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     onClick={() => { updateAd(adIndex, { mediaSource: 'library' }); handleLoadMediaLibrary(); }}
                     style={{
                       padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'library' ? '#1877f2' : '#ddd',
-                      background: ad.mediaSource === 'library' ? '#e7f3ff' : 'white',
+                      borderColor: ad.mediaSource === 'library' ? '#4A9FFF' : '#2A3441',
+                      background: ad.mediaSource === 'library' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                       cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'library' ? 'bold' : 'normal'
                     }}
                   >
@@ -1202,8 +1202,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     onClick={() => updateAd(adIndex, { mediaSource: 'upload' })}
                     style={{
                       padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'upload' ? '#1877f2' : '#ddd',
-                      background: ad.mediaSource === 'upload' ? '#e7f3ff' : 'white',
+                      borderColor: ad.mediaSource === 'upload' ? '#4A9FFF' : '#2A3441',
+                      background: ad.mediaSource === 'upload' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                       cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'upload' ? 'bold' : 'normal'
                     }}
                   >
@@ -1213,13 +1213,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
                 {/* Library Browser */}
                 {ad.mediaSource === 'library' && (
-                  <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '10px', maxHeight: '250px', overflowY: 'auto' }}>
+                  <div style={{ border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', maxHeight: '250px', overflowY: 'auto' }}>
                     {loadingMedia ? (
-                      <p style={{ textAlign: 'center', color: '#666', fontSize: '13px' }}>Cargando biblioteca...</p>
+                      <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>Cargando biblioteca...</p>
                     ) : (
                       <>
                         {mediaLibrary.images.length === 0 && mediaLibrary.videos.length === 0 ? (
-                          <p style={{ textAlign: 'center', color: '#999', fontSize: '13px' }}>No hay medios en esta cuenta</p>
+                          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '13px' }}>No hay medios en esta cuenta</p>
                         ) : (
                           <>
                             {mediaLibrary.images.length > 0 && (
@@ -1234,7 +1234,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                       onClick={() => handleAdSelectLibraryImage(adIndex, img)}
                                       style={{
                                         cursor: 'pointer',
-                                        border: ad.imageHash === img.hash ? '3px solid #1877f2' : '2px solid #eee',
+                                        border: ad.imageHash === img.hash ? '3px solid #4A9FFF' : '2px solid #2A3441',
                                         borderRadius: '6px',
                                         overflow: 'hidden',
                                         position: 'relative',
@@ -1250,7 +1250,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                       {ad.imageHash === img.hash && (
                                         <div style={{
                                           position: 'absolute', top: '2px', right: '2px',
-                                          background: '#1877f2', color: 'white', borderRadius: '50%',
+                                          background: '#4A9FFF', color: 'white', borderRadius: '50%',
                                           width: '16px', height: '16px', display: 'flex',
                                           alignItems: 'center', justifyContent: 'center', fontSize: '10px'
                                         }}>v</div>
@@ -1274,18 +1274,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                         key={vid.id || i}
                                         onClick={() => handleAdSelectLibraryVideo(adIndex, vid)}
                                         style={{
-                                          border: isSelected ? '3px solid #1877f2' : '2px solid #eee',
+                                          border: isSelected ? '3px solid #4A9FFF' : '2px solid #2A3441',
                                           borderRadius: '6px',
                                           overflow: 'hidden',
                                           cursor: 'pointer',
-                                          background: isSelected ? '#e7f3ff' : 'white',
+                                          background: isSelected ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                                           position: 'relative'
                                         }}
                                       >
                                         {thumbnail ? (
                                           <img src={thumbnail} alt={vid.title} style={{ width: '100%', height: '70px', objectFit: 'cover' }} />
                                         ) : (
-                                          <div style={{ width: '100%', height: '70px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                                          <div style={{ width: '100%', height: '70px', background: '#2A3441', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                                             V
                                           </div>
                                         )}
@@ -1293,12 +1293,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                           <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {vid.title || 'Sin título'}
                                           </p>
-                                          {vid.length && <p style={{ color: '#666', margin: 0 }}>{Math.round(vid.length)}s</p>}
+                                          {vid.length && <p style={{ color: '#94A3B8', margin: 0 }}>{Math.round(vid.length)}s</p>}
                                         </div>
                                         {isSelected && (
                                           <div style={{
                                             position: 'absolute', top: '2px', right: '2px',
-                                            background: '#1877f2', color: 'white', borderRadius: '50%',
+                                            background: '#4A9FFF', color: 'white', borderRadius: '50%',
                                             width: '16px', height: '16px', display: 'flex',
                                             alignItems: 'center', justifyContent: 'center', fontSize: '10px'
                                           }}>v</div>
@@ -1318,7 +1318,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
                 {/* Upload from device */}
                 {ad.mediaSource === 'upload' && (
-                  <div style={{ border: '2px dashed #ddd', borderRadius: '8px', padding: '15px', textAlign: 'center' }}>
+                  <div style={{ border: '2px dashed #2A3441', borderRadius: '8px', padding: '15px', textAlign: 'center' }}>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.mov"
@@ -1340,16 +1340,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 {ad.analyzingMedia && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
-                    background: '#e3f2fd', borderRadius: '6px', padding: '8px 12px', marginTop: '6px'
+                    background: 'rgba(74, 159, 255, 0.12)', borderRadius: '6px', padding: '8px 12px', marginTop: '6px'
                   }}>
                     <span className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
-                    <span style={{ fontSize: '12px', color: '#1565c0' }}>
+                    <span style={{ fontSize: '12px', color: '#4A9FFF' }}>
                       {ad.uploadProgress || 'Analizando con IA...'}
                     </span>
                   </div>
                 )}
                 {!ad.analyzingMedia && ad.uploadProgress && ad.mediaSource !== 'none' && (
-                  <p className="hint" style={{ color: ad.contentGenerated ? '#00aa00' : ad.imageUrl || ad.imageHash || ad.videoId ? '#00aa00' : '#cc6600', marginTop: '6px', fontSize: '12px' }}>
+                  <p className="hint" style={{ color: ad.contentGenerated ? '#34D399' : ad.imageUrl || ad.imageHash || ad.videoId ? '#34D399' : '#F59E0B', marginTop: '6px', fontSize: '12px' }}>
                     {ad.uploadProgress}
                   </p>
                 )}
@@ -1367,22 +1367,22 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     background: ad.contentGenerated ? 'linear-gradient(135deg, #e8f5e9, #c8e6c9)' : '#f0f4f8',
                     borderRadius: '10px', padding: '10px 14px', cursor: 'pointer',
-                    border: ad.contentGenerated ? '1px solid #81c784' : '1px solid #e0e0e0',
+                    border: ad.contentGenerated ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid #2A3441',
                     transition: 'all 0.2s'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {ad.contentGenerated && (
                       <span style={{
-                        background: '#4caf50', color: 'white', borderRadius: '4px',
+                        background: '#34D399', color: '#064E3B', borderRadius: '4px',
                         padding: '2px 6px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'
                       }}>IA</span>
                     )}
-                    <span style={{ fontSize: '13px', color: ad.contentGenerated ? '#1b5e20' : '#555', fontWeight: '500' }}>
+                    <span style={{ fontSize: '13px', color: ad.contentGenerated ? '#34D399' : '#94A3B8', fontWeight: '500' }}>
                       {ad.headlines.filter(h => h.trim()).length} Títulos + {ad.descriptions.filter(d => d.trim()).length} Descripciones + {[...new Set(ad.ctas)].length} CTAs
                     </span>
                   </div>
-                  <span style={{ fontSize: '18px', color: '#888', transform: ad.showEditContent ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <span style={{ fontSize: '18px', color: '#64748B', transform: ad.showEditContent ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
                     {ad.showEditContent ? 'v' : '>'}
                   </span>
                 </button>
@@ -1390,8 +1390,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 {/* Inline Content Editor */}
                 {ad.showEditContent && (
                   <div style={{
-                    marginTop: '8px', padding: '16px', background: '#fff', borderRadius: '10px',
-                    border: '1px solid #e0e0e0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                    marginTop: '8px', padding: '16px', background: '#1B2333', borderRadius: '10px',
+                    border: '1px solid #2A3441', boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
                   }}>
                     {/* Headlines */}
                     <div style={{ marginBottom: '16px' }}>
@@ -1399,10 +1399,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
                       }}>
                         <span style={{
-                          background: '#1877f2', color: 'white', borderRadius: '4px',
+                          background: '#4A9FFF', color: 'white', borderRadius: '4px',
                           padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
                         }}>H</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
                           Títulos ({ad.headlines.filter(h => h.trim()).length}/5)
                         </label>
                       </div>
@@ -1420,14 +1420,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             maxLength={55}
                             style={{
                               fontSize: '13px', padding: '8px 40px 8px 10px',
-                              borderRadius: '6px', border: headline.trim() ? '1px solid #90caf9' : '1px solid #e0e0e0',
-                              background: headline.trim() ? '#f8fbff' : '#fff',
+                              borderRadius: '6px', border: headline.trim() ? '1px solid rgba(74, 159, 255, 0.4)' : '1px solid #2A3441',
+                              background: headline.trim() ? 'rgba(74, 159, 255, 0.05)' : '#1B2333', color: '#E2E8F0',
                               width: '100%', boxSizing: 'border-box'
                             }}
                           />
                           <span style={{
                             position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-                            fontSize: '10px', color: headline.length > 50 ? '#e53935' : '#bbb'
+                            fontSize: '10px', color: headline.length > 50 ? '#F87171' : '#475569'
                           }}>{headline.length}/55</span>
                         </div>
                       ))}
@@ -1439,10 +1439,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
                       }}>
                         <span style={{
-                          background: '#ff9800', color: 'white', borderRadius: '4px',
+                          background: '#F59E0B', color: '#1B2333', borderRadius: '4px',
                           padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
                         }}>D</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
                           Textos Principales ({ad.descriptions.filter(d => d.trim()).length}/5)
                         </label>
                       </div>
@@ -1460,14 +1460,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             rows={3}
                             style={{
                               fontSize: '13px', padding: '8px 10px', resize: 'vertical',
-                              borderRadius: '6px', border: desc.trim() ? '1px solid #ffcc80' : '1px solid #e0e0e0',
-                              background: desc.trim() ? '#fffbf5' : '#fff',
+                              borderRadius: '6px', border: desc.trim() ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid #2A3441',
+                              background: desc.trim() ? 'rgba(245, 158, 11, 0.05)' : '#1B2333', color: '#E2E8F0',
                               width: '100%', boxSizing: 'border-box'
                             }}
                           />
                           <span style={{
                             position: 'absolute', right: '8px', bottom: '8px',
-                            fontSize: '10px', color: desc.length > 280 ? '#e53935' : '#bbb'
+                            fontSize: '10px', color: desc.length > 280 ? '#F87171' : '#475569'
                           }}>{desc.length}/500</span>
                         </div>
                       ))}
@@ -1482,7 +1482,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           background: '#9c27b0', color: 'white', borderRadius: '4px',
                           padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
                         }}>CTA</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
                           Call to Actions ({[...new Set(ad.ctas)].length} únicos)
                         </label>
                       </div>
@@ -1498,7 +1498,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             }}
                             style={{
                               fontSize: '12px', padding: '7px 8px', borderRadius: '6px',
-                              border: '1px solid #e0e0e0', background: '#faf5ff', cursor: 'pointer'
+                              border: '1px solid #2A3441', background: 'rgba(156, 39, 176, 0.08)', cursor: 'pointer', color: '#E2E8F0'
                             }}
                           >
                             {CTA_OPTIONS.map(option => (
@@ -1522,8 +1522,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             className="add-ad-btn"
             onClick={addAd}
             style={{
-              width: '100%', padding: '14px', border: '2px dashed #1877f2',
-              borderRadius: '12px', background: 'transparent', color: '#1877f2',
+              width: '100%', padding: '14px', border: '2px dashed #4A9FFF',
+              borderRadius: '12px', background: 'transparent', color: '#4A9FFF',
               cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', marginBottom: '15px'
             }}
           >
@@ -1809,7 +1809,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             </div>
 
             {adWasCreated ? (
-              <div className="draft-card" style={{ background: '#e8f5e9', border: '2px solid #4caf50' }}>
+              <div className="draft-card" style={{ background: 'rgba(52, 211, 153, 0.1)', border: '2px solid #34D399' }}>
                 <span className="card-icon">Ad</span>
                 <div>
                   <h4>Anuncios ({draftData.totalAdsCreated})</h4>
@@ -1830,14 +1830,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 </div>
               </div>
             ) : (
-              <div className="draft-card" style={{ background: '#fff3e0', border: '2px dashed #ff9800' }}>
+              <div className="draft-card" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '2px dashed #F59E0B' }}>
                 <span className="card-icon">Ad</span>
                 <div>
                   <h4>Anuncio (Pendiente)</h4>
-                  <p style={{ color: '#e65100' }}>Crear manualmente en Meta Ads Manager</p>
+                  <p style={{ color: '#F59E0B' }}>Crear manualmente en Meta Ads Manager</p>
                   <p className="hint">Página: {draftData.pageName}</p>
                   <p className="hint">Destino: {draftData.linkUrl}</p>
-                  <span className="status-badge" style={{ background: '#ff9800', color: 'white' }}>PENDIENTE</span>
+                  <span className="status-badge" style={{ background: '#F59E0B', color: '#1B2333' }}>PENDIENTE</span>
                 </div>
               </div>
             )}
@@ -1847,18 +1847,18 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           {adWasCreated ? (
             // Ads fueron creados - mostrar resumen de todas las variaciones
             <div className="generated-content-box" style={{
-              background: '#e8f5e9',
-              border: '2px solid #4caf50',
+              background: 'rgba(52, 211, 153, 0.1)',
+              border: '2px solid #34D399',
               borderRadius: '12px',
               padding: '20px',
               marginTop: '20px'
             }}>
-              <h3 style={{ color: '#2e7d32', marginBottom: '10px' }}>
+              <h3 style={{ color: '#34D399', marginBottom: '10px' }}>
                 🎉 {draftData.totalAdsCreated > 1
                   ? `¡${draftData.totalAdsCreated} Anuncios Creados!`
                   : '¡Anuncio Creado Exitosamente!'}
               </h3>
-              <p style={{ color: '#1b5e20', marginBottom: '15px', fontSize: '14px' }}>
+              <p style={{ color: '#34D399', marginBottom: '15px', fontSize: '14px' }}>
                 {draftData.totalAdsCreated > 1
                   ? `Se crearon ${draftData.totalAdsCreated} variaciones de anuncio. Meta optimizará y mostrará el de mejor rendimiento.`
                   : 'Tu anuncio está listo. Solo necesitas activar la campaña cuando quieras que empiece a correr.'}
@@ -1868,22 +1868,22 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               {draftData.headlines?.filter(h => h?.trim()).map((headline, i) => {
                 if (i >= (draftData.totalAdsCreated || 1)) return null;
                 return (
-                  <div key={i} style={{ background: 'white', padding: '12px 15px', borderRadius: '8px', marginBottom: '10px', borderLeft: '4px solid #4caf50' }}>
-                    <p style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>Variación {i + 1}</p>
+                  <div key={i} style={{ background: '#212B3D', padding: '12px 15px', borderRadius: '8px', marginBottom: '10px', borderLeft: '4px solid #34D399' }}>
+                    <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '5px' }}>Variación {i + 1}</p>
                     <p><strong>Título:</strong> {headline}</p>
                     <p><strong>Texto:</strong> {draftData.descriptions?.[i]?.substring(0, 80) || draftData.descriptions?.[0]?.substring(0, 80) || 'N/A'}...</p>
                   </div>
                 );
               })}
 
-              <div style={{ background: 'white', padding: '12px 15px', borderRadius: '8px', marginTop: '10px' }}>
+              <div style={{ background: '#212B3D', padding: '12px 15px', borderRadius: '8px', marginTop: '10px' }}>
                 <p><strong>Destino:</strong> {draftData.linkUrl}</p>
                 <p><strong>CTA:</strong> {CTA_OPTIONS.find(c => c.value === draftData.ctas?.[0])?.label || draftData.ctas?.[0] || 'LEARN_MORE'}</p>
                 {draftData.igUsername && <p><strong>Instagram:</strong> @{draftData.igUsername}</p>}
               </div>
 
               {!draftData.imageUrl && (
-                <p style={{ fontSize: '13px', color: '#ff9800', marginTop: '10px' }}>
+                <p style={{ fontSize: '13px', color: '#F59E0B', marginTop: '10px' }}>
                   💡 Nota: Los anuncios usan la imagen de vista previa del link. Puedes editarlos en Meta Ads Manager para agregar una imagen personalizada.
                 </p>
               )}
@@ -1891,28 +1891,28 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           ) : (
             // Ad NO fue creado - mostrar contenido para copiar
             <div className="generated-content-box" style={{
-              background: '#fff8e1',
-              border: '2px solid #ffc107',
+              background: 'rgba(251, 191, 36, 0.1)',
+              border: '2px solid #FBBF24',
               borderRadius: '12px',
               padding: '20px',
               marginTop: '20px'
             }}>
-              <h3 style={{ color: '#f57c00', marginBottom: '10px' }}>
+              <h3 style={{ color: '#FBBF24', marginBottom: '10px' }}>
                 📋 Contenido para crear tu Anuncio
               </h3>
-              <p style={{ color: '#e65100', marginBottom: '15px', fontSize: '14px' }}>
+              <p style={{ color: '#F59E0B', marginBottom: '15px', fontSize: '14px' }}>
                 Usa este contenido al crear el Anuncio en Meta Ads Manager. <strong>Click para copiar.</strong>
               </p>
 
               {draftData.imageUrl && (
                 <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#333' }}>🖼️ URL de Imagen</label>
+                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🖼️ URL de Imagen</label>
                   <div className="copy-item" style={{
-                    background: 'white',
+                    background: '#212B3D',
                     padding: '8px 12px',
                     margin: '5px 0',
                     borderRadius: '6px',
-                    border: '2px solid #4caf50',
+                    border: '2px solid #34D399',
                     cursor: 'pointer',
                     wordBreak: 'break-all',
                     fontSize: '13px'
@@ -1924,13 +1924,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               {draftData.linkUrl && (
                 <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#333' }}>🔗 URL de Destino</label>
+                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🔗 URL de Destino</label>
                   <div className="copy-item" style={{
-                    background: 'white',
+                    background: '#212B3D',
                     padding: '8px 12px',
                     margin: '5px 0',
                     borderRadius: '6px',
-                    border: '1px solid #ddd',
+                    border: '1px solid #2A3441',
                     cursor: 'pointer',
                     wordBreak: 'break-all',
                     fontSize: '13px'
@@ -1942,14 +1942,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               {draftData.headlines?.length > 0 && (
                 <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#333' }}>📝 Títulos ({draftData.headlines.length})</label>
+                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>📝 Títulos ({draftData.headlines.length})</label>
                   {draftData.headlines.map((h, i) => (
                     <div key={i} className="copy-item" style={{
-                      background: 'white',
+                      background: '#212B3D',
                       padding: '8px 12px',
                       margin: '5px 0',
                       borderRadius: '6px',
-                      border: '1px solid #ddd',
+                      border: '1px solid #2A3441',
                       cursor: 'pointer'
                     }} onClick={() => navigator.clipboard.writeText(h)} title="Click para copiar">
                       {h}
@@ -1960,14 +1960,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               {draftData.descriptions?.length > 0 && (
                 <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#333' }}>💬 Descripciones ({draftData.descriptions.length})</label>
+                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>💬 Descripciones ({draftData.descriptions.length})</label>
                   {draftData.descriptions.map((d, i) => (
                     <div key={i} className="copy-item" style={{
-                      background: 'white',
+                      background: '#212B3D',
                       padding: '8px 12px',
                       margin: '5px 0',
                       borderRadius: '6px',
-                      border: '1px solid #ddd',
+                      border: '1px solid #2A3441',
                       cursor: 'pointer'
                     }} onClick={() => navigator.clipboard.writeText(d)} title="Click para copiar">
                       {d}
@@ -1978,12 +1978,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               {draftData.ctas?.length > 0 && (
                 <div className="copy-section">
-                  <label style={{ fontWeight: 'bold', color: '#333' }}>🎯 CTAs Recomendados</label>
+                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🎯 CTAs Recomendados</label>
                   <div className="cta-badges" style={{ marginTop: '8px' }}>
                     {[...new Set(draftData.ctas)].map((cta, i) => (
                       <span key={i} className="cta-badge" style={{
-                        background: '#e3f2fd',
-                        color: '#1976d2',
+                        background: 'rgba(74, 159, 255, 0.12)',
+                        color: '#4A9FFF',
                         padding: '6px 12px',
                         borderRadius: '20px',
                         marginRight: '8px',
@@ -1994,7 +1994,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 </div>
               )}
 
-              <p style={{ fontSize: '12px', color: '#666', marginTop: '15px' }}>
+              <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '15px' }}>
                 💡 Tip: Haz click en cualquier texto para copiarlo al portapapeles
               </p>
             </div>
@@ -2133,15 +2133,15 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             <h4>Contenido de los Anuncios ({job.ads.length})</h4>
             {job.ads.map((ad, i) => (
               <div key={i} style={{
-                background: '#f8f9fa', borderRadius: '8px', padding: '10px', marginBottom: '8px',
-                borderLeft: '3px solid #1877f2'
+                background: '#212B3D', borderRadius: '8px', padding: '10px', marginBottom: '8px',
+                borderLeft: '3px solid #4A9FFF'
               }}>
                 <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
                   {ad.adName || `Ad ${i + 1}`}
                   {ad.videoId ? ' (Video)' : ad.imageUrl || ad.imageHash ? ' (Imagen)' : ' (Sin media)'}
                   {job.adSetMode === 'per-ad' && ad.audienceName ? ` - ${ad.audienceName}` : ''}
                 </p>
-                <p style={{ fontSize: '12px', color: '#666' }}>
+                <p style={{ fontSize: '12px', color: '#94A3B8' }}>
                   {ad.headlines?.length || 0} títulos + {ad.descriptions?.length || 0} descripciones + {[...new Set(ad.ctas || [])].length} CTAs
                 </p>
               </div>
@@ -2161,7 +2161,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             <li><strong>{job.ads?.length || 1} Anuncio(s)</strong></li>
           </ul>
           {job.ads?.length > 1 && (
-            <div style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
+            <div style={{ fontSize: '13px', marginTop: '10px', color: '#94A3B8' }}>
               {job.ads.map((ad, i) => (
                 <p key={i} style={{ margin: '3px 0' }}>
                   Ad {i + 1}: {ad.adName || `Ad ${i + 1}`} | {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
@@ -2170,11 +2170,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               ))}
             </div>
           )}
-          <p style={{ fontSize: '13px', marginTop: '10px', color: '#666' }}>
+          <p style={{ fontSize: '13px', marginTop: '10px', color: '#94A3B8' }}>
             Meta probará automáticamente las diferentes combinaciones de títulos, descripciones y CTAs para encontrar la mejor.
           </p>
           {job.igActorId && (
-            <p style={{ fontSize: '13px', marginTop: '5px', color: '#666' }}>
+            <p style={{ fontSize: '13px', marginTop: '5px', color: '#94A3B8' }}>
               Instagram: @{job.igUsername || 'vinculada'} - Los anuncios aparecerán también en Instagram.
             </p>
           )}

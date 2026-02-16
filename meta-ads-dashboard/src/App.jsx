@@ -83,24 +83,25 @@ function LoginScreen({ onLogin }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0a1628 0%, #1a237e 50%, #0d47a1 100%)',
+      background: '#151C29',
       padding: '20px'
     }}>
       <div style={{
-        background: 'white',
+        background: '#1B2333',
         borderRadius: '20px',
         padding: '48px 40px',
         maxWidth: '440px',
         width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+        border: '1px solid #2A3441',
         textAlign: 'center'
       }}>
         {/* Logo */}
         <div style={{ marginBottom: '8px', fontSize: '48px' }}>📊</div>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1a1a2e', marginBottom: '8px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#E2E8F0', marginBottom: '8px' }}>
           Meta Suite
         </h1>
-        <p style={{ color: '#666', fontSize: '15px', marginBottom: '32px' }}>
+        <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '32px' }}>
           Inicia sesión para administrar tus campañas
         </p>
 
@@ -114,7 +115,7 @@ function LoginScreen({ onLogin }) {
             fontSize: '16px',
             fontWeight: '600',
             color: 'white',
-            background: loading ? '#8b9dc3' : '#1877F2',
+            background: loading ? '#3B7ACC' : '#4A9FFF',
             border: 'none',
             borderRadius: '10px',
             cursor: loading || !fbReady ? 'not-allowed' : 'pointer',
@@ -139,9 +140,9 @@ function LoginScreen({ onLogin }) {
           margin: '24px 0',
           gap: '12px'
         }}>
-          <div style={{ flex: 1, height: '1px', background: '#e0e0e0' }} />
-          <span style={{ color: '#999', fontSize: '13px' }}>o</span>
-          <div style={{ flex: 1, height: '1px', background: '#e0e0e0' }} />
+          <div style={{ flex: 1, height: '1px', background: '#2A3441' }} />
+          <span style={{ color: '#64748B', fontSize: '13px' }}>o</span>
+          <div style={{ flex: 1, height: '1px', background: '#2A3441' }} />
         </div>
 
         {/* Manual Token Toggle */}
@@ -153,9 +154,9 @@ function LoginScreen({ onLogin }) {
               padding: '12px 24px',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#555',
-              background: '#f5f5f5',
-              border: '1px solid #e0e0e0',
+              color: '#94A3B8',
+              background: '#212B3D',
+              border: '1px solid #2A3441',
               borderRadius: '10px',
               cursor: 'pointer',
               transition: 'all 0.2s'
@@ -165,7 +166,7 @@ function LoginScreen({ onLogin }) {
           </button>
         ) : (
           <div style={{ textAlign: 'left' }}>
-            <label style={{ fontSize: '13px', color: '#555', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
+            <label style={{ fontSize: '13px', color: '#94A3B8', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
               Access Token de Meta
             </label>
             <textarea
@@ -177,11 +178,13 @@ function LoginScreen({ onLogin }) {
                 width: '100%',
                 padding: '12px',
                 fontSize: '13px',
-                border: '1px solid #ddd',
+                border: '1px solid #2A3441',
                 borderRadius: '8px',
                 resize: 'vertical',
                 fontFamily: 'monospace',
-                marginBottom: '12px'
+                marginBottom: '12px',
+                background: '#212B3D',
+                color: '#E2E8F0'
               }}
             />
             <button
@@ -192,7 +195,7 @@ function LoginScreen({ onLogin }) {
                 fontSize: '14px',
                 fontWeight: '600',
                 color: 'white',
-                background: '#333',
+                background: '#4A9FFF',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer'
@@ -200,9 +203,9 @@ function LoginScreen({ onLogin }) {
             >
               Conectar con Token
             </button>
-            <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+            <p style={{ fontSize: '12px', color: '#64748B', marginTop: '8px' }}>
               Genera un token en{' '}
-              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" style={{ color: '#1877F2' }}>
+              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" style={{ color: '#4A9FFF' }}>
                 Graph API Explorer
               </a>
               {' '}con permisos: ads_management, pages_show_list, business_management
@@ -215,10 +218,10 @@ function LoginScreen({ onLogin }) {
           <div style={{
             marginTop: '16px',
             padding: '10px 14px',
-            background: '#fff0f0',
-            border: '1px solid #ffcdd2',
+            background: 'rgba(248, 113, 113, 0.1)',
+            border: '1px solid rgba(248, 113, 113, 0.3)',
             borderRadius: '8px',
-            color: '#c62828',
+            color: '#F87171',
             fontSize: '13px',
             textAlign: 'left'
           }}>
@@ -332,7 +335,7 @@ function App() {
           {loadingAccounts ? (
             <span className="account-count">Cargando...</span>
           ) : accountsError ? (
-            <span className="account-count" style={{ color: '#cc0000' }}>Error</span>
+            <span className="account-count" style={{ color: '#F87171' }}>Error</span>
           ) : (
             <span className="account-count">{adAccounts.length} cuentas</span>
           )}
@@ -346,7 +349,7 @@ function App() {
                 style={{ width: '30px', height: '30px', borderRadius: '50%' }}
               />
             )}
-            <span style={{ fontSize: '13px', color: '#444', fontWeight: '500' }}>
+            <span style={{ fontSize: '13px', color: '#E2E8F0', fontWeight: '500' }}>
               {userName || 'Usuario'}
             </span>
             <button
@@ -355,9 +358,9 @@ function App() {
                 padding: '6px 14px',
                 fontSize: '12px',
                 fontWeight: '600',
-                color: '#666',
-                background: '#f0f0f0',
-                border: '1px solid #ddd',
+                color: '#94A3B8',
+                background: '#212B3D',
+                border: '1px solid #2A3441',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
