@@ -138,6 +138,19 @@ body {
 }
 
 /* ============================================
+   GLOBAL SELECT / OPTION DARK THEME
+   ============================================ */
+select option {
+  background: #161E2E;
+  color: #E8EDF5;
+}
+
+select optgroup {
+  background: #161E2E;
+  color: #8B9BB4;
+}
+
+/* ============================================
    SCROLLBAR
    ============================================ */
 
