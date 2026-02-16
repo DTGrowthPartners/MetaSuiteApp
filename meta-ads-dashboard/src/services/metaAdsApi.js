@@ -2104,34 +2104,29 @@ class MetaAdsService {
   }
 
   // ============================================
-  // MULTI-AD: Crear Campaign + N AdSets + N Creatives + N Ads
+  // MULTI-AD: Crear Campaign + AdSet(s) + N Creatives + N Ads
   // ============================================
-  // adSetMode: 'single' = 1 AdSet compartido, 'per-ad' = 1 AdSet por anuncio
+  // adSetMode: 'single' = 1 AdSet con todos los ads, 'per-ad' = 1 AdSet por anuncio (público diferente)
   async createCampaignWithMultipleAds(adAccountId, {
     campaignName,
     objective = 'OUTCOME_TRAFFIC',
     specialAdCategories = [],
     dailyBudget,
-    // Shared targeting (used when adSetMode === 'single' or as default)
     targeting,
     optimizationGoal = 'LANDING_PAGE_VIEWS',
     billingEvent = 'IMPRESSIONS',
     endDate = null,
-    // Page & Instagram
     pageId,
     igActorId = null,
     linkUrl = null,
-    // Multi-ad config
     adSetMode = 'single', // 'single' | 'per-ad'
-    ads = [] // Array of { adName, imageUrl, imageHash, videoId, videoThumbnailUrl, headlines, descriptions, ctas, audienceId, audienceName, audienceTargeting }
+    ads = []
   }) {
-    // CTAs compatibles con LINK_CLICKS + Dynamic Creative
     const VALID_LINK_CLICKS_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
       'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE'
     ];
 
-    // Filtra CTAs inválidos, reemplaza con LEARN_MORE si queda vacío
     const sanitizeCTAs = (ctas) => {
       const filtered = (ctas || []).filter(c => VALID_LINK_CLICKS_CTAS.includes(c));
       return filtered.length > 0 ? filtered : ['LEARN_MORE'];
@@ -2162,26 +2157,112 @@ class MetaAdsService {
       }
       results.campaign = campaignResult.data;
 
-      // ========================================================
-      // Dynamic Creative (5+5+5) requiere 1 Ad por AdSet (limitación de Meta).
-      // Ambos modos crean N AdSets con Dynamic Creative.
-      // 'single': mismo targeting para todos. 'per-ad': targeting diferente.
-      // Con CBO el presupuesto se distribuye automáticamente entre AdSets.
-      // ========================================================
-      {
-        const isSingleMode = adSetMode === 'single';
-        console.log(`Mode: ${isSingleMode ? 'MISMO PÚBLICO' : 'PÚBLICO POR ANUNCIO'} - ${ads.length} AdSets con Dynamic Creative (5+5+5)`);
+      // Helper: crear creative + ad para un ad entry
+      const createCreativeAndAd = async (ad, adIndex, adSetId) => {
+        const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
+        const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
+        const validCTAs = sanitizeCTAs(ad.ctas);
+
+        // Resolver thumbnail si es video
+        let resolvedThumbUrl = ad.videoThumbnailUrl || null;
+        let resolvedThumbHash = ad.imageHash || null;
+        if (ad.videoId && !resolvedThumbHash && !resolvedThumbUrl) {
+          try {
+            const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${ad.videoId}`, {
+              params: { adAccountId: this.normalizeAccountId(adAccountId) }
+            });
+            if (thumbResponse.data?.data?.thumbnailUrl) {
+              resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
+            } else if (thumbResponse.data?.data?.thumbnailHash) {
+              resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
+            }
+          } catch (err) {
+            console.warn('Thumbnail fetch failed for ad', adIndex, err.message);
+          }
+        }
+
+        const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
+          name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
+          pageId,
+          imageUrl: !ad.videoId ? ad.imageUrl : null,
+          imageHash: !ad.videoId ? ad.imageHash : null,
+          imageHash9x16: !ad.videoId ? ad.imageHash9x16 : null,
+          videoId: ad.videoId || null,
+          thumbnailHash: resolvedThumbHash || null,
+          thumbnailUrl: resolvedThumbUrl || null,
+          titles: validTitles,
+          bodies: validBodies,
+          descriptions: validBodies,
+          callToActionTypes: validCTAs,
+          linkUrl,
+          igActorId
+        });
+
+        if (!creativeResult.success) {
+          results.errors.push(`Creative ${adIndex + 1}: ${creativeResult.error}`);
+          return false;
+        }
+        results.creatives.push(creativeResult.data);
+
+        const adResult = await this.createAd(adAccountId, {
+          name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
+          adsetId: adSetId,
+          creativeId: creativeResult.data.id,
+          status: 'PAUSED'
+        });
+
+        if (!adResult.success) {
+          results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
+          return false;
+        }
+        results.ads.push(adResult.data);
+        return true;
+      };
+
+      if (adSetMode === 'single') {
+        // ========================================================
+        // MODO SINGLE: 1 AdSet → N Ads (cada uno con su Creative 5+5+5)
+        // ========================================================
+        console.log(`Mode: 1 ADSET → ${ads.length} ADS (cada uno con Dynamic Creative 5+5+5)`);
+
+        const adSetResult = await this.createAdSet(adAccountId, {
+          name: `${campaignName} - Ad Set`,
+          campaignId: results.campaign.id,
+          billingEvent,
+          optimizationGoal,
+          targeting,
+          status: 'PAUSED',
+          endTime: endDate,
+          isDynamicCreative: true
+        });
+
+        if (!adSetResult.success) {
+          results.errors.push(`AdSet: ${adSetResult.error}`);
+          return { success: false, ...results };
+        }
+        results.adSets.push(adSetResult.data);
+
+        // Crear N creatives + N ads en el mismo AdSet
+        for (let i = 0; i < ads.length; i++) {
+          console.log(`Creating creative + ad ${i + 1}/${ads.length} in shared AdSet...`);
+          await createCreativeAndAd(ads[i], i, adSetResult.data.id);
+        }
+
+      } else {
+        // ========================================================
+        // MODO PER-AD: N AdSets → N Ads (público diferente por ad)
+        // ========================================================
+        console.log(`Mode: ${ads.length} ADSETS (público diferente por anuncio)`);
 
         for (let i = 0; i < ads.length; i++) {
           const ad = ads[i];
+          const adTargeting = ad.audienceTargeting || targeting;
+          const audienceLabel = ad.audienceName ? ` (${ad.audienceName})` : '';
+
           console.log(`Creating adSet + creative + ad ${i + 1}/${ads.length}...`);
 
-          const adTargeting = isSingleMode ? targeting : (ad.audienceTargeting || targeting);
-          const adSetSuffix = ads.length === 1 ? '' : ` ${i + 1}`;
-          const audienceLabel = !isSingleMode && ad.audienceName ? ` (${ad.audienceName})` : '';
-
           const adSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set${adSetSuffix}${audienceLabel}`,
+            name: `${campaignName} - Ad Set ${i + 1}${audienceLabel}`,
             campaignId: results.campaign.id,
             billingEvent,
             optimizationGoal,
@@ -2197,69 +2278,13 @@ class MetaAdsService {
           }
           results.adSets.push(adSetResult.data);
 
-          const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
-          const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
-          const validCTAs = sanitizeCTAs(ad.ctas);
-
-          // Resolver thumbnail si es video
-          let resolvedThumbUrl = ad.videoThumbnailUrl || null;
-          let resolvedThumbHash = ad.imageHash || null;
-          if (ad.videoId && !resolvedThumbHash && !resolvedThumbUrl) {
-            try {
-              const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${ad.videoId}`, {
-                params: { adAccountId: this.normalizeAccountId(adAccountId) }
-              });
-              if (thumbResponse.data?.data?.thumbnailUrl) {
-                resolvedThumbUrl = thumbResponse.data.data.thumbnailUrl;
-              } else if (thumbResponse.data?.data?.thumbnailHash) {
-                resolvedThumbHash = thumbResponse.data.data.thumbnailHash;
-              }
-            } catch (err) {
-              console.warn('Thumbnail fetch failed for ad', i, err.message);
-            }
-          }
-
-          const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
-            name: `${ad.adName || campaignName + ' Ad ' + (i + 1)} - Creative`,
-            pageId,
-            imageUrl: !ad.videoId ? ad.imageUrl : null,
-            imageHash: !ad.videoId ? ad.imageHash : null,
-            imageHash9x16: !ad.videoId ? ad.imageHash9x16 : null,
-            videoId: ad.videoId || null,
-            thumbnailHash: resolvedThumbHash || null,
-            thumbnailUrl: resolvedThumbUrl || null,
-            titles: validTitles,
-            bodies: validBodies,
-            descriptions: validBodies,
-            callToActionTypes: validCTAs,
-            linkUrl,
-            igActorId
-          });
-
-          if (!creativeResult.success) {
-            results.errors.push(`Creative ${i + 1}: ${creativeResult.error}`);
-            continue;
-          }
-          results.creatives.push(creativeResult.data);
-
-          const adResult = await this.createAd(adAccountId, {
-            name: ad.adName || `${campaignName} - Ad ${i + 1}`,
-            adsetId: adSetResult.data.id,
-            creativeId: creativeResult.data.id,
-            status: 'PAUSED'
-          });
-
-          if (!adResult.success) {
-            results.errors.push(`Ad ${i + 1}: ${adResult.error}`);
-            continue;
-          }
-          results.ads.push(adResult.data);
+          await createCreativeAndAd(ad, i, adSetResult.data.id);
         }
       }
 
       const totalCreated = results.ads.length;
       const totalFailed = ads.length - totalCreated;
-      console.log(`Multi-ad campaign created: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads${totalFailed > 0 ? ` (${totalFailed} failed)` : ''}`);
+      console.log(`Multi-ad campaign created: 1 Campaign + ${results.adSets.length} AdSet(s) + ${results.creatives.length} Creatives + ${totalCreated} Ads${totalFailed > 0 ? ` (${totalFailed} failed)` : ''}`);
 
       return {
         success: totalCreated > 0,

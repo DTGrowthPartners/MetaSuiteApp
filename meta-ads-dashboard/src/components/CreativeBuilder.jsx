@@ -1041,7 +1041,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </div>
           <p className="hint">
             {adSetMode === 'single'
-              ? 'Mismo público para todos. Se crea 1 Ad Set por anuncio (requerido por Meta para 5+5+5). CBO distribuye el presupuesto automáticamente.'
+              ? 'Todos los anuncios van en 1 Ad Set con el mismo público. Cada ad tiene su propio Creative con 5+5+5.'
               : 'Cada anuncio tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
           </p>
         </div>
@@ -1595,7 +1595,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         // Campaña estándar (website, traffic, etc.) - MULTI-AD
         const totalAds = job.ads?.length || 1;
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
-        addLog(`Modo Ad Sets: ${job.adSetMode === 'per-ad' ? 'Un Ad Set por anuncio' : 'Un Ad Set compartido'}`);
+        const isSingleMode = (job.adSetMode || 'single') === 'single';
+        addLog(`Modo: ${isSingleMode ? `1 Ad Set → ${totalAds} Ads` : `${totalAds} Ad Sets (público diferente)`}`);
         addLog(`Total anuncios: ${totalAds}`);
         if (job.igActorId) addLog(`Instagram: @${job.igUsername || 'vinculada'}`);
 
@@ -1607,7 +1608,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           addLog(`  Ad ${i + 1}: ${numTitles}t + ${numDescs}d | Media: ${hasMedia ? 'Sí' : 'No'}${ad.audienceName ? ' | Público: ' + ad.audienceName : ''}`);
         });
 
-        addLog(`Creando Campaign + ${totalAds} AdSet(s) + ${totalAds} Creative(s) + ${totalAds} Ad(s)...`);
+        const numAdSets = isSingleMode ? 1 : totalAds;
+        addLog(`Creando Campaign + ${numAdSets} AdSet(s) + ${totalAds} Creative(s) + ${totalAds} Ad(s)...`);
 
         result = await metaService.createCampaignWithMultipleAds(job.adAccountId, {
           campaignName: job.campaignName,
