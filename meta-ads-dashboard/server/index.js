@@ -16,10 +16,10 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const app = express();
 
-// Configurar multer con almacenamiento en memoria (evita problemas de archivos temporales en Windows)
+// Configurar multer con almacenamiento en memoria
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB máximo
+  limits: { fileSize: 200 * 1024 * 1024 } // 200MB máximo
 });
 const PORT = process.env.PORT || 3002;
 
@@ -65,8 +65,19 @@ function getContentTypeFromExt(filename) {
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
+
+// Error handler for multer (file too large, etc.) - returns JSON instead of HTML
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ success: false, error: 'El archivo es demasiado grande. Máximo 200MB.' });
+    }
+    return res.status(400).json({ success: false, error: `Error de upload: ${err.message}` });
+  }
+  next(err);
+});
 
 // ============================================
 // HELPER FUNCTIONS
