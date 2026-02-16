@@ -875,7 +875,8 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
         timeout: 60000
       });
 
-      videoId = finishResponse.data.video_id;
+      console.log('Chunked upload finish response:', JSON.stringify(finishResponse.data, null, 2));
+      videoId = finishResponse.data.video_id || finishResponse.data.id;
       console.log(`Chunked upload complete: video_id=${videoId} (${chunkNum} chunks)`);
 
     } else {
