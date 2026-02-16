@@ -49,7 +49,9 @@ class MetaAdsService {
 
       const response = await axios.post(`${BACKEND_API_URL}/analyze-video`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000 // 2 minutes for transcription
+        timeout: 600000, // 10 minutes for large video transcription + AI analysis
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       });
 
       if (response.data.success) {
@@ -646,7 +648,7 @@ class MetaAdsService {
         headers: { 'Content-Type': 'multipart/form-data' },
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-        timeout: 300000 // 5 minutes for large video uploads
+        timeout: 600000 // 10 minutes for large video uploads
       });
 
       if (response.data.success) {

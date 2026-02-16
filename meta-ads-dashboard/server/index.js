@@ -771,6 +771,7 @@ app.post('/api/upload/image-file', upload.single('image'), async (req, res) => {
 
 // Subir video desde ARCHIVO a Meta Ads (multipart)
 app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
+  let tmpFilePath = null;
   try {
     const { adAccountId, title } = req.body;
     const token = getToken(req);
@@ -795,22 +796,39 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
       });
     }
 
-    console.log(`Uploading video file to ${normalizedId}:`, file.originalname, file.size, 'bytes', 'contentType:', contentType);
-    console.log('Buffer size:', file.buffer.length, 'bytes');
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+    console.log(`Uploading video file to ${normalizedId}: ${file.originalname} ${fileSizeMB}MB contentType: ${contentType}`);
 
-    // Usar file.buffer directamente (memoryStorage)
     const formData = new FormData();
     formData.append('access_token', token);
     formData.append('title', title || file.originalname);
-    formData.append('source', file.buffer, {
-      filename: file.originalname,
-      contentType: contentType
-    });
+
+    // For large files (>50MB), write to disk and stream to avoid memory duplication
+    if (file.size > 50 * 1024 * 1024) {
+      tmpFilePath = path.join(os.tmpdir(), `upload_${Date.now()}_${file.originalname}`);
+      fs.writeFileSync(tmpFilePath, file.buffer);
+      console.log(`Large file (${fileSizeMB}MB): streaming from temp file`);
+      formData.append('source', fs.createReadStream(tmpFilePath), {
+        filename: file.originalname,
+        contentType: contentType,
+        knownLength: file.size
+      });
+    } else {
+      formData.append('source', file.buffer, {
+        filename: file.originalname,
+        contentType: contentType
+      });
+    }
 
     const response = await axios.post(
       `${META_API_BASE_URL}/${normalizedId}/advideos`,
       formData,
-      { headers: formData.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity }
+      {
+        headers: formData.getHeaders(),
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 600000 // 10 minutes for large uploads
+      }
     );
 
     console.log('Video file upload response:', JSON.stringify(response.data, null, 2));
@@ -823,10 +841,19 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Video file upload error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-    const errorData = error.response?.data?.error;
+    const status = error.response?.status || 'N/A';
+    const statusText = error.response?.statusText || '';
+    const responseData = error.response?.data;
+    console.error(`Video file upload error [${status} ${statusText}]:`, JSON.stringify(responseData, null, 2) || error.message);
+    if (error.code) console.error('Error code:', error.code);
+    const errorData = responseData?.error;
     let errorMsg = errorData?.error_user_msg || errorData?.message || error.message;
-    res.status(500).json({ success: false, error: errorMsg });
+    if (error.code === 'ECONNABORTED') errorMsg = 'Timeout: la subida tardó demasiado. Intenta con un video más corto o comprimido.';
+    res.status(error.response?.status || 500).json({ success: false, error: errorMsg });
+  } finally {
+    if (tmpFilePath) {
+      try { fs.unlinkSync(tmpFilePath); } catch (e) { /* ignore */ }
+    }
   }
 });
 
