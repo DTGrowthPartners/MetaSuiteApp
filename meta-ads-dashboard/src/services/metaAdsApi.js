@@ -2221,11 +2221,14 @@ class MetaAdsService {
 
       if (adSetMode === 'single') {
         // ========================================================
-        // MODO SINGLE: 1 AdSet → N Ads (cada uno con su Creative 5+5+5)
+        // MODO SINGLE: Intenta 1 AdSet → N Ads.
+        // Si Meta rechaza el 2do ad (Dynamic Creative limit),
+        // crea AdSets adicionales automáticamente.
         // ========================================================
         console.log(`Mode: 1 ADSET → ${ads.length} ADS (cada uno con Dynamic Creative 5+5+5)`);
 
-        const adSetResult = await this.createAdSet(adAccountId, {
+        // Crear primer AdSet
+        const firstAdSetResult = await this.createAdSet(adAccountId, {
           name: `${campaignName} - Ad Set`,
           campaignId: results.campaign.id,
           billingEvent,
@@ -2236,16 +2239,48 @@ class MetaAdsService {
           isDynamicCreative: true
         });
 
-        if (!adSetResult.success) {
-          results.errors.push(`AdSet: ${adSetResult.error}`);
+        if (!firstAdSetResult.success) {
+          results.errors.push(`AdSet: ${firstAdSetResult.error}`);
           return { success: false, ...results };
         }
-        results.adSets.push(adSetResult.data);
+        results.adSets.push(firstAdSetResult.data);
 
-        // Crear N creatives + N ads en el mismo AdSet
+        // Intentar crear todos los ads en el primer AdSet
+        let needsSeparateAdSets = false;
         for (let i = 0; i < ads.length; i++) {
-          console.log(`Creating creative + ad ${i + 1}/${ads.length} in shared AdSet...`);
-          await createCreativeAndAd(ads[i], i, adSetResult.data.id);
+          console.log(`Creating creative + ad ${i + 1}/${ads.length}...`);
+          const ok = await createCreativeAndAd(ads[i], i, firstAdSetResult.data.id);
+
+          // Si el 2do+ ad falla, probablemente es por la limitación de 1 ad por Dynamic Creative AdSet
+          if (!ok && i > 0 && !needsSeparateAdSets) {
+            console.log('Dynamic Creative limit detected - switching to separate AdSets for remaining ads');
+            needsSeparateAdSets = true;
+          }
+
+          // Si ya detectamos la limitación, crear AdSet individual para este ad
+          if (!ok && needsSeparateAdSets) {
+            console.log(`Creating separate AdSet for ad ${i + 1}...`);
+            // Quitar el error anterior de Creative/Ad porque vamos a reintentar
+            const lastErrors = results.errors.splice(-2); // Remove last 2 errors (creative + ad or just ad)
+
+            const extraAdSetResult = await this.createAdSet(adAccountId, {
+              name: `${campaignName} - Ad Set ${results.adSets.length + 1}`,
+              campaignId: results.campaign.id,
+              billingEvent,
+              optimizationGoal,
+              targeting,
+              status: 'PAUSED',
+              endTime: endDate,
+              isDynamicCreative: true
+            });
+
+            if (!extraAdSetResult.success) {
+              results.errors.push(`AdSet ${results.adSets.length + 1}: ${extraAdSetResult.error}`);
+              continue;
+            }
+            results.adSets.push(extraAdSetResult.data);
+            await createCreativeAndAd(ads[i], i, extraAdSetResult.data.id);
+          }
         }
 
       } else {

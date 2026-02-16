@@ -1645,10 +1645,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         if (hasAds) {
           addLog(`Campaña creada: ${result.adSets?.length || 1} Ad Set(s) + ${totalCreated} anuncio(s).`);
           if (result.totalFailed > 0) {
-            addLog(`${result.totalFailed} anuncio(s) fallaron.`);
+            addLog(`⚠️ ${result.totalFailed} anuncio(s) fallaron.`);
+            (result.errors || []).forEach(err => addLog(`  → ${err}`));
           }
         } else {
           addLog('Campaña y Ad Set creados. Anuncios pendientes.');
+          (result.errors || []).forEach(err => addLog(`  → ${err}`));
         }
 
         setDraftData({
