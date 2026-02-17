@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import MetaAdsService from '../services/metaAdsApi';
 import {
   CAMPAIGN_TEMPLATES,
@@ -211,6 +212,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [dailyBudget, setDailyBudget] = useState(
     (templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000).toString()
   );
+  const [budgetLevel, setBudgetLevel] = useState('campaign'); // 'campaign' (CBO) o 'adset'
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
@@ -264,8 +266,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   };
 
   // Campos dinámicos según tipo de campaña
-  const [whatsappNumber, setWhatsappNumber] = useState(''); // Para campañas de WhatsApp
+  const [whatsappNumber, setWhatsappNumber] = useState(''); // Para campañas de WhatsApp (número manual)
   const [phoneNumber, setPhoneNumber] = useState(''); // Para campañas de llamadas
+
+  // Números de WhatsApp Business
+  const [whatsAppNumbers, setWhatsAppNumbers] = useState([]);
+  const [selectedWhatsAppNumber, setSelectedWhatsAppNumber] = useState('');
+  const [loadingWhatsAppNumbers, setLoadingWhatsAppNumbers] = useState(false);
+  const [whatsAppNumbersError, setWhatsAppNumbersError] = useState('');
 
   // Targeting: Fecha, Edad, Sexo
   const [endDate, setEndDate] = useState(''); // Fecha de finalización (opcional)
@@ -504,6 +512,82 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     loadPages();
   }, []);
 
+  // Cargar números de WhatsApp Business del business de la cuenta publicitaria seleccionada
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadWhatsAppNumbers = async () => {
+      if (!selectedAccount) {
+        setWhatsAppNumbers([]);
+        return;
+      }
+
+      setLoadingWhatsAppNumbers(true);
+      setWhatsAppNumbersError('');
+      setSelectedWhatsAppNumber('');
+      setWhatsappNumber('');
+
+      // Esperar 1.5s para no competir con otras cargas (audiences, pages, IG) y evitar rate limit
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (cancelled) return;
+
+      try {
+        const metaService = new MetaAdsService(accessToken);
+
+        const adAccountNumbers = await metaService.getWhatsAppNumbersFromAdAccount(selectedAccount);
+        if (cancelled) return;
+
+        console.log(`WhatsApp numbers for ad account ${selectedAccount}:`, adAccountNumbers.length, adAccountNumbers);
+
+        if (adAccountNumbers.length > 0) {
+          setWhatsAppNumbers(adAccountNumbers);
+          if (adAccountNumbers.length === 1) {
+            setSelectedWhatsAppNumber(String(adAccountNumbers[0].id));
+            setWhatsappNumber(adAccountNumbers[0].display_phone_number.replace(/\D/g, ''));
+          }
+        } else {
+          setWhatsAppNumbers([]);
+          setWhatsAppNumbersError('No se encontraron números de WhatsApp Business para esta cuenta publicitaria.');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err.response?.data?.error?.message || err.message;
+        console.error('Error loading WhatsApp numbers:', msg);
+        // Si es rate limit, reintentar después de 5s
+        if (msg.includes('request limit')) {
+          setWhatsAppNumbersError('Rate limit alcanzado. Reintentando...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          if (cancelled) return;
+          try {
+            const metaService2 = new MetaAdsService(accessToken);
+            const retry = await metaService2.getWhatsAppNumbersFromAdAccount(selectedAccount);
+            if (cancelled) return;
+            if (retry.length > 0) {
+              setWhatsAppNumbers(retry);
+              setWhatsAppNumbersError('');
+              if (retry.length === 1) {
+                setSelectedWhatsAppNumber(String(retry[0].id));
+                setWhatsappNumber(retry[0].display_phone_number.replace(/\D/g, ''));
+              }
+              return;
+            }
+          } catch (retryErr) {
+            // Silenciar retry
+          }
+        }
+        setWhatsAppNumbersError('Error al cargar números de WhatsApp: ' + msg);
+      } finally {
+        if (!cancelled) setLoadingWhatsAppNumbers(false);
+      }
+    };
+
+    if (selectedAccount) {
+      loadWhatsAppNumbers();
+    }
+
+    return () => { cancelled = true; };
+  }, [selectedAccount]);
+
   // Auto-fill linkUrl con el website de la página seleccionada
   useEffect(() => {
     if (!selectedPage || !pages.length) return;
@@ -515,8 +599,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
   }, [selectedPage, pages]);
 
-  // Cargar cuentas de Instagram: primero desde la página (ya cargada), luego fallback a API
+  // Cargar cuentas de Instagram: usar page token para evitar restricciones de Business Manager
   useEffect(() => {
+    let cancelled = false;
+
     const loadIgAccounts = async () => {
       if (!selectedAccount) {
         setIgAccounts([]);
@@ -527,7 +613,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const allIg = [];
       const seenIds = new Set();
 
-      // 1. Extraer IG directamente de los datos de la página (ya viene con getPages)
+      // 1. Extraer IG directamente de los datos de la página (ya viene con getPages, sin llamada extra)
       if (selectedPage && pages.length > 0) {
         const page = pages.find(p => p.id === selectedPage);
         if (page?.instagram_business_account) {
@@ -540,33 +626,54 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         }
       }
 
-      // 2. Si no se encontró desde la página, buscar desde la cuenta publicitaria via API
+      // 2. Si no se encontró en los datos de la página, usar el PAGE TOKEN para consultar cada página
+      if (allIg.length === 0 && pages.length > 0) {
+        for (const page of pages) {
+          if (cancelled) return;
+          if (!page.access_token) continue;
+          try {
+            // Usar el token de la página, no el del usuario
+            const response = await axios.get(`https://graph.facebook.com/v21.0/${page.id}`, {
+              params: {
+                access_token: page.access_token,
+                fields: 'instagram_business_account{id,username,profile_picture_url}'
+              }
+            });
+            const igBiz = response.data?.instagram_business_account;
+            if (igBiz && !seenIds.has(igBiz.id)) {
+              seenIds.add(igBiz.id);
+              allIg.push({
+                id: igBiz.id,
+                username: igBiz.username,
+                profile_pic: igBiz.profile_picture_url || null,
+                page_id: page.id,
+                page_name: page.name
+              });
+              console.log(`Instagram from page ${page.name} (page token):`, igBiz.username);
+            }
+          } catch (err) {
+            // Silenciar errores individuales
+          }
+        }
+      }
+
+      // 3. Fallback: endpoint directo del ad account
       if (allIg.length === 0) {
         try {
           const metaService = new MetaAdsService(accessToken);
           const result = await metaService.getInstagramAccounts(selectedAccount);
-          console.log('Instagram from ad account API:', result);
+          if (cancelled) return;
           if (result.success && result.data.length > 0) {
             result.data.forEach(ig => {
               if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
             });
-          }
-
-          // 3. Último fallback: buscar desde la página via API
-          if (allIg.length === 0 && selectedPage) {
-            const pageResult = await metaService.getInstagramAccountFromPage(selectedPage);
-            console.log('Instagram from page API:', pageResult);
-            if (pageResult.success && pageResult.data.length > 0) {
-              pageResult.data.forEach(ig => {
-                if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
-              });
-            }
           }
         } catch (err) {
           console.error('Error loading Instagram accounts:', err);
         }
       }
 
+      if (cancelled) return;
       console.log('Total Instagram accounts found:', allIg.length, allIg);
       if (allIg.length > 0) {
         setIgAccounts(allIg);
@@ -577,6 +684,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
     };
     loadIgAccounts();
+
+    return () => { cancelled = true; };
   }, [selectedAccount, selectedPage, pages]);
 
   // Cargar todos los públicos cuando se selecciona una cuenta
@@ -658,9 +767,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
 
     // Validar WhatsApp si es requerido
-    if (templateRequirements.whatsapp && !whatsappNumber.trim()) {
-      setError('Por favor ingresa el número de WhatsApp (ej: 573001234567)');
-      return;
+    if (templateRequirements.whatsapp) {
+      // Si hay números de WhatsApp Business disponibles, usar el selector
+      if (whatsAppNumbers.length > 0 && !selectedWhatsAppNumber) {
+        setError('Por favor selecciona un número de WhatsApp Business');
+        return;
+      }
+      // Si no hay números disponibles, permitir número manual (retrocompatibilidad)
+      if (whatsAppNumbers.length === 0 && !whatsappNumber.trim()) {
+        setError('Por favor ingresa el número de WhatsApp (ej: 573001234567)');
+        return;
+      }
     }
 
     // Validar teléfono si es requerido
@@ -718,6 +835,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         adAccountId: selectedAccount,
         adAccountName: selectedAccountData?.name || selectedAccount,
         dailyBudgetCOP: parseFloat(dailyBudget),
+        budgetLevel: templateAdSetConfig.allowBudgetLevel ? budgetLevel : 'campaign', // 'campaign' (CBO) o 'adset'
         // Página de Facebook para el anuncio
         pageId: selectedPage,
         pageName: selectedPageData?.name || selectedPage,
@@ -732,6 +850,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         totalAds: builtAds.length,
         // Campos dinámicos según tipo
         whatsappNumber: whatsappNumber.trim() || null,
+        whatsappNumberId: selectedWhatsAppNumber || null,
+        // Debug: log what WhatsApp values are being sent
+        ...((() => { console.log('JOB WhatsApp values:', { whatsappNumber, selectedWhatsAppNumber, selectedInDropdown: whatsAppNumbers.find(n => String(n.id) === String(selectedWhatsAppNumber))?.display_phone_number }); return {}; })()),
         phoneNumber: phoneNumber.trim() || null,
         // Público (puede ser null si no hay disponibles)
         savedAudienceId: selectedAudience || null,
@@ -893,18 +1014,66 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </div>
         )}
 
-        {/* WhatsApp Number - Solo si es requerido */}
+        {/* WhatsApp Number - Selector de WhatsApp Business */}
         {templateRequirements.whatsapp && (
           <div className="form-group">
-            <label>Número de WhatsApp *</label>
-            <input
-              type="tel"
-              placeholder="573001234567"
-              value={whatsappNumber}
-              onChange={(e) => setWhatsappNumber(e.target.value)}
-              required
-            />
-            <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
+            <label>Número de WhatsApp Business *</label>
+            {loadingWhatsAppNumbers ? (
+              <select disabled>
+                <option>Cargando números de WhatsApp...</option>
+              </select>
+            ) : whatsAppNumbers.length > 0 ? (
+              <>
+                <select
+                  value={selectedWhatsAppNumber}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
+                    setSelectedWhatsAppNumber(val);
+                    if (selected) {
+                      const digits = selected.display_phone_number.replace(/\D/g, '');
+                      setWhatsappNumber(digits);
+                      console.log('WhatsApp number selected:', digits, 'ID:', val);
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Selecciona un número de WhatsApp</option>
+                  {whatsAppNumbers.map(num => {
+                    const statusLabel = num.quality_score?.score
+                      ? ` [${num.quality_score.score}]`
+                      : '';
+                    const pageName = num.page_name
+                      ? ` - ${num.page_name}`
+                      : num.whatsapp_business_account_name
+                        ? ` - ${num.whatsapp_business_account_name}`
+                        : '';
+                    return (
+                      <option key={num.id} value={String(num.id)}>
+                        {num.display_phone_number} ({num.verified_name}{pageName}){statusLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="hint">
+                  {whatsAppNumbers.length} número(s) encontrado(s). Selecciona el número de destino para tu campaña.
+                </p>
+              </>
+            ) : (
+              <>
+                <input
+                  type="tel"
+                  placeholder="573001234567"
+                  value={whatsappNumber}
+                  onChange={(e) => {
+                    setWhatsappNumber(e.target.value);
+                  }}
+                  required
+                />
+                {whatsAppNumbersError && <p className="hint error">{whatsAppNumbersError}</p>}
+                <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
+              </>
+            )}
           </div>
         )}
 
@@ -958,6 +1127,34 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
         </div>
 
+        {/* Budget Level Selector (only for templates that allow it) */}
+        {templateAdSetConfig.allowBudgetLevel && (
+          <div className="form-group">
+            <label>Nivel de Presupuesto</label>
+            <div className="budget-level-buttons" style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className={`gender-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
+                onClick={() => setBudgetLevel('campaign')}
+              >
+                Por Campaña (CBO)
+              </button>
+              <button
+                type="button"
+                className={`gender-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
+                onClick={() => setBudgetLevel('adset')}
+              >
+                Por Conjunto de Anuncios
+              </button>
+            </div>
+            <p className="hint">
+              {budgetLevel === 'campaign'
+                ? 'Meta distribuye el presupuesto automáticamente entre los conjuntos de anuncios'
+                : 'Tú controlas cuánto gasta cada conjunto de anuncios'}
+            </p>
+          </div>
+        )}
+
         {/* Daily Budget in COP */}
         <div className="form-group">
           <label>Presupuesto Diario (COP) *</label>
@@ -971,7 +1168,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             required
           />
           <p className="hint">
-            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día (CBO) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000)}
+            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día ({budgetLevel === 'campaign' ? 'CBO' : 'por Ad Set'}) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000)}
           </p>
         </div>
 
@@ -1603,23 +1800,29 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       if (job.endDate) {
         addLog(`Fecha fin: ${job.endDate}`);
       }
-      addLog(`Presupuesto: $${formatCOP(job.dailyBudgetCOP)} COP/día (CBO)`);
+      const budgetLevelLabel = job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO';
+      addLog(`Presupuesto: $${formatCOP(job.dailyBudgetCOP)} COP/día (${budgetLevelLabel})`);
 
       let result;
 
       // Seleccionar método de creación según el tipo de campaña
       if (conversionLocation === 'WHATSAPP' && job.whatsappNumber) {
         addLog(`WhatsApp: ${job.whatsappNumber}`);
-        addLog('Creando campaña para WhatsApp...');
+        if (job.whatsappNumberId) {
+          addLog(`WhatsApp Business ID: ${job.whatsappNumberId}`);
+        }
+        addLog(`Creando campaña para WhatsApp (presupuesto ${budgetLevelLabel})...`);
 
         result = await metaService.createCampaignForWhatsApp(job.adAccountId, {
           campaignName: job.campaignName,
           adSetName: `${job.campaignName} - Ad Set`,
           adName: job.adName,
           dailyBudget: Math.round(job.dailyBudgetCOP),
+          budgetLevel: job.budgetLevel || 'campaign',
           targeting,
           pageId: job.pageId,
           whatsappNumber: job.whatsappNumber,
+          whatsappNumberId: job.whatsappNumberId || null,
           imageUrl: job.imageUrl,
           imageHash: job.imageHash || null,
           headlines: job.headlines || [],
@@ -1818,7 +2021,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               <span className="card-icon">AS</span>
               <div>
                 <h4>Ad Set(s) ({draftData.totalAdSets || 1})</h4>
-                <p>Presupuesto: ${formatCOP(draftData.dailyBudgetCOP)} COP/día (CBO)</p>
+                <p>Presupuesto: ${formatCOP(draftData.dailyBudgetCOP)} COP/día ({draftData.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO'})</p>
                 {draftData.adSets?.length > 0 ? (
                   draftData.adSets.map((adSet, i) => (
                     <p key={i} className="hint">Ad Set {i + 1} ID: {adSet.id}</p>
@@ -2088,7 +2291,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             <p>{job.totalAds || 1} anuncio(s) | {job.adSetMode === 'single' ? '1 Ad Set' : `${job.totalAds || 1} Ad Sets${job.adSetMode === 'dynamic' ? ' con 5+5+5' : ' (público diferente)'}`}</p>
           </div>
           <div className="summary-item">
-            <label>Presupuesto Diario (CBO)</label>
+            <label>Presupuesto Diario ({job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO'})</label>
             <p>${formatCOP(job.dailyBudgetCOP)} COP</p>
           </div>
           <div className="summary-item">

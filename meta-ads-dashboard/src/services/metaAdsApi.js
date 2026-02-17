@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const META_API_BASE_URL = 'https://graph.facebook.com/v18.0';
+const META_API_BASE_URL = 'https://graph.facebook.com/v21.0';
 
 // Backend URL para endpoints que requieren proxy (uploads, etc.)
 const BACKEND_API_URL = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
@@ -142,6 +142,25 @@ class MetaAdsService {
       return response.data;
     } catch (error) {
       return null;
+    }
+  }
+
+  // Verificar permisos del token actual
+  async debugTokenPermissions() {
+    try {
+      const response = await axios.get(`${META_API_BASE_URL}/me/permissions`, {
+        params: { access_token: this.accessToken }
+      });
+      const permissions = response.data.data || [];
+      const granted = permissions.filter(p => p.status === 'granted').map(p => p.permission);
+      const declined = permissions.filter(p => p.status === 'declined').map(p => p.permission);
+      console.log('TOKEN PERMISSIONS - Granted:', granted);
+      if (declined.length > 0) console.warn('TOKEN PERMISSIONS - Declined:', declined);
+      console.log('Has whatsapp_business_management:', granted.includes('whatsapp_business_management'));
+      return { granted, declined };
+    } catch (error) {
+      console.error('Error checking token permissions:', error.response?.data?.error || error.message);
+      return { granted: [], declined: [] };
     }
   }
 
@@ -333,6 +352,160 @@ class MetaAdsService {
       return response.data;
     } catch (error) {
       return null;
+    }
+  }
+
+  // =============================================
+  // WHATSAPP BUSINESS - Obtener números de WhatsApp
+  // =============================================
+
+  // Obtener cuentas de WhatsApp Business asociadas a un Business Manager
+  async getWhatsAppBusinessAccounts(businessId) {
+    try {
+      console.log('Fetching WhatsApp Business accounts for business:', businessId);
+
+      // 1. Intentar cuentas propias (owned) primero
+      try {
+        const ownedResponse = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_whatsapp_business_accounts`, {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,name'
+          }
+        });
+        const owned = ownedResponse.data.data || [];
+        console.log(`Business ${businessId} owned WABA:`, owned.length);
+        if (owned.length > 0) return owned;
+      } catch (err) {
+        console.warn(`Business ${businessId} owned WABA error:`, err.response?.data?.error?.message || err.message);
+      }
+
+      // 2. Solo si owned no encontró nada, intentar client
+      try {
+        const clientResponse = await axios.get(`${META_API_BASE_URL}/${businessId}/client_whatsapp_business_accounts`, {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,name'
+          }
+        });
+        const clients = clientResponse.data.data || [];
+        console.log(`Business ${businessId} client WABA:`, clients.length);
+        return clients;
+      } catch (err) {
+        console.warn(`Business ${businessId} client WABA error:`, err.response?.data?.error?.message || err.message);
+      }
+
+      return [];
+    } catch (error) {
+      console.error(`Get WhatsApp Business accounts error for business ${businessId}:`, error.message);
+      return [];
+    }
+  }
+
+  // Obtener números de teléfono de una cuenta de WhatsApp Business
+  async getWhatsAppPhoneNumbers(whatsappBusinessAccountId) {
+    try {
+      console.log('Fetching WhatsApp phone numbers for account:', whatsappBusinessAccountId);
+      const response = await axios.get(
+        `${META_API_BASE_URL}/${whatsappBusinessAccountId}/phone_numbers`,
+        {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,display_phone_number,verified_name,code_verification_status,quality_score,name_status,status'
+          }
+        }
+      );
+      console.log('WhatsApp phone numbers:', response.data);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Get WhatsApp phone numbers error:', error.response?.data?.error || error.message);
+      return [];
+    }
+  }
+
+  // Obtener todos los números de WhatsApp Business de todos los businesses del usuario
+  async getAllWhatsAppPhoneNumbers() {
+    try {
+      const allNumbers = [];
+      const businesses = await this.getBusinesses();
+      
+      console.log('Fetching WhatsApp numbers from', businesses.length, 'businesses');
+
+      for (const business of businesses) {
+        try {
+          const waAccounts = await this.getWhatsAppBusinessAccounts(business.id);
+          
+          for (const waAccount of waAccounts) {
+            const phoneNumbers = await this.getWhatsAppPhoneNumbers(waAccount.id);
+            
+            for (const phone of phoneNumbers) {
+              allNumbers.push({
+                ...phone,
+                business_id: business.id,
+                business_name: business.name,
+                whatsapp_business_account_id: waAccount.id,
+                whatsapp_business_account_name: waAccount.name
+              });
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching WhatsApp for business ${business.name}:`, err.message);
+        }
+      }
+
+      console.log('Total WhatsApp phone numbers found:', allNumbers.length);
+      return allNumbers;
+    } catch (error) {
+      console.error('getAllWhatsAppPhoneNumbers error:', error);
+      return [];
+    }
+  }
+
+  // Obtener números de WhatsApp desde una cuenta publicitaria (ad account → business → WABA → phone numbers)
+  async getWhatsAppNumbersFromAdAccount(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Getting WhatsApp numbers via ad account business:', normalizedId);
+
+      // Paso 1: Obtener el business asociado a la cuenta publicitaria
+      const adAccountResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'business{id,name}'
+        }
+      });
+
+      const business = adAccountResponse.data?.business;
+      if (!business) {
+        console.log('No business found for ad account:', normalizedId);
+        return [];
+      }
+
+      console.log('Found business for ad account:', business.id, business.name);
+
+      // Paso 2: Obtener cuentas de WhatsApp Business del business
+      const waAccounts = await this.getWhatsAppBusinessAccounts(business.id);
+      console.log('WhatsApp Business accounts from ad account business:', waAccounts.length);
+
+      // Paso 3: Obtener números de cada cuenta de WhatsApp
+      const allNumbers = [];
+      for (const waAccount of waAccounts) {
+        const phoneNumbers = await this.getWhatsAppPhoneNumbers(waAccount.id);
+        for (const phone of phoneNumbers) {
+          allNumbers.push({
+            ...phone,
+            business_id: business.id,
+            business_name: business.name,
+            whatsapp_business_account_id: waAccount.id,
+            whatsapp_business_account_name: waAccount.name
+          });
+        }
+      }
+
+      console.log('WhatsApp numbers from ad account business:', allNumbers.length);
+      return allNumbers;
+    } catch (error) {
+      console.error('getWhatsAppNumbersFromAdAccount error:', error.response?.data?.error || error.message);
+      return [];
     }
   }
 
@@ -539,7 +712,87 @@ class MetaAdsService {
     return results;
   }
 
-  // Obtener cuentas de Instagram vinculadas a la cuenta publicitaria
+  // Obtener cuentas de Instagram desde el business de la cuenta publicitaria
+  async getInstagramAccountsFromAdAccount(adAccountId) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Getting Instagram accounts via ad account business:', normalizedId);
+
+      // Paso 1: Obtener el business de la cuenta publicitaria
+      const adAccountResponse = await axios.get(`${META_API_BASE_URL}/${normalizedId}`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'business{id,name}'
+        }
+      });
+
+      const business = adAccountResponse.data?.business;
+      if (!business) {
+        console.log('No business found for ad account:', normalizedId);
+        return [];
+      }
+
+      console.log('Found business for IG:', business.id, business.name);
+
+      // Paso 2: Obtener IG accounts owned por el business
+      const allIg = [];
+      try {
+        const ownedResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/owned_instagram_accounts`, {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,username,profile_pic'
+          }
+        });
+        const owned = ownedResponse.data.data || [];
+        console.log(`Business ${business.id} owned IG:`, owned.length);
+        allIg.push(...owned);
+      } catch (err) {
+        console.warn(`Business ${business.id} owned_instagram_accounts error:`, err.response?.data?.error?.message || err.message);
+      }
+
+      // Paso 3: Si no hay owned, intentar client
+      if (allIg.length === 0) {
+        try {
+          const clientResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/client_instagram_accounts`, {
+            params: {
+              access_token: this.accessToken,
+              fields: 'id,username,profile_pic'
+            }
+          });
+          const clients = clientResponse.data.data || [];
+          console.log(`Business ${business.id} client IG:`, clients.length);
+          allIg.push(...clients);
+        } catch (err) {
+          console.warn(`Business ${business.id} client_instagram_accounts error:`, err.response?.data?.error?.message || err.message);
+        }
+      }
+
+      // Paso 4: Último fallback - instagram_accounts del business
+      if (allIg.length === 0) {
+        try {
+          const bizResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/instagram_accounts`, {
+            params: {
+              access_token: this.accessToken,
+              fields: 'id,username,profile_pic'
+            }
+          });
+          const bizIg = bizResponse.data.data || [];
+          console.log(`Business ${business.id} instagram_accounts:`, bizIg.length);
+          allIg.push(...bizIg);
+        } catch (err) {
+          console.warn(`Business ${business.id} instagram_accounts error:`, err.response?.data?.error?.message || err.message);
+        }
+      }
+
+      console.log('Total IG accounts from ad account business:', allIg.length, allIg);
+      return allIg;
+    } catch (error) {
+      console.error('getInstagramAccountsFromAdAccount error:', error.response?.data?.error?.message || error.message);
+      return [];
+    }
+  }
+
+  // Obtener cuentas de Instagram vinculadas a la cuenta publicitaria (endpoint directo)
   async getInstagramAccounts(adAccountId) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -709,10 +962,59 @@ class MetaAdsService {
           fields: 'id,name,access_token,website,instagram_business_account{id,username}'
         }
       });
+      console.log('Pages response:', response.data);
       return { success: true, data: response.data.data || [] };
     } catch (error) {
       const errorMsg = error.response?.data?.error?.message || error.message;
+      console.error('getPages error:', errorMsg);
       return { success: false, error: errorMsg };
+    }
+  }
+
+  // Obtener números de WhatsApp desde una página específica
+  async getWhatsAppNumbersFromPage(pageId) {
+    try {
+      console.log('Fetching WhatsApp numbers from page:', pageId);
+      // Primero obtener la cuenta de WhatsApp asociada a la página
+      const response = await axios.get(`${META_API_BASE_URL}/${pageId}`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'whatsapp_business_account{id,name}'
+        }
+      });
+      
+      const waAccount = response.data?.whatsapp_business_account;
+      if (!waAccount) {
+        console.log('No WhatsApp business account found for page:', pageId);
+        return [];
+      }
+      
+      // Ahora obtener los números de teléfono
+      const phoneResponse = await axios.get(
+        `${META_API_BASE_URL}/${waAccount.id}/phone_numbers`,
+        {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,display_phone_number,verified_name,code_verification_status,quality_score'
+          }
+        }
+      );
+      
+      console.log('WhatsApp phone numbers from page:', phoneResponse.data);
+      return phoneResponse.data.data || [];
+    } catch (error) {
+      const errDetail = error.response?.data?.error;
+      console.error('getWhatsAppNumbersFromPage error:', {
+        pageId,
+        code: errDetail?.code,
+        subcode: errDetail?.error_subcode,
+        message: errDetail?.message,
+        type: errDetail?.type,
+        hint: errDetail?.code === 100
+          ? 'El token puede no tener permiso whatsapp_business_management o la página no tiene WhatsApp Business vinculado'
+          : error.message
+      });
+      return [];
     }
   }
 
@@ -733,6 +1035,9 @@ class MetaAdsService {
       if (dailyBudget) {
         formData.append('daily_budget', dailyBudget.toString());
         formData.append('bid_strategy', bidStrategy);
+      } else {
+        // Sin CBO: presupuesto va en el ad set, Meta requiere este campo
+        formData.append('is_campaign_budget_optimization', 'false');
       }
 
       console.log('Creating campaign with:', {
@@ -1781,7 +2086,9 @@ class MetaAdsService {
     optimizationGoal = 'CONVERSATIONS',
     billingEvent = 'IMPRESSIONS',
     status = 'PAUSED',
-    promotedObject = null
+    promotedObject = null,
+    whatsappPhoneNumber = null, // Número de teléfono real (ej: "573007189383")
+    dailyBudget = null // Presupuesto a nivel de ad set (cuando no es CBO)
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1796,14 +2103,36 @@ class MetaAdsService {
       formData.append('status', status);
       formData.append('destination_type', 'WHATSAPP');
 
-      if (promotedObject) {
-        formData.append('promoted_object', JSON.stringify(promotedObject));
+      // Si el presupuesto es a nivel de ad set (no CBO), incluirlo aquí
+      if (dailyBudget) {
+        formData.append('daily_budget', dailyBudget.toString());
+        formData.append('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');
+        console.log('AdSet budget (non-CBO):', dailyBudget);
+      }
+
+      const promotedObj = {};
+
+      if (promotedObject?.page_id) {
+        promotedObj.page_id = promotedObject.page_id;
+      }
+
+      // Pasar el número de WhatsApp específico para que Meta use ese número, no el default de la página
+      if (whatsappPhoneNumber) {
+        promotedObj.whatsapp_phone_number = '+' + whatsappPhoneNumber.replace(/\D/g, '');
+      }
+
+      if (Object.keys(promotedObj).length > 0) {
+        formData.append('promoted_object', JSON.stringify(promotedObj));
+        console.log('WhatsApp promoted_object:', promotedObj);
+      } else {
+        console.warn('No page_id provided for WhatsApp campaign');
       }
 
       console.log('Creating WhatsApp AdSet with params:', {
         name, campaignId, billingEvent, optimizationGoal, status,
         destination_type: 'WHATSAPP',
-        promotedObject,
+        page_id: promotedObject?.page_id,
+        whatsapp_phone_number: whatsappPhoneNumber,
         targeting: JSON.stringify(targeting).substring(0, 200)
       });
 
@@ -1979,6 +2308,7 @@ class MetaAdsService {
     adSetName,
     adName,
     dailyBudget,
+    budgetLevel = 'campaign', // 'campaign' (CBO) o 'adset'
     targeting,
     pageId,
     whatsappNumber,
@@ -1995,12 +2325,15 @@ class MetaAdsService {
 
     try {
       // 1. Crear Campaña
-      console.log('Step 1/4: Creating campaign...');
+      // Si budgetLevel es 'campaign' (CBO), el presupuesto va en la campaña
+      // Si budgetLevel es 'adset', el presupuesto va en el ad set
+      const isCBO = budgetLevel === 'campaign';
+      console.log(`Step 1/4: Creating campaign (budget level: ${budgetLevel})...`);
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
         status: 'PAUSED',
-        dailyBudget
+        dailyBudget: isCBO ? dailyBudget : null // Solo pasar presupuesto si es CBO
       });
 
       if (!campaignResult.success) {
@@ -2011,12 +2344,17 @@ class MetaAdsService {
 
       // 2. Crear AdSet para WhatsApp
       console.log('Step 2/4: Creating ad set for WhatsApp...');
+      console.log('Page ID:', pageId);
+      console.log('WhatsApp Number for campaign:', whatsappNumber);
+
       const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
         name: adSetName || `${campaignName} - Ad Set`,
         campaignId: results.campaign.id,
         targeting,
         optimizationGoal,
-        promotedObject: { page_id: pageId }
+        promotedObject: { page_id: pageId },
+        whatsappPhoneNumber: whatsappNumber,
+        dailyBudget: !isCBO ? dailyBudget : null // Solo pasar presupuesto si es por ad set
       });
 
       if (!adSetResult.success) {
