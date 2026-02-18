@@ -99,6 +99,27 @@ class MetaAdsService {
     }
   }
 
+  // Analyze media from URL (server-side download, for Meta library media)
+  async analyzeMediaUrl(url, type = 'image', adIndex = 0, category = '', objective = '', templateName = '', destType = '') {
+    try {
+      console.log(`Analyzing ${type} from URL for ad ${adIndex}: ${url.substring(0, 80)}...`);
+      const response = await axios.post(`${BACKEND_API_URL}/analyze-media-url`, {
+        url, type, adIndex, category, objective, templateName, destType
+      }, {
+        timeout: type === 'video' ? 600000 : 60000 // 10min for video, 1min for image
+      });
+
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.error };
+      }
+    } catch (error) {
+      console.error('analyzeMediaUrl error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  }
+
   // Normaliza el ID de cuenta para asegurar que tenga el prefijo 'act_'
   normalizeAccountId(accountId) {
     if (!accountId) return null;
@@ -1036,8 +1057,9 @@ class MetaAdsService {
         formData.append('daily_budget', dailyBudget.toString());
         formData.append('bid_strategy', bidStrategy);
       } else {
-        // Sin CBO: presupuesto va en el ad set, Meta requiere este campo
+        // Sin CBO: presupuesto va en el ad set, Meta requiere estos campos
         formData.append('is_campaign_budget_optimization', 'false');
+        formData.append('is_adset_budget_sharing_enabled', 'false');
       }
 
       console.log('Creating campaign with:', {
@@ -1094,7 +1116,9 @@ class MetaAdsService {
     targeting,
     status = 'PAUSED',
     endTime = null, // Fecha de fin en formato ISO o timestamp UNIX
-    isDynamicCreative = false // Para Asset Feed Spec (5+5+5 en 1 anuncio)
+    isDynamicCreative = false, // Para Asset Feed Spec (5+5+5 en 1 anuncio)
+    destinationType = null, // 'WEBSITE', 'INSTAGRAM_PROFILE', etc. (null = Meta decide)
+    promotedObject = null // { page_id: '...' } para Instagram Profile / Facebook Page
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1118,6 +1142,18 @@ class MetaAdsService {
       // NO enviamos bid_strategy cuando usamos CBO - se hereda de la campaña
       formData.append('targeting', JSON.stringify(targeting));
       formData.append('status', status);
+
+      // destination_type para indicar a Meta a dónde va el tráfico
+      if (destinationType) {
+        formData.append('destination_type', destinationType);
+        console.log('AdSet destination_type:', destinationType);
+      }
+
+      // promoted_object para Instagram Profile / Facebook Page
+      if (promotedObject && Object.keys(promotedObject).length > 0) {
+        formData.append('promoted_object', JSON.stringify(promotedObject));
+        console.log('AdSet promoted_object:', promotedObject);
+      }
 
       // Dynamic Creative permite 5+5+5 (múltiples títulos, descripciones, CTAs) en 1 anuncio
       if (isDynamicCreative) {
@@ -1290,9 +1326,9 @@ class MetaAdsService {
         link_description: description,
         call_to_action: {
           type: callToAction,
-          value: {
-            link: linkUrl
-          }
+          value: callToAction === 'WHATSAPP_MESSAGE' 
+            ? { wa_id: whatsappNumber || linkUrl } 
+            : { link: linkUrl }
         }
       };
 
@@ -1384,7 +1420,9 @@ class MetaAdsService {
           link: linkUrl,
           call_to_action: {
             type: callToAction,
-            value: { link: linkUrl }
+            value: callToAction === 'WHATSAPP_MESSAGE' 
+              ? { wa_id: whatsappNumber || linkUrl } 
+              : { link: linkUrl }
           }
         }
       };
@@ -1469,7 +1507,8 @@ class MetaAdsService {
     description = '',
     linkUrl,
     callToAction = 'LEARN_MORE',
-    igActorId = null
+    igActorId = null,
+    igConnected = true
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1484,7 +1523,9 @@ class MetaAdsService {
           title: headline,
           call_to_action: {
             type: callToAction,
-            value: { link: linkUrl }
+            value: callToAction === 'WHATSAPP_MESSAGE'
+              ? { wa_id: whatsappNumber || linkUrl }
+              : { link: linkUrl }
           }
         };
         if (thumbnailUrl) videoData.image_url = thumbnailUrl;
@@ -1509,12 +1550,15 @@ class MetaAdsService {
         objectStorySpec.link_data = linkData;
       }
 
-      if (igActorId) {
+      // Solo poner instagram_actor_id DENTRO de object_story_spec si está CONECTADA al ad account
+      if (igActorId && igConnected) {
         objectStorySpec.instagram_actor_id = igActorId;
       }
 
       console.log('Creating standard creative:', {
         name, pageId,
+        igActorId: igActorId || 'none',
+        igConnected,
         type: videoId ? 'VIDEO' : 'IMAGE',
         headline,
         primaryText: primaryText?.substring(0, 50) + '...',
@@ -1525,6 +1569,13 @@ class MetaAdsService {
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      // Cuando la cuenta IG NO está conectada: top-level field + use_page_actor_override
+      if (igActorId && !igConnected) {
+        formData.append('instagram_actor_id', igActorId);
+        formData.append('use_page_actor_override', 'true');
+        console.log(`Using igActorId ${igActorId} as TOP-LEVEL field + use_page_actor_override=true`);
+      }
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -1589,7 +1640,9 @@ class MetaAdsService {
     descriptions, // Array de descripciones link (max 5)
     callToActionTypes, // Array de CTAs (max 5)
     linkUrl,
-    igActorId = null
+    igActorId = null,
+    igConnected = true, // true = IG conectada al ad account (usar en object_story_spec), false = usar como top-level field
+    isWhatsApp = false // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1599,11 +1652,16 @@ class MetaAdsService {
         bodies: bodies.slice(0, 5).map(text => ({ text })),
         titles: titles.slice(0, 5).map(text => ({ text })),
         descriptions: descriptions.slice(0, 5).map(text => ({ text })),
-        call_to_action_types: [...new Set(callToActionTypes.slice(0, 5))],
-        link_urls: [{ website_url: linkUrl }]
+        call_to_action_types: [...new Set(callToActionTypes.slice(0, 5))]
       };
 
-      // Video o imagen
+      // link_urls: requerido para web/Messenger, NO para WhatsApp
+      // WhatsApp usa destination_type en el ad set, no necesita link_urls
+      if (linkUrl && !isWhatsApp) {
+        assetFeedSpec.link_urls = [{ website_url: linkUrl }];
+      }
+
+      // Video o imagen (ad_formats siempre requerido por Meta)
       if (videoId) {
         const videoEntry = { video_id: videoId };
         if (thumbnailHash) {
@@ -1613,8 +1671,8 @@ class MetaAdsService {
         }
         assetFeedSpec.videos = [videoEntry];
         assetFeedSpec.ad_formats = ['SINGLE_VIDEO'];
-      } else if (imageHash && imageHash9x16) {
-        // Imagen con versión 9:16 para Stories/Reels
+      } else if (imageHash && imageHash9x16 && !isWhatsApp) {
+        // Imagen con versión 9:16 para Stories/Reels (solo web/Messenger)
         assetFeedSpec.images = [
           { hash: imageHash, adlabels: [{ name: 'feed_image' }] },
           { hash: imageHash9x16, adlabels: [{ name: 'stories_image' }] }
@@ -1648,12 +1706,15 @@ class MetaAdsService {
         page_id: pageId
       };
 
-      if (igActorId) {
+      // Solo poner instagram_actor_id DENTRO de object_story_spec si está CONECTADA al ad account
+      if (igActorId && igConnected) {
         objectStorySpec.instagram_actor_id = igActorId;
       }
 
       console.log('Creating Asset Feed Spec creative (5+5+5):', {
         name, pageId,
+        igActorId: igActorId || 'none',
+        igConnected,
         type: videoId ? 'VIDEO' : 'IMAGE',
         videoId: videoId || 'N/A',
         thumbnailHash: thumbnailHash || 'N/A',
@@ -1661,6 +1722,7 @@ class MetaAdsService {
         titles: titles.length, bodies: bodies.length,
         descriptions: descriptions.length, callToActionTypes
       });
+      console.log('objectStorySpec:', JSON.stringify(objectStorySpec));
       console.log('assetFeedSpec:', JSON.stringify(assetFeedSpec, null, 2));
 
       const formData = new URLSearchParams();
@@ -1668,6 +1730,15 @@ class MetaAdsService {
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
       formData.append('asset_feed_spec', JSON.stringify(assetFeedSpec));
+
+      // Cuando la cuenta IG NO está conectada al ad account:
+      // - instagram_actor_id como campo TOP-LEVEL del creative (no dentro de object_story_spec)
+      // - use_page_actor_override = true para usar la Page como identidad de IG
+      if (igActorId && !igConnected) {
+        formData.append('instagram_actor_id', igActorId);
+        formData.append('use_page_actor_override', 'true');
+        console.log(`Using igActorId ${igActorId} as TOP-LEVEL field + use_page_actor_override=true`);
+      }
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2088,7 +2159,8 @@ class MetaAdsService {
     status = 'PAUSED',
     promotedObject = null,
     whatsappPhoneNumber = null, // Número de teléfono real (ej: "573007189383")
-    dailyBudget = null // Presupuesto a nivel de ad set (cuando no es CBO)
+    dailyBudget = null, // Presupuesto a nivel de ad set (cuando no es CBO)
+    isDynamicCreative = false // true para habilitar 5+5+5 (Asset Feed Spec)
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -2102,6 +2174,11 @@ class MetaAdsService {
       formData.append('targeting', JSON.stringify(targeting));
       formData.append('status', status);
       formData.append('destination_type', 'WHATSAPP');
+
+      // Dynamic Creative permite 5+5+5 (múltiples títulos, descripciones, CTAs)
+      if (isDynamicCreative) {
+        formData.append('is_dynamic_creative', 'true');
+      }
 
       // Si el presupuesto es a nivel de ad set (no CBO), incluirlo aquí
       if (dailyBudget) {
@@ -2118,7 +2195,8 @@ class MetaAdsService {
 
       // Pasar el número de WhatsApp específico para que Meta use ese número, no el default de la página
       if (whatsappPhoneNumber) {
-        promotedObj.whatsapp_phone_number = '+' + whatsappPhoneNumber.replace(/\D/g, '');
+        const cleanNumber = whatsappPhoneNumber.replace(/\D/g, '');
+        promotedObj.whatsapp_phone_number = '+' + cleanNumber;
       }
 
       if (Object.keys(promotedObj).length > 0) {
@@ -2195,6 +2273,8 @@ class MetaAdsService {
     pageId,
     imageHash = null,
     imageUrl = null, // URL directa de la imagen
+    videoId = null, // ID del video subido
+    videoThumbnailUrl = null, // Thumbnail del video
     whatsappNumber,
     primaryText,
     headline,
@@ -2204,35 +2284,70 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      const linkData = {
-        link: `https://wa.me/${whatsappNumber}`,
-        message: primaryText,
-        name: headline,
-        description: description,
-        call_to_action: {
-          type: callToAction,
-          value: {
-            app_destination: 'WHATSAPP'
-          }
-        }
-      };
+      let objectStorySpec;
 
-      // Usar image_hash si está disponible, sino usar picture (URL directa)
-      if (imageHash) {
-        linkData.image_hash = imageHash;
-      } else if (imageUrl) {
-        linkData.picture = imageUrl;
+      if (videoId) {
+        // Creativo con VIDEO para WhatsApp - usa video_data
+        const videoData = {
+          video_id: videoId,
+          message: primaryText,
+          title: headline,
+          call_to_action: {
+            type: callToAction,
+            value: {
+              wa_id: whatsappNumber
+            }
+          }
+        };
+
+        // Thumbnail: solo usar URLs públicas (http/https), ignorar blob: y data: URLs
+        if (imageHash) {
+          videoData.image_hash = imageHash;
+        } else if (videoThumbnailUrl && videoThumbnailUrl.startsWith('http')) {
+          videoData.image_url = videoThumbnailUrl;
+        } else if (imageUrl && imageUrl.startsWith('http')) {
+          videoData.image_url = imageUrl;
+        }
+        // Si no hay thumbnail válido, Meta auto-genera uno del primer frame del video
+
+        objectStorySpec = {
+          page_id: pageId,
+          video_data: videoData
+        };
+        console.log('Creating WhatsApp VIDEO creative:', JSON.stringify(objectStorySpec, null, 2));
+      } else {
+        // Creativo con IMAGEN para WhatsApp
+        const linkData = {
+          message: primaryText,
+          name: headline,
+          description: description,
+          call_to_action: {
+            type: callToAction,
+            value: {
+              wa_id: whatsappNumber
+            }
+          }
+        };
+
+        if (imageHash) {
+          linkData.image_hash = imageHash;
+        } else if (imageUrl) {
+          linkData.picture = imageUrl;
+        }
+
+        objectStorySpec = {
+          page_id: pageId,
+          link_data: linkData
+        };
       }
 
-      const objectStorySpec = {
-        page_id: pageId,
-        link_data: linkData
-      };
+      const specJson = JSON.stringify(objectStorySpec);
+      console.log('WhatsApp creative object_story_spec length:', specJson.length, 'chars');
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
-      formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+      formData.append('object_story_spec', specJson);
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2241,8 +2356,8 @@ class MetaAdsService {
       );
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Creative for WhatsApp error:', error.response?.data || error.message);
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      console.error('Creative for WhatsApp FULL error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      return { success: false, error: error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message };
     }
   }
 
@@ -2302,38 +2417,49 @@ class MetaAdsService {
     }
   }
 
-  // Crear campaña completa para WhatsApp (usa URL de imagen directamente, sin subir)
+  // Crear campaña completa para WhatsApp (soporta múltiples ads, imagen y video)
   async createCampaignForWhatsApp(adAccountId, {
     campaignName,
-    adSetName,
-    adName,
     dailyBudget,
     budgetLevel = 'campaign', // 'campaign' (CBO) o 'adset'
     targeting,
     pageId,
+    igActorId = null, // Instagram account ID para mostrar anuncios en Instagram
     whatsappNumber,
+    ads = [], // Array de ads [{imageUrl, imageHash, videoId, videoThumbnailUrl, headlines, descriptions, ctas, adName}]
+    // Legacy single-ad fields (fallback si ads está vacío)
     imageUrl,
     imageHash = null,
+    videoId = null,
+    videoThumbnailUrl = null,
     headlines = [],
     descriptions = [],
     primaryTexts = [],
     callToAction = 'WHATSAPP_MESSAGE',
-    objective = 'OUTCOME_ENGAGEMENT',
+    objective = 'OUTCOME_SALES',
     optimizationGoal = 'CONVERSATIONS'
   }) {
-    const results = { campaign: null, adSet: null, creative: null, ad: null, errors: [] };
+    const results = { campaign: null, adSets: [], creatives: [], ads: [], errors: [] };
+
+    // Si no hay ads array, crear uno con los campos legacy
+    if (!ads || ads.length === 0) {
+      ads = [{
+        imageUrl, imageHash, videoId, videoThumbnailUrl,
+        headlines, descriptions, primaryTexts,
+        ctas: [callToAction],
+        adName: campaignName + ' - Ad'
+      }];
+    }
 
     try {
       // 1. Crear Campaña
-      // Si budgetLevel es 'campaign' (CBO), el presupuesto va en la campaña
-      // Si budgetLevel es 'adset', el presupuesto va en el ad set
       const isCBO = budgetLevel === 'campaign';
-      console.log(`Step 1/4: Creating campaign (budget level: ${budgetLevel})...`);
+      console.log(`Step 1: Creating campaign (budget: ${budgetLevel}, ${ads.length} ads)...`);
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
         status: 'PAUSED',
-        dailyBudget: isCBO ? dailyBudget : null // Solo pasar presupuesto si es CBO
+        dailyBudget: isCBO ? dailyBudget : null
       });
 
       if (!campaignResult.success) {
@@ -2342,63 +2468,218 @@ class MetaAdsService {
       }
       results.campaign = campaignResult.data;
 
-      // 2. Crear AdSet para WhatsApp
-      console.log('Step 2/4: Creating ad set for WhatsApp...');
-      console.log('Page ID:', pageId);
-      console.log('WhatsApp Number for campaign:', whatsappNumber);
+      // 2. Para cada ad: crear AdSet + Creative (regular, sin Dynamic Creative) + Ad
+      // Meta NO soporta Dynamic Creative (asset_feed_spec) para WhatsApp con CONVERSATIONS optimization
+      // Se usa object_story_spec con WHATSAPP_MESSAGE CTA (creative regular)
+      for (let i = 0; i < ads.length; i++) {
+        const ad = ads[i];
+        const adLabel = ads.length > 1 ? ` ${i + 1}` : '';
+        console.log(`Creating Ad Set${adLabel} + Creative + Ad (${i + 1}/${ads.length})...`);
 
-      const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
-        campaignId: results.campaign.id,
-        targeting,
-        optimizationGoal,
-        promotedObject: { page_id: pageId },
-        whatsappPhoneNumber: whatsappNumber,
-        dailyBudget: !isCBO ? dailyBudget : null // Solo pasar presupuesto si es por ad set
-      });
+        // 2a. Crear AdSet para WhatsApp (SIN Dynamic Creative)
+        const adWhatsappNumber = ad.whatsappNumber || whatsappNumber;
+        console.log(`  AdSet${adLabel} WhatsApp: ${adWhatsappNumber}${ad.whatsappNumber ? ' (per-ad)' : ' (global)'}`);
 
-      if (!adSetResult.success) {
-        results.errors.push(`AdSet: ${adSetResult.error}`);
-        return { success: false, ...results };
+        const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+          name: `${campaignName} - Ad Set${adLabel}`,
+          campaignId: results.campaign.id,
+          targeting,
+          optimizationGoal,
+          promotedObject: { page_id: pageId },
+          whatsappPhoneNumber: adWhatsappNumber,
+          dailyBudget: !isCBO ? dailyBudget : null,
+          isDynamicCreative: false // WhatsApp NO soporta Dynamic Creative con CONVERSATIONS
+        });
+
+        if (!adSetResult.success) {
+          results.errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
+          continue;
+        }
+        results.adSets.push(adSetResult.data);
+
+        // 2b. Crear Creative regular (object_story_spec) para WhatsApp
+        const adVideoId = ad.videoId || null;
+        const adImageUrl = ad.imageUrl || null;
+        const adImageHash = ad.imageHash || null;
+        const adThumbnailUrl = ad.videoThumbnailUrl || null;
+        const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
+        const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
+
+        // Tomar el primer título y descripción del contenido generado
+        const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
+        const headline = adHeadlines[0] || 'Contáctanos';
+        const description = adHeadlines[1] || headline; // Segundo título como descripción del link
+
+        console.log(`  Creative${adLabel}: ${adVideoId ? 'VIDEO ' + adVideoId : 'IMAGE'} | CTA: WHATSAPP_MESSAGE | IG: ${igActorId || 'none'}`);
+        console.log(`  Headline: ${headline}`);
+        console.log(`  Primary text: ${primaryText.substring(0, 80)}...`);
+
+        let creativeResult;
+
+        if (adVideoId) {
+          // Video creative con object_story_spec
+          const videoData = {
+            video_id: adVideoId,
+            message: primaryText,
+            title: headline,
+            link_description: description,
+            call_to_action: {
+              type: 'WHATSAPP_MESSAGE',
+              value: {} // Sin link ni wa_id: el número viene del promoted_object del ad set
+            }
+          };
+
+          // Thumbnail del video
+          if (adThumbnailUrl && adThumbnailUrl.startsWith('http')) {
+            videoData.image_url = adThumbnailUrl;
+          }
+
+          const objectStorySpec = { page_id: pageId, video_data: videoData };
+          if (igActorId) objectStorySpec.instagram_actor_id = igActorId;
+
+          console.log(`  objectStorySpec:`, JSON.stringify(objectStorySpec, null, 2));
+
+          const normalizedId = this.normalizeAccountId(adAccountId);
+          const formData = new URLSearchParams();
+          formData.append('access_token', this.accessToken);
+          formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
+          formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+          try {
+            const response = await axios.post(
+              `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+              formData,
+              { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+            );
+            creativeResult = { success: true, data: response.data };
+          } catch (error) {
+            const errData = error.response?.data?.error;
+            console.error(`Creative${adLabel} FAILED:`, JSON.stringify(error.response?.data, null, 2));
+            creativeResult = { success: false, error: errData?.error_user_msg || errData?.message || error.message };
+          }
+        } else {
+          // Image creative con object_story_spec
+          const linkData = {
+            image_hash: adImageHash,
+            message: primaryText,
+            name: headline,
+            description: description,
+            call_to_action: {
+              type: 'WHATSAPP_MESSAGE',
+              value: {} // Sin link: el número viene del promoted_object del ad set
+            }
+          };
+
+          // Fallback a image_url si no hay hash
+          if (!adImageHash && adImageUrl) {
+            delete linkData.image_hash;
+            linkData.picture = adImageUrl;
+          }
+
+          const objectStorySpec = { page_id: pageId, link_data: linkData };
+          if (igActorId) objectStorySpec.instagram_actor_id = igActorId;
+
+          console.log(`  objectStorySpec:`, JSON.stringify(objectStorySpec, null, 2));
+
+          const normalizedId = this.normalizeAccountId(adAccountId);
+          const formData = new URLSearchParams();
+          formData.append('access_token', this.accessToken);
+          formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
+          formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+          try {
+            const response = await axios.post(
+              `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+              formData,
+              { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+            );
+            creativeResult = { success: true, data: response.data };
+          } catch (error) {
+            const errData = error.response?.data?.error;
+            console.error(`Creative${adLabel} FAILED:`, JSON.stringify(error.response?.data, null, 2));
+            creativeResult = { success: false, error: errData?.error_user_msg || errData?.message || error.message };
+          }
+        }
+
+        // Si falla por instagram_actor_id inválido, reintentar sin él
+        if (!creativeResult.success && creativeResult.error?.includes('instagram_actor_id')) {
+          console.warn(`Creative${adLabel}: igActorId "${igActorId}" inválido, reintentando sin Instagram...`);
+          // Reintentar: reconstruir sin igActorId
+          const retrySpec = creativeResult._lastSpec ? { ...creativeResult._lastSpec } : null;
+          if (!retrySpec) {
+            // Rebuild manually
+            const normalizedId = this.normalizeAccountId(adAccountId);
+            let objectStorySpec;
+            if (adVideoId) {
+              objectStorySpec = {
+                page_id: pageId,
+                video_data: {
+                  video_id: adVideoId,
+                  message: primaryText,
+                  title: headline,
+                  link_description: description,
+                  call_to_action: { type: 'WHATSAPP_MESSAGE', value: {} },
+                  ...(adThumbnailUrl && adThumbnailUrl.startsWith('http') ? { image_url: adThumbnailUrl } : {})
+                }
+              };
+            } else {
+              objectStorySpec = {
+                page_id: pageId,
+                link_data: {
+                  ...(adImageHash ? { image_hash: adImageHash } : { picture: adImageUrl }),
+                  message: primaryText,
+                  name: headline,
+                  description: description,
+                  call_to_action: { type: 'WHATSAPP_MESSAGE', value: {} }
+                }
+              };
+            }
+
+            const formData = new URLSearchParams();
+            formData.append('access_token', this.accessToken);
+            formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
+            formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+            try {
+              const response = await axios.post(
+                `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
+                formData,
+                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+              );
+              creativeResult = { success: true, data: response.data };
+            } catch (error) {
+              const errData = error.response?.data?.error;
+              console.error(`Creative${adLabel} retry FAILED:`, JSON.stringify(error.response?.data, null, 2));
+              creativeResult = { success: false, error: errData?.error_user_msg || errData?.message || error.message };
+            }
+          }
+        }
+
+        if (!creativeResult.success) {
+          results.errors.push(`Creative${adLabel}: ${creativeResult.error}`);
+          continue;
+        }
+        results.creatives.push(creativeResult.data);
+
+        // 2c. Crear Ad
+        const adResult = await this.createAd(adAccountId, {
+          name: ad.adName || `${campaignName} - Ad${adLabel}`,
+          adsetId: adSetResult.data.id,
+          creativeId: creativeResult.data.id,
+          status: 'PAUSED'
+        });
+
+        if (!adResult.success) {
+          results.errors.push(`Ad${adLabel}: ${adResult.error}`);
+          continue;
+        }
+        results.ads.push(adResult.data);
       }
-      results.adSet = adSetResult.data;
 
-      // 3. Crear Creative para WhatsApp (usando URL directa, sin subir imagen)
-      console.log('Step 3/4: Creating creative (using image URL directly)...');
-      const creativeResult = await this.createCreativeForWhatsApp(adAccountId, {
-        name: `${campaignName} - Creative`,
-        pageId,
-        imageHash,
-        imageUrl,
-        whatsappNumber,
-        primaryText: primaryTexts[0] || descriptions[0] || 'Escríbenos por WhatsApp',
-        headline: headlines[0] || 'Contáctanos',
-        description: descriptions[0] || '',
-        callToAction
-      });
+      const totalCreated = results.ads.length;
+      console.log(`WhatsApp campaign done: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads`);
 
-      if (!creativeResult.success) {
-        results.errors.push(`Creative: ${creativeResult.error}`);
-        return { success: false, ...results };
-      }
-      results.creative = creativeResult.data;
-
-      // 4. Crear Ad
-      console.log('Step 4/4: Creating ad...');
-      const adResult = await this.createAd(adAccountId, {
-        name: adName || `${campaignName} - Ad`,
-        adsetId: results.adSet.id,
-        creativeId: results.creative.id,
-        status: 'PAUSED'
-      });
-
-      if (!adResult.success) {
-        results.errors.push(`Ad: ${adResult.error}`);
-        return { success: false, ...results };
-      }
-      results.ad = adResult.data;
-
-      return { success: true, ...results };
+      return { success: totalCreated > 0, ...results };
 
     } catch (error) {
       results.errors.push(`Unexpected: ${error.message}`);
@@ -2714,6 +2995,7 @@ class MetaAdsService {
     pageId,
     igActorId = null,
     linkUrl = null,
+    conversionLocation = null, // 'WEBSITE', 'INSTAGRAM_PROFILE', etc.
     adSetMode = 'single', // 'single' | 'per-ad'
     ads = []
   }) {
@@ -2738,9 +3020,57 @@ class MetaAdsService {
       errors: []
     };
 
+    // Mapear conversionLocation a destination_type de Meta API
+    const destinationType = conversionLocation === 'INSTAGRAM_PROFILE' ? 'INSTAGRAM_PROFILE'
+      : conversionLocation === 'WEBSITE' ? 'WEBSITE'
+      : null; // null = Meta decide automáticamente
+
+    // promoted_object para Instagram Profile
+    // Requiere page_id + instagram_profile_id (el perfil de IG a donde va el tráfico)
+    let promotedObject = null;
+    if (destinationType === 'INSTAGRAM_PROFILE') {
+      promotedObject = { page_id: pageId };
+      // instagram_profile_id = perfil de IG destino del tráfico (diferente de instagram_actor_id del creative)
+      if (igActorId) {
+        promotedObject.instagram_profile_id = igActorId;
+        console.log(`promoted_object includes instagram_profile_id: ${igActorId}`);
+      }
+    }
+
     try {
+      // 0. Resolver igActorId — verificar si hay una cuenta IG conectada al ad account
+      const normalizedAdAccount = this.normalizeAccountId(adAccountId);
+      let resolvedIgActorId = null;
+
+      try {
+        const checkResp = await axios.get(`${META_API_BASE_URL}/${normalizedAdAccount}/instagram_accounts`, {
+          params: { access_token: this.accessToken, fields: 'id,username' }
+        });
+        const connected = checkResp.data?.data || [];
+        console.log(`Ad account IG accounts connected: ${connected.length}`, connected.map(a => `${a.username}(${a.id})`));
+        if (connected.length > 0) {
+          const match = igActorId ? connected.find(a => a.id === igActorId) : null;
+          resolvedIgActorId = match ? match.id : connected[0].id;
+          console.log(`Using connected IG account as igActorId for creative: ${resolvedIgActorId}`);
+        }
+      } catch (checkErr) {
+        console.warn('Error checking ad account IG accounts:', checkErr.response?.data?.error?.message || checkErr.message);
+      }
+
+      // Determinar si la cuenta IG está conectada al ad account
+      let igConnected = false;
+      if (resolvedIgActorId) {
+        igActorId = resolvedIgActorId;
+        igConnected = true;
+        console.log(`IG account ${igActorId} is connected to ad account — will use in object_story_spec`);
+      } else if (igActorId) {
+        console.log(`IG account ${igActorId} NOT connected to ad account — will use as top-level creative field + use_page_actor_override`);
+      } else {
+        console.warn('No IG account available at all');
+      }
+
       // 1. Crear Campaña con CBO
-      console.log(`Creating campaign with CBO for ${ads.length} ads...`);
+      console.log(`Creating campaign with CBO for ${ads.length} ads... (destination: ${destinationType || 'auto'})`);
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
@@ -2780,7 +3110,7 @@ class MetaAdsService {
         const validCTAs = sanitizeCTAs(ad.ctas);
         const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, adIndex);
 
-        const creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
+        const creativeParams = {
           name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
           pageId,
           imageUrl: !ad.videoId ? ad.imageUrl : null,
@@ -2794,8 +3124,20 @@ class MetaAdsService {
           descriptions: validBodies,
           callToActionTypes: validCTAs,
           linkUrl,
-          igActorId
-        });
+          igActorId,
+          igConnected
+        };
+
+        let creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, creativeParams);
+
+        // Si falla por instagram_actor_id inválido, reintentar sin él
+        if (!creativeResult.success && creativeResult.error?.includes('instagram_actor_id')) {
+          console.warn(`Creative ${adIndex + 1}: igActorId inválido, reintentando sin instagram_actor_id...`);
+          creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
+            ...creativeParams,
+            igActorId: null
+          });
+        }
 
         if (!creativeResult.success) {
           results.errors.push(`Creative ${adIndex + 1}: ${creativeResult.error}`);
@@ -2825,7 +3167,7 @@ class MetaAdsService {
         const cta = sanitizeCTAs(ad.ctas)[0] || 'LEARN_MORE';
         const { resolvedThumbUrl } = await resolveThumbnail(ad, adIndex);
 
-        const creativeResult = await this.createStandardAdCreative(adAccountId, {
+        const stdCreativeParams = {
           name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
           pageId,
           imageUrl: !ad.videoId ? ad.imageUrl : null,
@@ -2837,8 +3179,20 @@ class MetaAdsService {
           description: ad.descriptions?.[1]?.trim() || '',
           linkUrl,
           callToAction: cta,
-          igActorId
-        });
+          igActorId,
+          igConnected
+        };
+
+        let creativeResult = await this.createStandardAdCreative(adAccountId, stdCreativeParams);
+
+        // Si falla por instagram_actor_id inválido, reintentar sin él
+        if (!creativeResult.success && creativeResult.error?.includes('instagram_actor_id')) {
+          console.warn(`Creative ${adIndex + 1}: igActorId inválido, reintentando sin instagram_actor_id...`);
+          creativeResult = await this.createStandardAdCreative(adAccountId, {
+            ...stdCreativeParams,
+            igActorId: null
+          });
+        }
 
         if (!creativeResult.success) {
           results.errors.push(`Creative ${adIndex + 1}: ${creativeResult.error}`);
@@ -2876,7 +3230,9 @@ class MetaAdsService {
           targeting,
           status: 'PAUSED',
           endTime: endDate,
-          isDynamicCreative: false // Standard ads allow multiple per AdSet
+          isDynamicCreative: false, // Standard ads allow multiple per AdSet
+          destinationType,
+          promotedObject
         });
 
         if (!adSetResult.success) {
@@ -2909,7 +3265,9 @@ class MetaAdsService {
             targeting,
             status: 'PAUSED',
             endTime: endDate,
-            isDynamicCreative: true
+            isDynamicCreative: true,
+            destinationType,
+            promotedObject
           });
 
           if (!adSetResult.success) {
@@ -2942,7 +3300,9 @@ class MetaAdsService {
             targeting: adTargeting,
             status: 'PAUSED',
             endTime: endDate,
-            isDynamicCreative: true
+            isDynamicCreative: true,
+            destinationType,
+            promotedObject
           });
 
           if (!adSetResult.success) {

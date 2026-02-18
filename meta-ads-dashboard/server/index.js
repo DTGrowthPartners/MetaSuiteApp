@@ -7,6 +7,25 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
+
+// Load .env file from server directory (for local dev)
+const __dirname_server = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.join(__dirname_server, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...valueParts] = trimmed.split('=');
+      const value = valueParts.join('=');
+      if (key && value && !process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  }
+  console.log('Loaded .env from', envPath);
+}
 import ffmpeg from 'fluent-ffmpeg';
 import sharp from 'sharp';
 
@@ -30,8 +49,8 @@ const PORT = process.env.PORT || 3002;
 // Token de acceso con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
 const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI';
 
-// OpenAI Configuration
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+// OpenAI Configuration - Configurar variable de entorno OPENAI_API_KEY
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 let openai = null;
 
 if (OPENAI_API_KEY) {
@@ -1203,6 +1222,19 @@ async function extractFrameFromBuffer(videoBuffer, filename) {
 // Helper: Generate 5+5+5 content from transcription text
 // Helper: generar contexto específico según tipo de campaña
 function getCampaignContext(objective, destType) {
+  if (destType === 'INSTAGRAM_PROFILE') {
+    return {
+      focus: `CAMPAÑA DE TRÁFICO AL PERFIL DE INSTAGRAM - El objetivo es que el usuario VISITE el perfil y SE HAGA SEGUIDOR.
+- Los títulos deben despertar curiosidad sobre el contenido del perfil: "Mira lo que compartimos", "Contenido que no te puedes perder"
+- Las descripciones deben mostrar el valor de seguir la cuenta: contenido exclusivo, tips, novedades, comunidad
+- Usa frases como "Síguenos", "Visita nuestro perfil", "Únete a nuestra comunidad", "No te pierdas nuestro contenido"
+- Resalta qué encontrarán en el perfil: tips diarios, ofertas exclusivas, detrás de cámaras, testimonios
+- Crea FOMO (miedo a perderse algo): "Miles ya nos siguen", "Contenido nuevo cada día"
+- NO uses CTAs de compra ni WhatsApp. El objetivo es que visiten el perfil de Instagram`,
+      ctas: 'LEARN_MORE, CONTACT_US, SHOP_NOW, GET_QUOTE',
+      preferredCtas: ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']
+    };
+  }
   if (destType === 'WEBSITE' || objective === 'OUTCOME_TRAFFIC') {
     return {
       focus: `CAMPAÑA DE TRÁFICO WEB - El objetivo es que el usuario HAGA CLIC y visite la página web.
@@ -1270,10 +1302,10 @@ async function generateContentFromText(transcription, adIndex, category, objecti
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Puedes usar 1-2 emojis por título para hacerlos más llamativos. Deben generar curiosidad o urgencia.
-- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con emojis estratégicos, beneficios claros y un llamado a la acción. Usa saltos implícitos con emojis para separar ideas. Ejemplo: "🔥 Transforma tu negocio con... ✅ Beneficio 1 ✅ Beneficio 2 👉 Haz clic ahora"
+- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con beneficios claros y un llamado a la acción. Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
 - Todo en español
-- Usa emojis de forma estratégica (🔥 ✅ 💪 🎯 ⚡ 👉 💰 🏆 ❤️ 🚀) para resaltar puntos clave
+- MÁXIMO 1 emoji por elemento (título o frase dentro de descripción). Menos es más. Si no aporta, no pongas emoji.
 - NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio
 - Responde SOLO en JSON válido, sin markdown`;
 
@@ -1287,14 +1319,14 @@ ${templateName ? `Tipo de campaña: ${templateName}` : ''}
 Instrucción de ángulo: ${angle}
 
 Genera exactamente:
-- 5 TÍTULOS llamativos (máx 55 chars) con emojis - que enganchen y generen curiosidad
-- 5 DESCRIPCIONES largas y persuasivas (150-300 chars cada una) - con emojis, beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Estas son el texto principal del anuncio, deben convencer al usuario de hacer clic
+- 5 TÍTULOS llamativos (máx 55 chars) con máximo 1 emoji cada uno - que enganchen y generen curiosidad
+- 5 DESCRIPCIONES largas y persuasivas (150-300 chars cada una) - con beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Máximo 1 emoji por oración, no abuses
 - 5 CTAs variados de esta lista: ${ctx.ctas}
 
 JSON exacto:
 {
-  "headlines": ["título con emoji", "título con emoji", "título con emoji", "título con emoji", "título con emoji"],
-  "descriptions": ["descripción larga y detallada con emojis y beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
+  "headlines": ["título", "título", "título", "título", "título"],
+  "descriptions": ["descripción larga y detallada con beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }`;
 
@@ -1348,10 +1380,10 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Puedes usar 1-2 emojis por título para hacerlos más llamativos. Deben generar curiosidad o urgencia.
-- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con emojis estratégicos, beneficios claros y un llamado a la acción. Usa emojis para separar ideas. Ejemplo: "🔥 Transforma tu negocio con... ✅ Beneficio 1 ✅ Beneficio 2 👉 Haz clic ahora"
+- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con beneficios claros y un llamado a la acción. Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
 - Todo en español
-- Usa emojis de forma estratégica (🔥 ✅ 💪 🎯 ⚡ 👉 💰 🏆 ❤️ 🚀) para resaltar puntos clave
+- MÁXIMO 1 emoji por elemento (título o frase dentro de descripción). Menos es más. Si no aporta, no pongas emoji.
 - NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio de la imagen
 - Responde SOLO en JSON válido, sin markdown`
       },
@@ -1368,11 +1400,12 @@ Instrucción de ángulo: ${angle}
 
 Genera exactamente en JSON:
 {
-  "headlines": ["título con emoji", "título con emoji", "título con emoji", "título con emoji", "título con emoji"],
-  "descriptions": ["descripción larga y detallada con emojis y beneficios (150-300 chars)...", "otra descripción persuasiva...", "...", "...", "..."],
+  "headlines": ["título", "título", "título", "título", "título"],
+  "descriptions": ["descripción larga y detallada con beneficios (150-300 chars)...", "otra descripción persuasiva...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
+Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
 CTAs variados de esta lista: ${ctx.ctas}`
           },
           {
@@ -1561,6 +1594,110 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Error analizando la imagen'
+    });
+  }
+});
+
+// POST /api/analyze-media-url - Download media from URL (server-side, no CORS) and analyze with AI
+// Used for Meta library media where browser fetch fails due to CORS
+app.post('/api/analyze-media-url', async (req, res) => {
+  try {
+    if (!openai) {
+      return res.status(503).json({ success: false, error: 'OpenAI no está configurado.' });
+    }
+
+    const { url, type, adIndex: adIndexStr, category, objective, templateName, destType } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'URL requerida' });
+    }
+
+    const adIndex = parseInt(adIndexStr) || 0;
+    const mediaType = type || 'image'; // 'image' or 'video'
+    console.log(`Analyzing ${mediaType} from URL for ad ${adIndex}: ${url.substring(0, 100)}...`);
+
+    // Download media from URL (server-side, avoids CORS)
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      timeout: 120000, // 2 min
+      maxContentLength: 200 * 1024 * 1024 // 200MB
+    });
+    const buffer = Buffer.from(response.data);
+    console.log(`Downloaded ${mediaType}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`);
+
+    if (mediaType === 'video') {
+      // Video: transcribe audio with Whisper, then generate content
+      let transcription = '';
+
+      try {
+        // Extract audio with ffmpeg (the buffer is a video file)
+        const audioBuffer = await extractAudioFromBuffer(buffer, 'video.mp4');
+        console.log(`Audio extracted: ${(audioBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+
+        const audioFile = new File([audioBuffer], 'audio.mp3', { type: 'audio/mpeg' });
+        const whisperResponse = await openai.audio.transcriptions.create({
+          model: 'whisper-1',
+          file: audioFile,
+          language: 'es'
+        });
+        transcription = whisperResponse.text || '';
+        console.log(`Transcription (${transcription.length} chars): ${transcription.substring(0, 200)}...`);
+      } catch (whisperError) {
+        console.warn('Whisper transcription failed for library video:', whisperError.message);
+      }
+
+      // If no meaningful speech, fall back to frame analysis
+      if (transcription.length < 20) {
+        console.log('No speech detected, falling back to frame analysis...');
+        try {
+          const frameBuffer = await extractFrameFromBuffer(buffer, 'video.mp4');
+          const base64Frame = frameBuffer.toString('base64');
+          const content = await generateContentFromImage(base64Frame, adIndex, category || '', objective || '', templateName || '', destType || '');
+          return res.json({
+            success: true,
+            data: {
+              headlines: content.headlines?.slice(0, 5) || [],
+              descriptions: content.descriptions?.slice(0, 5) || [],
+              ctas: content.ctas?.slice(0, 5) || [],
+              method: 'vision-url'
+            }
+          });
+        } catch (visionErr) {
+          return res.status(500).json({ success: false, error: 'No se pudo analizar el video (sin audio ni frame)' });
+        }
+      }
+
+      const content = await generateContentFromText(transcription, adIndex, category || '', objective || '', templateName || '', destType || '');
+      return res.json({
+        success: true,
+        data: {
+          headlines: content.headlines?.slice(0, 5) || [],
+          descriptions: content.descriptions?.slice(0, 5) || [],
+          ctas: content.ctas?.slice(0, 5) || [],
+          transcription,
+          method: 'whisper-url'
+        }
+      });
+
+    } else {
+      // Image: analyze with vision
+      const base64Image = buffer.toString('base64');
+      const content = await generateContentFromImage(base64Image, adIndex, category || '', objective || '', templateName || '', destType || '');
+      return res.json({
+        success: true,
+        data: {
+          headlines: content.headlines?.slice(0, 5) || [],
+          descriptions: content.descriptions?.slice(0, 5) || [],
+          ctas: content.ctas?.slice(0, 5) || [],
+          method: 'vision-url'
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('analyze-media-url error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error analizando media desde URL'
     });
   }
 });

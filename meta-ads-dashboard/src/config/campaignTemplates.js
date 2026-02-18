@@ -1,6 +1,6 @@
 // ============================================
 // SISTEMA DE PLANTILLAS DE CAMPAÑAS META ADS
-// 6 plantillas principales para tu negocio
+// 7 plantillas principales para tu negocio
 // ============================================
 
 // Objetivos de campaña disponibles en Meta Ads
@@ -113,7 +113,7 @@ export const getCTALabel = (ctaValue) => {
 };
 
 // ============================================
-// PLANTILLAS DE CAMPAÑAS (6 total)
+// PLANTILLAS DE CAMPAÑAS (7 total)
 // ============================================
 
 export const CAMPAIGN_TEMPLATES = [
@@ -492,7 +492,81 @@ export const CAMPAIGN_TEMPLATES = [
   },
 
   // ==========================================
-  // 6. MENSAJES INSTAGRAM (INTERACCIÓN)
+  // 6. TRÁFICO AL PERFIL DE INSTAGRAM
+  // ==========================================
+  {
+    id: 'traffic_instagram_profile',
+    name: 'Tráfico a Perfil Instagram',
+    icon: '📲',
+    category: 'Tráfico',
+    description: 'Lleva personas a tu perfil de Instagram para ganar seguidores y visibilidad. Meta optimiza para visitas al perfil.',
+    objective: 'OUTCOME_TRAFFIC',
+    specialAdCategories: [],
+    buyingType: 'AUCTION',
+    adSetConfig: {
+      conversionLocation: 'INSTAGRAM_PROFILE',
+      optimizationGoal: 'LINK_CLICKS',
+      billingEvent: 'IMPRESSIONS',
+      bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
+      requiresPixel: false,
+      requiresInstagram: true,
+      allowBudgetLevel: true,
+      budgetType: 'daily',
+      suggestedBudget: 30000,
+      minBudget: 10000,
+      maxBudget: 300000,
+      scheduleConfig: { allowScheduling: true, allowEndDate: true },
+      audienceConfig: {
+        allowAdvantage: true,
+        allowCustomAudiences: true,
+        allowLookalikes: true,
+        defaultTargeting: { geo_locations: { countries: ['CO'] }, age_min: 18, age_max: 45, genders: [0] }
+      },
+      placementsConfig: {
+        allowAdvantage: true,
+        defaultPlacements: {
+          facebook: ['feed', 'story', 'reels'],
+          instagram: ['stream', 'story', 'reels', 'explore'],
+          messenger: []
+        }
+      }
+    },
+    adConfig: {
+      allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
+      defaultFormat: 'SINGLE_VIDEO',
+      destinationConfig: { type: 'INSTAGRAM_PROFILE', requiresUrl: false, requiresInstagram: true },
+      allowedCtas: ['LEARN_MORE', 'CONTACT_US', 'SHOP_NOW', 'GET_QUOTE'],
+      defaultCta: 'LEARN_MORE',
+      trackingConfig: { requiresPixel: false }
+    },
+    creativeContent: {
+      headlines: [
+        'Síguenos en Instagram',
+        'Conoce nuestro contenido',
+        'Descubre más en nuestro perfil',
+        'Únete a nuestra comunidad',
+        'Visita nuestro Instagram'
+      ],
+      descriptions: [
+        'Contenido exclusivo, tips y novedades todos los días en nuestro perfil de Instagram.',
+        'Miles de personas ya nos siguen. Descubre por qué somos su cuenta favorita.',
+        'Historias, reels y publicaciones que no te puedes perder. Síguenos ahora.',
+        'Conecta con nosotros y sé parte de nuestra comunidad. Te esperamos en Instagram.',
+        'Todo lo que buscas está en nuestro perfil. Visítanos y síguenos para más.'
+      ],
+      primaryTexts: [
+        'Dale un vistazo a nuestro perfil de Instagram y descubre contenido que te va a encantar. Publicamos todos los días para ti.',
+        'No te pierdas lo que estamos compartiendo en Instagram. Tips, novedades y mucho más. Visita nuestro perfil ahora.',
+        'Nuestra comunidad en Instagram está creciendo. Únete y sé parte de los que reciben contenido exclusivo todos los días.',
+        'Si te gustó este anuncio, espera a ver nuestro perfil completo. Contenido fresco todos los días. Síguenos.',
+        'Todo lo mejor lo compartimos primero en Instagram. Visita nuestro perfil y no te pierdas ninguna novedad.'
+      ],
+      ctas: ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'CONTACT_US', 'LEARN_MORE']
+    }
+  },
+
+  // ==========================================
+  // 7. MENSAJES INSTAGRAM (INTERACCIÓN)
   // ==========================================
   {
     id: 'engagement_messages_ig',

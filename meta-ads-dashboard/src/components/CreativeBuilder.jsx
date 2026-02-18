@@ -249,6 +249,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     audienceId: '',
     audienceName: '',
     audienceTargeting: null,
+    // Per-ad WhatsApp number (only used when whatsappMode === 'per-ad')
+    whatsappNumber: '',
+    whatsappNumberId: '',
+    whatsappDisplayNumber: '',
   });
   const [ads, setAds] = useState([createEmptyAd(0)]);
 
@@ -268,6 +272,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   // Campos dinámicos según tipo de campaña
   const [whatsappNumber, setWhatsappNumber] = useState(''); // Para campañas de WhatsApp (número manual)
   const [phoneNumber, setPhoneNumber] = useState(''); // Para campañas de llamadas
+  const [whatsappMode, setWhatsappMode] = useState('same'); // 'same' = mismo número para todos, 'per-ad' = número por ad set
 
   // Números de WhatsApp Business
   const [whatsAppNumbers, setWhatsAppNumbers] = useState([]);
@@ -439,8 +444,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   };
 
   // Seleccionar imagen de la biblioteca (per-ad)
-  // Note: Library items don't have the file blob, so we can't auto-analyze them.
-  // Content can be generated with the AI prompt instead.
   const handleAdSelectLibraryImage = (adIndex, image) => {
     updateAd(adIndex, {
       imageUrl: image.url || '',
@@ -449,9 +452,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       videoThumbnailUrl: '',
       uploadProgress: `Imagen seleccionada: ${image.name || 'Sin nombre'}`
     });
-    // Try to fetch the image URL and analyze it
+    // Analyze image via backend (server-side download avoids CORS)
     if (image.url) {
-      fetchAndAnalyzeImageUrl(adIndex, image.url);
+      analyzeLibraryMedia(adIndex, image.url, 'image');
     }
   };
 
@@ -465,26 +468,53 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       imageHash: '',
       uploadProgress: `Video seleccionado: ${video.title || 'Sin título'}`
     });
-    // For library videos, try to analyze the thumbnail image as fallback
-    if (thumbUrl) {
-      fetchAndAnalyzeImageUrl(adIndex, thumbUrl, 'video');
+    // Analyze the actual video (source URL) via backend for Whisper transcription
+    // Falls back to thumbnail analysis if no source URL
+    const videoSourceUrl = video.source || '';
+    if (videoSourceUrl) {
+      analyzeLibraryMedia(adIndex, videoSourceUrl, 'video');
+    } else if (thumbUrl) {
+      analyzeLibraryMedia(adIndex, thumbUrl, 'image');
     }
   };
 
-  // Helper: Fetch image from URL and analyze it
-  const fetchAndAnalyzeImageUrl = async (adIndex, imageUrl, mediaType = 'imagen') => {
-    const label = mediaType === 'video' ? 'Analizando video con IA...' : 'Analizando imagen con IA...';
+  // Helper: Analyze library media via backend (server-side download, no CORS issues)
+  const analyzeLibraryMedia = async (adIndex, mediaUrl, mediaType = 'image') => {
+    const label = mediaType === 'video' ? 'Descargando y analizando video con IA...' : 'Analizando imagen con IA...';
     updateAd(adIndex, { analyzingMedia: true, uploadProgress: label });
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'library-image.jpg', { type: blob.type || 'image/jpeg' });
-      await autoAnalyzeMedia(adIndex, file, false);
+      const metaService = new MetaAdsService(accessToken);
+      const category = selectedTemplate?.category || '';
+      const objective = selectedTemplate?.objective || '';
+      const templateName = selectedTemplate?.name || '';
+      const destType = templateAdConfig.destinationConfig?.type || '';
+
+      const result = await metaService.analyzeMediaUrl(
+        mediaUrl, mediaType, adIndex, category, objective, templateName, destType
+      );
+
+      if (result.success && result.data) {
+        updateAd(adIndex, {
+          headlines: result.data.headlines || ['', '', '', '', ''],
+          descriptions: result.data.descriptions || ['', '', '', '', ''],
+          ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+          analyzingMedia: false,
+          contentGenerated: true,
+          uploadProgress: `Contenido generado (${result.data.method || mediaType})`,
+          showEditContent: true
+        });
+        console.log(`Ad ${adIndex}: Library ${mediaType} content generated via ${result.data.method}`);
+      } else {
+        updateAd(adIndex, {
+          analyzingMedia: false,
+          uploadProgress: `Media seleccionada. IA: ${result.error || 'Error generando contenido'}`
+        });
+      }
     } catch (err) {
-      console.warn('Could not fetch library image for analysis:', err.message);
+      console.error('Library media analysis error:', err);
       updateAd(adIndex, {
         analyzingMedia: false,
-        uploadProgress: 'Media seleccionada. Usa el generador de IA para el contenido.'
+        uploadProgress: `Media seleccionada. Error IA: ${err.message}`
       });
     }
   };
@@ -588,8 +618,34 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     return () => { cancelled = true; };
   }, [selectedAccount]);
 
-  // Auto-fill linkUrl con el website de la página seleccionada
+  // Auto-fill linkUrl con el website de la página o perfil de Instagram
   useEffect(() => {
+    const conversionLocation = templateAdSetConfig?.conversionLocation;
+
+    // Para campañas de tráfico a Instagram: usar URL del perfil de Instagram
+    if (conversionLocation === 'INSTAGRAM_PROFILE') {
+      // Priorizar username de instagram_business_account (username real de IG, sin espacios)
+      const page = selectedPage ? pages.find(p => p.id === selectedPage) : null;
+      const igBizUsername = page?.instagram_business_account?.username;
+      if (igBizUsername && !igBizUsername.includes(' ')) {
+        const igUrl = `https://www.instagram.com/${igBizUsername}/`;
+        setLinkUrl(igUrl);
+        console.log('Auto-filled linkUrl from instagram_business_account:', igUrl);
+        return;
+      }
+      // Fallback: username de la cuenta IG seleccionada (puede venir de page_backed con nombre de página)
+      if (selectedIgAccount && igAccounts.length) {
+        const ig = igAccounts.find(a => a.id === selectedIgAccount);
+        if (ig?.username && !ig.username.includes(' ')) {
+          const igUrl = `https://www.instagram.com/${ig.username}/`;
+          setLinkUrl(igUrl);
+          console.log('Auto-filled linkUrl from selected IG account:', igUrl);
+          return;
+        }
+      }
+    }
+
+    // Para las demás campañas: usar website de la página
     if (!selectedPage || !pages.length) return;
     const page = pages.find(p => p.id === selectedPage);
     if (page?.website && !linkUrl) {
@@ -597,7 +653,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       setLinkUrl(url);
       console.log('Auto-filled linkUrl from page website:', url);
     }
-  }, [selectedPage, pages]);
+  }, [selectedPage, pages, selectedIgAccount, igAccounts, templateAdSetConfig]);
 
   // Cargar cuentas de Instagram: usar page token para evitar restricciones de Business Manager
   useEffect(() => {
@@ -613,63 +669,102 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const allIg = [];
       const seenIds = new Set();
 
-      // 1. Extraer IG directamente de los datos de la página (ya viene con getPages, sin llamada extra)
-      if (selectedPage && pages.length > 0) {
+      // 1. PRIORIDAD: /{ad-account}/instagram_accounts — IDs garantizados válidos para instagram_actor_id en creativos
+      try {
+        const metaService = new MetaAdsService(accessToken);
+        const result = await metaService.getInstagramAccounts(selectedAccount);
+        if (cancelled) return;
+        console.log('Ad account instagram_accounts result:', result);
+        if (result.success && result.data.length > 0) {
+          result.data.forEach(ig => {
+            if (ig.id && !seenIds.has(ig.id)) {
+              seenIds.add(ig.id);
+              allIg.push(ig);
+              console.log(`Instagram from ad account endpoint: @${ig.username} (ID: ${ig.id})`);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error loading Instagram accounts from ad account:', err);
+      }
+
+      // 2. Fallback: /{page-id}/page_backed_instagram_accounts — cuenta IG creada por Meta para la página (siempre válida para ads)
+      if (allIg.length === 0 && selectedPage && pages.length > 0) {
         const page = pages.find(p => p.id === selectedPage);
-        if (page?.instagram_business_account) {
-          const igBiz = page.instagram_business_account;
-          console.log('Instagram from page data:', igBiz);
-          if (!seenIds.has(igBiz.id)) {
-            seenIds.add(igBiz.id);
-            allIg.push({ id: igBiz.id, username: igBiz.username, profile_pic: null });
+        if (page?.access_token) {
+          try {
+            const response = await axios.get(`https://graph.facebook.com/v21.0/${page.id}/page_backed_instagram_accounts`, {
+              params: {
+                access_token: page.access_token,
+                fields: 'id,username,profile_picture_url'
+              }
+            });
+            if (cancelled) return;
+            const pbia = response.data?.data || [];
+            pbia.forEach(ig => {
+              if (ig.id && !seenIds.has(ig.id)) {
+                seenIds.add(ig.id);
+                allIg.push({
+                  id: ig.id,
+                  username: ig.username || page.name,
+                  profile_pic: ig.profile_picture_url || null,
+                  page_id: page.id,
+                  page_name: page.name,
+                  isPageBacked: true
+                });
+                console.log(`Instagram from page_backed_instagram_accounts: @${ig.username || page.name} (ID: ${ig.id})`);
+              }
+            });
+          } catch (err) {
+            console.warn('page_backed_instagram_accounts error:', err.response?.data?.error?.message || err.message);
           }
         }
       }
 
-      // 2. Si no se encontró en los datos de la página, usar el PAGE TOKEN para consultar cada página
+      // 3. Fallback: /{page-id}/instagram_accounts con page token
       if (allIg.length === 0 && pages.length > 0) {
-        for (const page of pages) {
+        const targetPage = selectedPage ? pages.find(p => p.id === selectedPage) : null;
+        const pagesToCheck = targetPage ? [targetPage] : pages;
+        for (const page of pagesToCheck) {
           if (cancelled) return;
           if (!page.access_token) continue;
           try {
-            // Usar el token de la página, no el del usuario
-            const response = await axios.get(`https://graph.facebook.com/v21.0/${page.id}`, {
+            const response = await axios.get(`https://graph.facebook.com/v21.0/${page.id}/instagram_accounts`, {
               params: {
                 access_token: page.access_token,
-                fields: 'instagram_business_account{id,username,profile_picture_url}'
+                fields: 'id,username,profile_pic'
               }
             });
-            const igBiz = response.data?.instagram_business_account;
-            if (igBiz && !seenIds.has(igBiz.id)) {
-              seenIds.add(igBiz.id);
-              allIg.push({
-                id: igBiz.id,
-                username: igBiz.username,
-                profile_pic: igBiz.profile_picture_url || null,
-                page_id: page.id,
-                page_name: page.name
-              });
-              console.log(`Instagram from page ${page.name} (page token):`, igBiz.username);
-            }
+            const igList = response.data?.data || [];
+            igList.forEach(ig => {
+              if (ig.id && !seenIds.has(ig.id)) {
+                seenIds.add(ig.id);
+                allIg.push({
+                  id: ig.id,
+                  username: ig.username,
+                  profile_pic: ig.profile_pic || null,
+                  page_id: page.id,
+                  page_name: page.name
+                });
+                console.log(`Instagram from /${page.id}/instagram_accounts: @${ig.username} (ID: ${ig.id})`);
+              }
+            });
           } catch (err) {
             // Silenciar errores individuales
           }
         }
       }
 
-      // 3. Fallback: endpoint directo del ad account
-      if (allIg.length === 0) {
-        try {
-          const metaService = new MetaAdsService(accessToken);
-          const result = await metaService.getInstagramAccounts(selectedAccount);
-          if (cancelled) return;
-          if (result.success && result.data.length > 0) {
-            result.data.forEach(ig => {
-              if (!seenIds.has(ig.id)) { seenIds.add(ig.id); allIg.push(ig); }
-            });
+      // 4. Último fallback: instagram_business_account de la página (IG Graph API ID, puede no funcionar en ads)
+      if (allIg.length === 0 && selectedPage && pages.length > 0) {
+        const page = pages.find(p => p.id === selectedPage);
+        if (page?.instagram_business_account) {
+          const igBiz = page.instagram_business_account;
+          console.log('Instagram from page data (last fallback — may not work for ads):', igBiz.username, igBiz.id);
+          if (!seenIds.has(igBiz.id)) {
+            seenIds.add(igBiz.id);
+            allIg.push({ id: igBiz.id, username: igBiz.username, profile_pic: null });
           }
-        } catch (err) {
-          console.error('Error loading Instagram accounts:', err);
         }
       }
 
@@ -768,15 +863,24 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
     // Validar WhatsApp si es requerido
     if (templateRequirements.whatsapp) {
-      // Si hay números de WhatsApp Business disponibles, usar el selector
-      if (whatsAppNumbers.length > 0 && !selectedWhatsAppNumber) {
-        setError('Por favor selecciona un número de WhatsApp Business');
-        return;
-      }
-      // Si no hay números disponibles, permitir número manual (retrocompatibilidad)
-      if (whatsAppNumbers.length === 0 && !whatsappNumber.trim()) {
-        setError('Por favor ingresa el número de WhatsApp (ej: 573001234567)');
-        return;
+      if (whatsappMode === 'per-ad') {
+        // Validar que cada ad tenga un número seleccionado
+        const adsMissingNumber = ads.filter(ad => !ad.whatsappNumberId);
+        if (adsMissingNumber.length > 0) {
+          setError(`Selecciona un número de WhatsApp para cada anuncio (${adsMissingNumber.length} sin número)`);
+          return;
+        }
+      } else {
+        // Modo 'same': validar el selector global
+        if (whatsAppNumbers.length > 0 && !selectedWhatsAppNumber) {
+          setError('Por favor selecciona un número de WhatsApp Business');
+          return;
+        }
+        // Si no hay números disponibles, permitir número manual (retrocompatibilidad)
+        if (whatsAppNumbers.length === 0 && !whatsappNumber.trim()) {
+          setError('Por favor ingresa el número de WhatsApp (ej: 573001234567)');
+          return;
+        }
       }
     }
 
@@ -827,6 +931,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         audienceId: ad.audienceId || null,
         audienceName: ad.audienceName || null,
         audienceTargeting: ad.audienceTargeting || null,
+        // Per-ad WhatsApp number (for per-ad whatsapp mode)
+        whatsappNumber: ad.whatsappNumber || null,
+        whatsappNumberId: ad.whatsappNumberId || null,
       }));
 
       const jobData = {
@@ -843,7 +950,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         linkUrl: linkUrl.trim() || null,
         // Cuenta de Instagram para el anuncio
         igActorId: selectedIgAccount || null,
-        igUsername: igAccounts.find(ig => ig.id === selectedIgAccount)?.username || null,
+        igUsername: (() => { const ig = igAccounts.find(ig => ig.id === selectedIgAccount); console.log('IG account being sent:', { id: selectedIgAccount, username: ig?.username, allAccounts: igAccounts.map(a => ({ id: a.id, username: a.username })) }); return ig?.username || null; })(),
         // Multi-ad
         adSetMode: adSetMode,
         ads: builtAds,
@@ -994,7 +1101,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </select>
           <p className="hint">
             {igAccounts.length === 0
-              ? 'Vincula una cuenta de Instagram a tu página de Facebook para publicar en Instagram'
+              ? (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
+                ? 'Se usará la cuenta de Instagram vinculada a tu página para dirigir tráfico al perfil'
+                : 'Vincula una cuenta de Instagram a tu página de Facebook para publicar en Instagram')
               : 'El anuncio aparecerá también en Instagram con esta cuenta'}
           </p>
         </div>
@@ -1073,6 +1182,31 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 {whatsAppNumbersError && <p className="hint error">{whatsAppNumbersError}</p>}
                 <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
               </>
+            )}
+
+            {/* Toggle: mismo número vs número por ad set (solo con 2+ ads) */}
+            {ads.length > 1 && whatsAppNumbers.length > 1 && (
+              <div className="whatsapp-mode-toggle" style={{ marginTop: '8px' }}>
+                <div className="budget-level-selector">
+                  <button
+                    type="button"
+                    className={`budget-btn ${whatsappMode === 'same' ? 'active' : ''}`}
+                    onClick={() => setWhatsappMode('same')}
+                  >
+                    Mismo número para todos
+                  </button>
+                  <button
+                    type="button"
+                    className={`budget-btn ${whatsappMode === 'per-ad' ? 'active' : ''}`}
+                    onClick={() => setWhatsappMode('per-ad')}
+                  >
+                    Número por Ad Set
+                  </button>
+                </div>
+                {whatsappMode === 'per-ad' && (
+                  <p className="hint">Selecciona un número de WhatsApp diferente en cada anuncio abajo.</p>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -1362,6 +1496,40 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Per-ad WhatsApp Number (only in per-ad whatsapp mode) */}
+              {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px' }}>Número de WhatsApp para este Ad Set *</label>
+                  <select
+                    value={ad.whatsappNumberId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
+                      updateAd(adIndex, {
+                        whatsappNumberId: val,
+                        whatsappNumber: selected ? selected.display_phone_number.replace(/\D/g, '') : '',
+                        whatsappDisplayNumber: selected ? selected.display_phone_number : ''
+                      });
+                    }}
+                    style={{ fontSize: '13px' }}
+                  >
+                    <option value="">Selecciona un número</option>
+                    {whatsAppNumbers.map(num => {
+                      const pageName = num.page_name
+                        ? ` - ${num.page_name}`
+                        : num.whatsapp_business_account_name
+                          ? ` - ${num.whatsapp_business_account_name}`
+                          : '';
+                      return (
+                        <option key={num.id} value={String(num.id)}>
+                          {num.display_phone_number} ({num.verified_name}{pageName})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}
@@ -1807,28 +1975,32 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
       // Seleccionar método de creación según el tipo de campaña
       if (conversionLocation === 'WHATSAPP' && job.whatsappNumber) {
+        const totalAds = job.ads?.length || 1;
         addLog(`WhatsApp: ${job.whatsappNumber}`);
         if (job.whatsappNumberId) {
           addLog(`WhatsApp Business ID: ${job.whatsappNumberId}`);
         }
-        addLog(`Creando campaña para WhatsApp (presupuesto ${budgetLevelLabel})...`);
+        addLog(`Creando campaña para WhatsApp (${totalAds} anuncio(s), presupuesto ${budgetLevelLabel})...`);
 
         result = await metaService.createCampaignForWhatsApp(job.adAccountId, {
           campaignName: job.campaignName,
-          adSetName: `${job.campaignName} - Ad Set`,
-          adName: job.adName,
           dailyBudget: Math.round(job.dailyBudgetCOP),
           budgetLevel: job.budgetLevel || 'campaign',
           targeting,
           pageId: job.pageId,
+          igActorId: job.igActorId || null,
           whatsappNumber: job.whatsappNumber,
-          whatsappNumberId: job.whatsappNumberId || null,
+          linkUrl: job.linkUrl || null,
+          ads: job.ads || [],
+          // Legacy fields (fallback si ads está vacío)
           imageUrl: job.imageUrl,
           imageHash: job.imageHash || null,
+          videoId: job.videoId || null,
+          videoThumbnailUrl: job.videoThumbnailUrl || null,
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
           primaryTexts: job.primaryTexts || job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'WHATSAPP_MESSAGE',
+          callToAction: job.ctas?.[0] || 'SHOP_NOW',
           objective,
           optimizationGoal
         });
@@ -1909,6 +2081,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           pageId: job.pageId,
           igActorId: job.igActorId || null,
           linkUrl: job.linkUrl,
+          conversionLocation,
           adSetMode: job.adSetMode || 'single',
           ads: job.ads || [{
             adName: job.adName,
