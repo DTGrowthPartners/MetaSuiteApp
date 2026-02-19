@@ -347,10 +347,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
 
       if (result.success && result.data) {
+        const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
-          ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+          // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
+          ...(!isWhatsApp && { ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method === 'whisper' ? 'audio transcrito' : 'análisis visual'})`,
@@ -494,10 +496,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       );
 
       if (result.success && result.data) {
+        const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
-          ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+          // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
+          ...(!isWhatsApp && { ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method || mediaType})`,
@@ -1991,6 +1995,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           igActorId: job.igActorId || null,
           whatsappNumber: job.whatsappNumber,
           linkUrl: job.linkUrl || null,
+          adSetMode: job.adSetMode || 'dynamic',
           ads: job.ads || [],
           // Legacy fields (fallback si ads está vacío)
           imageUrl: job.imageUrl,
