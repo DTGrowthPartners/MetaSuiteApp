@@ -761,7 +761,7 @@ class MetaAdsService {
         const ownedResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/owned_instagram_accounts`, {
           params: {
             access_token: this.accessToken,
-            fields: 'id,username,profile_pic'
+            fields: 'id,username'
           }
         });
         const owned = ownedResponse.data.data || [];
@@ -777,7 +777,7 @@ class MetaAdsService {
           const clientResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/client_instagram_accounts`, {
             params: {
               access_token: this.accessToken,
-              fields: 'id,username,profile_pic'
+              fields: 'id,username'
             }
           });
           const clients = clientResponse.data.data || [];
@@ -794,7 +794,7 @@ class MetaAdsService {
           const bizResponse = await axios.get(`${META_API_BASE_URL}/${business.id}/instagram_accounts`, {
             params: {
               access_token: this.accessToken,
-              fields: 'id,username,profile_pic'
+              fields: 'id,username'
             }
           });
           const bizIg = bizResponse.data.data || [];
@@ -822,7 +822,7 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/instagram_accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,username,profile_pic'
+          fields: 'id,username'
         }
       });
 
@@ -861,7 +861,7 @@ class MetaAdsService {
       const response2 = await axios.get(`${META_API_BASE_URL}/${pageId}/instagram_accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,username,profile_pic'
+          fields: 'id,username'
         }
       });
 
@@ -1367,7 +1367,7 @@ class MetaAdsService {
       };
 
       if (igActorId) {
-        objectStorySpec.instagram_actor_id = igActorId;
+        objectStorySpec.instagram_user_id = igActorId;
       }
 
       console.log('Creating video creative:', { name, pageId, videoId, linkUrl, callToAction });
@@ -1428,7 +1428,7 @@ class MetaAdsService {
       };
 
       if (igActorId) {
-        objectStorySpec.instagram_actor_id = igActorId;
+        objectStorySpec.instagram_user_id = igActorId;
       }
 
       console.log('Creating image creative:', { name, pageId, imageHash, objectStorySpec });
@@ -1456,17 +1456,14 @@ class MetaAdsService {
   }
 
   // Crear un Ad
-  async createAd(adAccountId, { name, adsetId, creativeId, igActorId = null, status = 'PAUSED' }) {
+  async createAd(adAccountId, { name, adsetId, creativeId, status = 'PAUSED' }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      // Build creative spec - include instagram_actor_id as override if provided
+      // El Creative ya tiene instagram_user_id en object_story_spec — el Ad solo necesita creative_id
       const creativeSpec = { creative_id: creativeId };
-      if (igActorId) {
-        creativeSpec.instagram_actor_id = igActorId;
-      }
 
-      console.log('Creating ad:', { name, adsetId, creativeId, igActorId: igActorId || 'none', status });
+      console.log('Creating ad:', { name, adsetId, creativeId, status });
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
@@ -1514,13 +1511,18 @@ class MetaAdsService {
     description = '',
     linkUrl,
     callToAction = 'LEARN_MORE',
-    igActorId = null,
-    igConnected = true
+    igActorId = null
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
       const objectStorySpec = { page_id: pageId };
+
+      // Usar instagram_user_id (reemplazo de instagram_actor_id deprecado) en object_story_spec
+      if (igActorId) {
+        objectStorySpec.instagram_user_id = igActorId;
+        console.log('Using instagram_user_id in objectStorySpec:', igActorId);
+      }
 
       if (videoId) {
         // Video creative usando video_data
@@ -1557,35 +1559,19 @@ class MetaAdsService {
         objectStorySpec.link_data = linkData;
       }
 
-      // instagram_actor_id dentro de object_story_spec Y como top-level
-      if (igActorId && igConnected) {
-        objectStorySpec.instagram_actor_id = igActorId;
-      }
-
       console.log('Creating standard creative:', {
         name, pageId,
-        igActorId: igActorId || 'none',
-        igConnected,
         type: videoId ? 'VIDEO' : 'IMAGE',
         headline,
         primaryText: primaryText?.substring(0, 50) + '...',
-        linkUrl, callToAction
+        linkUrl, callToAction,
+        igActorId: igActorId || 'none'
       });
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
-
-      // instagram_actor_id también como campo top-level del creative
-      if (igActorId && igConnected) {
-        formData.append('instagram_actor_id', igActorId);
-        console.log(`Using instagram_actor_id: ${igActorId} (in object_story_spec + top-level)`);
-      }
-      if (!igConnected) {
-        formData.append('use_page_actor_override', 'true');
-        console.log('Using use_page_actor_override=true (no instagram_actor_id)');
-      }
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -1651,7 +1637,6 @@ class MetaAdsService {
     callToActionTypes, // Array de CTAs (max 5)
     linkUrl,
     igActorId = null,
-    igConnected = true, // true = IG conectada al ad account (usar en object_story_spec), false = usar como top-level field
     isWhatsApp = false // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
   }) {
     try {
@@ -1716,22 +1701,21 @@ class MetaAdsService {
       const objectStorySpec = {
         page_id: pageId
       };
-
-      // instagram_actor_id dentro de object_story_spec Y como top-level
-      if (igActorId && igConnected) {
-        objectStorySpec.instagram_actor_id = igActorId;
+      // Usar instagram_user_id (reemplazo de instagram_actor_id deprecado) en object_story_spec
+      if (igActorId) {
+        objectStorySpec.instagram_user_id = igActorId;
+        console.log('Using instagram_user_id in objectStorySpec:', igActorId);
       }
 
       console.log('Creating Asset Feed Spec creative (5+5+5):', {
         name, pageId,
-        igActorId: igActorId || 'none',
-        igConnected,
         type: videoId ? 'VIDEO' : 'IMAGE',
         videoId: videoId || 'N/A',
         thumbnailHash: thumbnailHash || 'N/A',
         imageHash9x16: imageHash9x16 || 'N/A',
         titles: titles.length, bodies: bodies.length,
-        descriptions: descriptions.length, callToActionTypes
+        descriptions: descriptions.length, callToActionTypes,
+        igActorId: igActorId || 'none'
       });
       console.log('objectStorySpec:', JSON.stringify(objectStorySpec));
       console.log('assetFeedSpec:', JSON.stringify(assetFeedSpec, null, 2));
@@ -1741,16 +1725,6 @@ class MetaAdsService {
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
       formData.append('asset_feed_spec', JSON.stringify(assetFeedSpec));
-
-      // instagram_actor_id también como campo top-level del creative
-      if (igActorId && igConnected) {
-        formData.append('instagram_actor_id', igActorId);
-        console.log(`Using instagram_actor_id: ${igActorId} (in object_story_spec + top-level)`);
-      }
-      if (!igConnected) {
-        formData.append('use_page_actor_override', 'true');
-        console.log('Using use_page_actor_override=true (no instagram_actor_id)');
-      }
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2831,7 +2805,7 @@ class MetaAdsService {
 
       const objectStorySpec = {
         page_id: pageId,
-        instagram_actor_id: igActorId,
+        instagram_user_id: igActorId,
         link_data: linkData
       };
 
@@ -2997,10 +2971,11 @@ class MetaAdsService {
     let promotedObject = null;
 
     try {
-      // 0. Resolver igActorId — SOLO cuentas IG formalmente conectadas al ad account son válidas
+      // 0. Resolver igActorId — verificar y auto-conectar IG al ad account si es necesario
       const normalizedAdAccount = this.normalizeAccountId(adAccountId);
       let igConnected = false;
 
+      // Paso A: Verificar si ya hay IG conectada al ad account
       try {
         const checkResp = await axios.get(`${META_API_BASE_URL}/${normalizedAdAccount}/instagram_accounts`, {
           params: { access_token: this.accessToken, fields: 'id,username' }
@@ -3017,14 +2992,93 @@ class MetaAdsService {
         console.warn('Error checking ad account IG accounts:', checkErr.response?.data?.error?.message || checkErr.message);
       }
 
-      // Si no hay IG conectada y destino es INSTAGRAM_PROFILE → quitar destination_type
-      // INSTAGRAM_PROFILE requiere IG formalmente conectada al ad account (no hay workaround por API)
-      // Sin destination_type, Meta usa tráfico genérico al link URL (que apunta al perfil IG)
+      // Paso B: Si no hay IG conectada y necesitamos INSTAGRAM_PROFILE → intentar auto-conectar
+      if (!igConnected && destinationType === 'INSTAGRAM_PROFILE') {
+        console.log('No IG connected to ad account. Attempting to auto-connect...');
+
+        // B1: Obtener instagram_business_account de la página
+        let realIgId = null;
+        try {
+          const pageResp = await axios.get(`${META_API_BASE_URL}/${pageId}`, {
+            params: { access_token: this.accessToken, fields: 'instagram_business_account{id,username}' }
+          });
+          const igBiz = pageResp.data?.instagram_business_account;
+          if (igBiz) {
+            realIgId = igBiz.id;
+            console.log(`Page's instagram_business_account: ${igBiz.username} (ID: ${realIgId})`);
+          }
+        } catch (igErr) {
+          console.warn('Could not get instagram_business_account:', igErr.response?.data?.error?.message || igErr.message);
+        }
+
+        // B2: Obtener business_id del ad account
+        let businessId = null;
+        try {
+          const acctResp = await axios.get(`${META_API_BASE_URL}/${normalizedAdAccount}`, {
+            params: { access_token: this.accessToken, fields: 'business{id,name}' }
+          });
+          businessId = acctResp.data?.business?.id;
+          if (businessId) {
+            console.log(`Ad account business: ${acctResp.data.business.name} (ID: ${businessId})`);
+          }
+        } catch (bizErr) {
+          console.warn('Could not get ad account business:', bizErr.response?.data?.error?.message || bizErr.message);
+        }
+
+        // B3: Intentar conectar el IG al ad account vía business
+        if (realIgId && businessId) {
+          // Primero: reclamar IG para el business (si no lo está ya)
+          try {
+            console.log(`Attempting to claim IG ${realIgId} to business ${businessId}...`);
+            await axios.post(`${META_API_BASE_URL}/${businessId}/instagram_accounts`, null, {
+              params: { access_token: this.accessToken, instagram_actor_id: realIgId }
+            });
+            console.log(`✅ IG ${realIgId} claimed to business ${businessId}`);
+          } catch (claimErr) {
+            const msg = claimErr.response?.data?.error?.message || claimErr.message;
+            // Si ya está reclamado, no es error real
+            if (msg.includes('already') || msg.includes('duplicate')) {
+              console.log(`IG ${realIgId} already claimed by business`);
+            } else {
+              console.warn(`Could not claim IG to business: ${msg}`);
+            }
+          }
+
+          // Segundo: asignar IG al ad account vía business
+          try {
+            console.log(`Attempting to assign IG ${realIgId} to ad account ${normalizedAdAccount} via business...`);
+            await axios.post(`${META_API_BASE_URL}/${realIgId}/assigned_users`, null, {
+              params: { access_token: this.accessToken, business: businessId }
+            });
+            console.log(`✅ IG ${realIgId} assigned to ad account`);
+          } catch (assignErr) {
+            console.warn('Could not assign IG to ad account:', assignErr.response?.data?.error?.message || assignErr.message);
+          }
+
+          // Verificar si ahora está conectada
+          try {
+            const recheck = await axios.get(`${META_API_BASE_URL}/${normalizedAdAccount}/instagram_accounts`, {
+              params: { access_token: this.accessToken, fields: 'id,username' }
+            });
+            const nowConnected = recheck.data?.data || [];
+            console.log(`After auto-connect attempt: ${nowConnected.length} IG accounts`, nowConnected.map(a => `${a.username}(${a.id})`));
+            if (nowConnected.length > 0) {
+              igActorId = nowConnected[0].id;
+              igConnected = true;
+              console.log(`✅ Auto-connected IG: ${igActorId}`);
+            }
+          } catch (recheckErr) {
+            console.warn('Error rechecking IG accounts:', recheckErr.response?.data?.error?.message || recheckErr.message);
+          }
+        }
+      }
+
+      // Paso C: Si aún no hay IG conectada → fallback sin destination_type
       if (!igConnected) {
         igActorId = null;
         if (destinationType === 'INSTAGRAM_PROFILE') {
-          console.warn('⚠️ No IG connected to ad account. Removing destination_type (will use link URL to IG profile)');
-          console.warn('💡 Para que aparezca como "Instagram o Facebook" en Ads Manager, conecta tu Instagram en: Meta Business Settings > Instagram Accounts > Add Assets > selecciona tu Ad Account.');
+          console.warn('⚠️ Could not auto-connect IG. Falling back to generic traffic (link URL points to IG profile).');
+          console.warn('💡 Para que aparezca como "Instagram o Facebook", conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
           destinationType = null;
         }
       }
@@ -3090,19 +3144,17 @@ class MetaAdsService {
           descriptions: validBodies,
           callToActionTypes: validCTAs,
           linkUrl,
-          igActorId,
-          igConnected
+          igActorId
         };
 
         let creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, creativeParams);
 
-        // Si falla por instagram_actor_id inválido, reintentar con use_page_actor_override
-        if (!creativeResult.success && creativeResult.error?.includes('instagram_actor_id')) {
-          console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying with use_page_actor_override...`);
+        // Si falla por instagram_user_id inválido, reintentar sin IG
+        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+          console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying without IG...`);
           creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
             ...creativeParams,
-            igActorId: null,
-            igConnected: false
+            igActorId: null
           });
         }
 
@@ -3112,12 +3164,11 @@ class MetaAdsService {
         }
         results.creatives.push(creativeResult.data);
 
-        // Crear Ad
+        // Crear Ad — el Creative ya tiene instagram_user_id
         let adResult = await this.createAd(adAccountId, {
           name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
-          igActorId: igActorId || null,
           status: 'PAUSED'
         });
 
@@ -3148,19 +3199,17 @@ class MetaAdsService {
           description: ad.descriptions?.[1]?.trim() || '',
           linkUrl,
           callToAction: cta,
-          igActorId,
-          igConnected
+          igActorId
         };
 
         let creativeResult = await this.createStandardAdCreative(adAccountId, stdCreativeParams);
 
-        // Si falla por instagram_actor_id inválido, reintentar con use_page_actor_override
-        if (!creativeResult.success && creativeResult.error?.includes('instagram_actor_id')) {
-          console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying with use_page_actor_override...`);
+        // Si falla por instagram_user_id inválido, reintentar sin IG
+        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+          console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying without IG...`);
           creativeResult = await this.createStandardAdCreative(adAccountId, {
             ...stdCreativeParams,
-            igActorId: null,
-            igConnected: false
+            igActorId: null
           });
         }
 
@@ -3170,12 +3219,11 @@ class MetaAdsService {
         }
         results.creatives.push(creativeResult.data);
 
-        // Crear Ad
+        // Crear Ad — el Creative ya tiene instagram_user_id
         let adResult = await this.createAd(adAccountId, {
           name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
-          igActorId: igActorId || null,
           status: 'PAUSED'
         });
 

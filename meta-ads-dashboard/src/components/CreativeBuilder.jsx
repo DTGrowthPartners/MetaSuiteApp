@@ -241,7 +241,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     uploadProgress: '',
     headlines: templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', ''],
     descriptions: templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', ''],
-    ctas: templateContent.ctas || selectedTemplate?.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+    ctas: templateContent.ctas || selectedTemplate?.ctas || (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
+      ? ['VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE']
+      : ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']),
     showEditContent: false,
     analyzingMedia: false, // AI is analyzing the media
     contentGenerated: false, // AI has generated content
@@ -348,11 +350,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
       if (result.success && result.data) {
         const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
+        const isIgProfile = templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
           // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
-          ...(!isWhatsApp && { ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'] }),
+          // Instagram Profile: usar VISIT_INSTAGRAM_PROFILE como CTA por defecto
+          ...(!isWhatsApp && { ctas: isIgProfile
+            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
+            : (result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]) }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method === 'whisper' ? 'audio transcrito' : 'análisis visual'})`,
@@ -497,11 +504,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
       if (result.success && result.data) {
         const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
+        const isIgProfile = templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
           // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
-          ...(!isWhatsApp && { ctas: result.data.ctas || ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'] }),
+          // Instagram Profile: usar VISIT_INSTAGRAM_PROFILE como CTA por defecto
+          ...(!isWhatsApp && { ctas: isIgProfile
+            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
+            : (result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]) }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method || mediaType})`,
