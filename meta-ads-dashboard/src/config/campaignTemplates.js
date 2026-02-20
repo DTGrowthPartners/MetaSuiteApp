@@ -16,6 +16,7 @@ export const OPTIMIZATION_GOALS = {
   // Tráfico
   LANDING_PAGE_VIEWS: 'Vistas de página de destino',
   LINK_CLICKS: 'Clics en el enlace',
+  VISIT_INSTAGRAM_PROFILE: 'Maximizar visitas al perfil de IG',
   // Leads
   LEAD_GENERATION: 'Clientes potenciales',
   OFFSITE_CONVERSIONS: 'Conversiones',
@@ -506,7 +507,7 @@ export const CAMPAIGN_TEMPLATES = [
     buyingType: 'AUCTION',
     adSetConfig: {
       conversionLocation: 'INSTAGRAM_PROFILE',
-      optimizationGoal: 'LINK_CLICKS',
+      optimizationGoal: 'VISIT_INSTAGRAM_PROFILE',
       billingEvent: 'IMPRESSIONS',
       bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
       requiresPixel: false,

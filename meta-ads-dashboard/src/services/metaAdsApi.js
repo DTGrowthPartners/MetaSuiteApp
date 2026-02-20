@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const META_API_BASE_URL = 'https://graph.facebook.com/v21.0';
+const META_API_BASE_URL = 'https://graph.facebook.com/v24.0';
 
 // Backend URL para endpoints que requieren proxy (uploads, etc.)
 const BACKEND_API_URL = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
@@ -1460,8 +1460,10 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      // El Creative ya tiene instagram_user_id en object_story_spec — el Ad solo necesita creative_id
-      const creativeSpec = { creative_id: creativeId };
+      // Solo referencia al creative - degrees_of_freedom_spec se configura a nivel del AdCreative, no del Ad
+      const creativeSpec = {
+        creative_id: creativeId
+      };
 
       console.log('Creating ad:', { name, adsetId, creativeId, status });
 
@@ -1572,6 +1574,17 @@ class MetaAdsService {
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      // Optimizar texto por persona + Advantage+ creative features (web traffic)
+      formData.append('degrees_of_freedom_spec', JSON.stringify({
+        creative_features_spec: {
+          text_optimizations: { enroll_status: 'OPT_IN' },
+          enhance_cta: { enroll_status: 'OPT_IN' },
+          image_touchups: { enroll_status: 'OPT_IN' },
+          inline_comment: { enroll_status: 'OPT_IN' }
+        },
+        text_transformation_types: ['TEXT_LIQUIDITY']
+      }));
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -1725,6 +1738,17 @@ class MetaAdsService {
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
       formData.append('asset_feed_spec', JSON.stringify(assetFeedSpec));
+
+      // Optimizar texto por persona + Advantage+ creative features (web traffic 5+5+5)
+      formData.append('degrees_of_freedom_spec', JSON.stringify({
+        creative_features_spec: {
+          text_optimizations: { enroll_status: 'OPT_IN' },
+          enhance_cta: { enroll_status: 'OPT_IN' },
+          image_touchups: { enroll_status: 'OPT_IN' },
+          inline_comment: { enroll_status: 'OPT_IN' }
+        },
+        text_transformation_types: ['TEXT_LIQUIDITY']
+      }));
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2335,11 +2359,37 @@ class MetaAdsService {
       formData.append('name', name);
       formData.append('object_story_spec', specJson);
 
+      // Advantage+ creative individual features (solo las que esta cuenta soporta)
+      // + text_transformation_types para "Optimizar texto por persona" (swap headline/primary/description)
+      formData.append('degrees_of_freedom_spec', JSON.stringify({
+        creative_features_spec: {
+          text_optimizations: { enroll_status: 'OPT_IN' },
+          enhance_cta: { enroll_status: 'OPT_IN' },
+          image_touchups: { enroll_status: 'OPT_IN' },
+          inline_comment: { enroll_status: 'OPT_IN' }
+        },
+        text_transformation_types: ['TEXT_LIQUIDITY']
+      }));
+
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
+
+      // Diagnóstico: leer el creative de vuelta para verificar si degrees_of_freedom_spec fue guardado
+      if (response.data?.id) {
+        try {
+          const readBack = await axios.get(
+            `${META_API_BASE_URL}/${response.data.id}`,
+            { params: { access_token: this.accessToken, fields: 'id,name,degrees_of_freedom_spec' } }
+          );
+          console.log('WhatsApp creative READ-BACK degrees_of_freedom_spec:', JSON.stringify(readBack.data, null, 2));
+        } catch (readErr) {
+          console.warn('Could not read back creative:', readErr.message);
+        }
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Creative for WhatsApp FULL error:', JSON.stringify(error.response?.data, null, 2) || error.message);
@@ -2440,7 +2490,6 @@ class MetaAdsService {
 
     // WhatsApp: siempre usar creative estándar (no dynamic creative / asset_feed_spec)
     // El CTA WHATSAPP_MESSAGE no es compatible con asset_feed_spec (requiere link_urls).
-    // Meta Ads Manager también usa creative estándar para campañas de WhatsApp.
     const useDynamicCreative = false;
 
     try {
@@ -2460,32 +2509,62 @@ class MetaAdsService {
       }
       results.campaign = campaignResult.data;
 
-      // 2. Para cada ad: crear AdSet + Creative + Ad
+      // 2. Crear AdSet(s) + Creative(s) + Ad(s) según adSetMode
+      let sharedAdSetId = null;
+
+      if (adSetMode === 'single') {
+        // MODO SINGLE: 1 AdSet → N Ads (todos los anuncios en 1 solo Ad Set)
+        console.log(`Mode: 1 ADSET → ${ads.length} ADS (standard creatives en 1 Ad Set)`);
+
+        const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+          name: `${campaignName} - Ad Set`,
+          campaignId: results.campaign.id,
+          targeting,
+          optimizationGoal,
+          promotedObject: { page_id: pageId },
+          whatsappPhoneNumber: whatsappNumber,
+          dailyBudget: !isCBO ? dailyBudget : null,
+          isDynamicCreative: false
+        });
+
+        if (!adSetResult.success) {
+          results.errors.push(`AdSet: ${adSetResult.error}`);
+          return { success: false, ...results };
+        }
+        results.adSets.push(adSetResult.data);
+        sharedAdSetId = adSetResult.data.id;
+      }
+
       for (let i = 0; i < ads.length; i++) {
         const ad = ads[i];
         const adLabel = ads.length > 1 ? ` ${i + 1}` : '';
         const adWhatsappNumber = ad.whatsappNumber || whatsappNumber;
 
-        console.log(`Creating Ad Set${adLabel} + ${useDynamicCreative ? 'Dynamic' : 'Standard'} Creative + Ad (${i + 1}/${ads.length})...`);
-        console.log(`  WhatsApp: ${adWhatsappNumber}${ad.whatsappNumber ? ' (per-ad)' : ' (global)'}`);
+        if (adSetMode !== 'single') {
+          // MODO DYNAMIC/PER-AD: crear 1 AdSet por cada ad
+          console.log(`Creating Ad Set${adLabel} + Standard Creative + Ad (${i + 1}/${ads.length})...`);
+          console.log(`  WhatsApp: ${adWhatsappNumber}${ad.whatsappNumber ? ' (per-ad)' : ' (global)'}`);
 
-        // 2a. Crear AdSet para WhatsApp
-        const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-          name: `${campaignName} - Ad Set${adLabel}`,
-          campaignId: results.campaign.id,
-          targeting: ad.audienceTargeting || targeting,
-          optimizationGoal,
-          promotedObject: { page_id: pageId },
-          whatsappPhoneNumber: adWhatsappNumber,
-          dailyBudget: !isCBO ? dailyBudget : null,
-          isDynamicCreative: useDynamicCreative
-        });
+          const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+            name: `${campaignName} - Ad Set${adLabel}`,
+            campaignId: results.campaign.id,
+            targeting: ad.audienceTargeting || targeting,
+            optimizationGoal,
+            promotedObject: { page_id: pageId },
+            whatsappPhoneNumber: adWhatsappNumber,
+            dailyBudget: !isCBO ? dailyBudget : null,
+            isDynamicCreative: useDynamicCreative
+          });
 
-        if (!adSetResult.success) {
-          results.errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
-          continue;
+          if (!adSetResult.success) {
+            results.errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
+            continue;
+          }
+          results.adSets.push(adSetResult.data);
+          sharedAdSetId = adSetResult.data.id;
+        } else {
+          console.log(`Creating Standard Creative + Ad ${i + 1}/${ads.length} in shared AdSet...`);
         }
-        results.adSets.push(adSetResult.data);
 
         const adVideoId = ad.videoId || null;
         const adImageUrl = ad.imageUrl || null;
@@ -2572,12 +2651,28 @@ class MetaAdsService {
             objectStorySpec.link_data = linkData;
           }
 
-          // WhatsApp: NO incluir instagram_actor_id (no es necesario y causa error)
+          // Incluir instagram_user_id para que el anuncio quede vinculado a la cuenta de IG
+          if (igActorId) {
+            objectStorySpec.instagram_user_id = igActorId;
+            console.log('WhatsApp creative using instagram_user_id:', igActorId);
+          }
+
           const normalizedId = this.normalizeAccountId(adAccountId);
           const formData = new URLSearchParams();
           formData.append('access_token', this.accessToken);
           formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
           formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+          // Advantage+ creative individual features + Optimizar texto por persona
+          formData.append('degrees_of_freedom_spec', JSON.stringify({
+            creative_features_spec: {
+              text_optimizations: { enroll_status: 'OPT_IN' },
+              enhance_cta: { enroll_status: 'OPT_IN' },
+              image_touchups: { enroll_status: 'OPT_IN' },
+              inline_comment: { enroll_status: 'OPT_IN' }
+            },
+            text_transformation_types: ['TEXT_LIQUIDITY']
+          }));
 
           console.log('WhatsApp objectStorySpec:', JSON.stringify(objectStorySpec, null, 2));
 
@@ -2603,10 +2698,10 @@ class MetaAdsService {
         }
         results.creatives.push(creativeResult.data);
 
-        // 2c. Crear Ad
+        // 2c. Crear Ad (usar sharedAdSetId que apunta al AdSet correcto en ambos modos)
         const adResult = await this.createAd(adAccountId, {
           name: ad.adName || `${campaignName} - Ad${adLabel}`,
-          adsetId: adSetResult.data.id,
+          adsetId: sharedAdSetId,
           creativeId: creativeResult.data.id,
           status: 'PAUSED'
         });

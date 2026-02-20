@@ -65,7 +65,7 @@ if (OPENAI_API_KEY) {
   console.warn('Configura la variable de entorno OPENAI_API_KEY para habilitar generación de contenido con IA.');
 }
 
-const META_API_BASE_URL = 'https://graph.facebook.com/v21.0';
+const META_API_BASE_URL = 'https://graph.facebook.com/v24.0';
 
 // Helper: obtener token dinámico del request (query, body, header) o fallback al hardcodeado
 function getToken(req) {
