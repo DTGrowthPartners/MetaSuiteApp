@@ -673,7 +673,8 @@
 }
 
 .targeting-field select,
-.targeting-field input[type="date"] {
+.targeting-field input[type="date"],
+.targeting-field input[type="datetime-local"] {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid var(--border);
@@ -700,14 +701,16 @@
 }
 
 .targeting-field select:focus,
-.targeting-field input[type="date"]:focus {
+.targeting-field input[type="date"]:focus,
+.targeting-field input[type="datetime-local"]:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 .targeting-field select:hover,
-.targeting-field input[type="date"]:hover {
+.targeting-field input[type="date"]:hover,
+.targeting-field input[type="datetime-local"]:hover {
   border-color: var(--border-light);
 }
 
@@ -750,6 +753,33 @@
   color: var(--accent);
   font-weight: 600;
   box-shadow: 0 0 12px rgba(74, 159, 255, 0.15);
+}
+
+/* Toggle Buttons (gender-btn used for bid strategy, Advantage+, placements) */
+.gender-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+}
+
+.gender-btn:hover {
+  border-color: var(--border-light);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.gender-btn.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* ============================================

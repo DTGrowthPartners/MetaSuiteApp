@@ -2174,7 +2174,11 @@ class MetaAdsService {
     promotedObject = null,
     whatsappPhoneNumber = null, // Número de teléfono real (ej: "573007189383")
     dailyBudget = null, // Presupuesto a nivel de ad set (cuando no es CBO)
-    isDynamicCreative = false // true para habilitar 5+5+5 (Asset Feed Spec)
+    isDynamicCreative = false, // true para habilitar 5+5+5 (Asset Feed Spec)
+    startTime = null, // Fecha de inicio (ISO string o timestamp UNIX)
+    endTime = null, // Fecha de fin (ISO string o timestamp UNIX)
+    bidStrategy = 'LOWEST_COST_WITHOUT_CAP', // Estrategia de puja para non-CBO
+    bidAmount = null // Monto de puja (para COST_CAP o BID_CAP)
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -2194,11 +2198,31 @@ class MetaAdsService {
         formData.append('is_dynamic_creative', 'true');
       }
 
+      // Fecha de inicio
+      if (startTime) {
+        const startTimestamp = typeof startTime === 'string' && startTime.includes('-')
+          ? Math.floor(new Date(startTime).getTime() / 1000)
+          : startTime;
+        formData.append('start_time', startTimestamp.toString());
+      }
+
+      // Fecha de fin
+      if (endTime) {
+        const endTimestamp = typeof endTime === 'string' && endTime.includes('-')
+          ? Math.floor(new Date(endTime + (endTime.includes('T') ? '' : 'T23:59:59')).getTime() / 1000)
+          : endTime;
+        formData.append('end_time', endTimestamp.toString());
+      }
+
       // Si el presupuesto es a nivel de ad set (no CBO), incluirlo aquí
       if (dailyBudget) {
         formData.append('daily_budget', dailyBudget.toString());
-        formData.append('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');
-        console.log('AdSet budget (non-CBO):', dailyBudget);
+        formData.append('bid_strategy', bidStrategy || 'LOWEST_COST_WITHOUT_CAP');
+        // Monto de puja para COST_CAP o BID_CAP
+        if (bidAmount && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+          formData.append('bid_amount', bidAmount.toString());
+        }
+        console.log('AdSet budget (non-CBO):', dailyBudget, 'bid_strategy:', bidStrategy);
       }
 
       const promotedObj = {};
@@ -2237,7 +2261,11 @@ class MetaAdsService {
     } catch (error) {
       const errData = error.response?.data?.error;
       console.error('AdSet for WhatsApp FULL error:', JSON.stringify(error.response?.data, null, 2));
-      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      let errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      // Error específico: ToS de Lead Generation no aceptados (subcode 1815089)
+      if (errData?.error_subcode === 1815089) {
+        errorMsg = 'Tu página de Facebook debe aceptar las Condiciones del Servicio de Generación de Clientes Potenciales. Ve a la configuración de tu página en Facebook → Herramientas de publicación → Formularios de clientes potenciales y acepta los términos.';
+      }
       return { success: false, error: errorMsg };
     }
   }
@@ -2478,7 +2506,15 @@ class MetaAdsService {
     primaryTexts = [],
     callToAction = 'WHATSAPP_MESSAGE',
     objective = 'OUTCOME_SALES',
-    optimizationGoal = 'CONVERSATIONS'
+    optimizationGoal = 'CONVERSATIONS',
+    // Nuevos campos
+    specialAdCategories = [],
+    bidStrategy = 'LOWEST_COST_WITHOUT_CAP',
+    bidAmount = null,
+    startTime = null,
+    endTime = null,
+    linkUrl = null,
+    pageWelcomeMessage = null // Plantilla de mensaje de bienvenida para WhatsApp
   }) {
     const results = { campaign: null, adSets: [], creatives: [], ads: [], errors: [] };
 
@@ -2504,7 +2540,9 @@ class MetaAdsService {
         name: campaignName,
         objective,
         status: 'PAUSED',
-        dailyBudget: isCBO ? dailyBudget : null
+        dailyBudget: isCBO ? dailyBudget : null,
+        specialAdCategories: specialAdCategories || [],
+        bidStrategy: isCBO ? bidStrategy : 'LOWEST_COST_WITHOUT_CAP'
       });
 
       if (!campaignResult.success) {
@@ -2528,7 +2566,11 @@ class MetaAdsService {
           promotedObject: { page_id: pageId },
           whatsappPhoneNumber: whatsappNumber,
           dailyBudget: !isCBO ? dailyBudget : null,
-          isDynamicCreative: false
+          isDynamicCreative: false,
+          startTime,
+          endTime,
+          bidStrategy: !isCBO ? bidStrategy : undefined,
+          bidAmount: !isCBO ? bidAmount : undefined
         });
 
         if (!adSetResult.success) {
@@ -2557,7 +2599,11 @@ class MetaAdsService {
             promotedObject: { page_id: pageId },
             whatsappPhoneNumber: adWhatsappNumber,
             dailyBudget: !isCBO ? dailyBudget : null,
-            isDynamicCreative: useDynamicCreative
+            isDynamicCreative: useDynamicCreative,
+            startTime,
+            endTime,
+            bidStrategy: !isCBO ? bidStrategy : undefined,
+            bidAmount: !isCBO ? bidAmount : undefined
           });
 
           if (!adSetResult.success) {

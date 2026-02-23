@@ -4,6 +4,10 @@ import MetaAdsService from '../services/metaAdsApi';
 import {
   CAMPAIGN_TEMPLATES,
   CTA_OPTIONS,
+  SPECIAL_AD_CATEGORIES,
+  BID_STRATEGIES,
+  PLACEMENT_OPTIONS,
+  CHAT_FORM_FIELDS,
   getCategories,
   getTemplatesByCategory,
   getTemplateRequirements,
@@ -505,10 +509,32 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [whatsAppNumbersError, setWhatsAppNumbersError] = useState('');
 
   // Targeting: Fecha, Edad, Sexo
+  const [startDate, setStartDate] = useState(''); // Fecha de inicio (opcional)
   const [endDate, setEndDate] = useState(''); // Fecha de finalización (opcional)
   const [ageMin, setAgeMin] = useState(18); // Edad mínima
   const [ageMax, setAgeMax] = useState(65); // Edad máxima
   const [gender, setGender] = useState('all'); // 'all', 'male', 'female'
+
+  // Nuevos campos de campaña
+  const [specialAdCategories, setSpecialAdCategories] = useState([]); // Categorías de anuncios especiales
+  const [bidStrategy, setBidStrategy] = useState(templateAdSetConfig.bidStrategy || 'LOWEST_COST_WITHOUT_CAP');
+  const [bidAmount, setBidAmount] = useState(''); // Monto de puja (para COST_CAP o BID_CAP)
+
+  // Advantage+ Audience
+  const [advantageAudience, setAdvantageAudience] = useState(
+    templateAdSetConfig.audienceConfig?.allowAdvantage !== false
+  );
+
+  // Ubicaciones / Placements
+  const [useAdvantagePlacements, setUseAdvantagePlacements] = useState(
+    templateAdSetConfig.placementsConfig?.allowAdvantage !== false
+  );
+  const [excludedPlacements, setExcludedPlacements] = useState([]);
+
+  // Editor de chats (WhatsApp leads)
+  const [chatGreeting, setChatGreeting] = useState('Te damos la bienvenida. Completa el siguiente formulario para registrarte.');
+  const [chatFormFields, setChatFormFields] = useState(['name', 'email']);
+  const [showChatEditor, setShowChatEditor] = useState(false);
 
   // Páginas de Facebook
   const [pages, setPages] = useState([]);
@@ -1205,10 +1231,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         savedAudienceTargeting: selectedAudienceData?.targeting || null,
         audienceType: selectedAudienceData?.audienceType || 'default',
         // Targeting personalizado
+        startDate: startDate || null,
         endDate: endDate || null,
         ageMin: ageMin,
         ageMax: ageMax,
         gender: gender, // 'all', 'male', 'female'
+        // Nuevos campos de campaña
+        specialAdCategories: specialAdCategories.length > 0 ? specialAdCategories : [],
+        bidStrategy: bidStrategy,
+        bidAmount: bidAmount ? parseFloat(bidAmount) : null,
+        advantageAudience: advantageAudience,
+        useAdvantagePlacements: useAdvantagePlacements,
+        excludedPlacements: excludedPlacements,
+        // Chat editor (WhatsApp leads)
+        chatGreeting: chatGreeting || null,
+        chatFormFields: chatFormFields.length > 0 ? chatFormFields : null,
         // Legacy fields from first ad (for WhatsApp/Messenger compat)
         headlines: builtAds[0]?.headlines || [],
         descriptions: builtAds[0]?.descriptions || [],
@@ -1283,6 +1320,40 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             />
           </div>
           <p className="hint">Se agregará "{CAMPAIGN_PREFIX}" al inicio para identificar tus campañas</p>
+        </div>
+
+        {/* Categorías de Anuncios Especiales */}
+        <div className="form-group">
+          <label>Categorías de Anuncios Especiales</label>
+          <select
+            value=""
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val && !specialAdCategories.includes(val)) {
+                setSpecialAdCategories(prev => [...prev, val]);
+              }
+            }}
+          >
+            <option value="">Declara la categoría si corresponde</option>
+            {SPECIAL_AD_CATEGORIES.filter(c => !specialAdCategories.includes(c.value)).map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+          {specialAdCategories.length > 0 && (
+            <div className="selected-categories" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+              {specialAdCategories.map(cat => {
+                const catInfo = SPECIAL_AD_CATEGORIES.find(c => c.value === cat);
+                return (
+                  <span key={cat} className="requirement-badge" style={{ backgroundColor: '#3498db', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => setSpecialAdCategories(prev => prev.filter(c => c !== cat))}
+                  >
+                    {catInfo?.label || cat} ×
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <p className="hint">Declara si tus anuncios están relacionados con servicios financieros, empleos, viviendas o temas sociales</p>
         </div>
 
         {/* Ad Account Selection */}
@@ -1544,14 +1615,67 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
-        {/* Targeting Section: End Date, Age, Gender */}
-        <div className="targeting-section">
-          <h4>Segmentación del Público</h4>
+        {/* Estrategia de Puja */}
+        <div className="form-group">
+          <label>Estrategia de Puja de la Campaña</label>
+          <div className="budget-level-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {BID_STRATEGIES.map(bs => (
+              <button
+                key={bs.value}
+                type="button"
+                className={`gender-btn ${bidStrategy === bs.value ? 'active' : ''}`}
+                onClick={() => {
+                  setBidStrategy(bs.value);
+                  if (bs.value === 'LOWEST_COST_WITHOUT_CAP') setBidAmount('');
+                }}
+              >
+                {bs.label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            {BID_STRATEGIES.find(bs => bs.value === bidStrategy)?.description || ''}
+          </p>
+          {bidStrategy !== 'LOWEST_COST_WITHOUT_CAP' && (
+            <div style={{ marginTop: '10px' }}>
+              <label>{bidStrategy === 'COST_CAP' ? 'Costo por Resultado Objetivo (COP)' : 'Límite de Puja (COP)'}</label>
+              <input
+                type="number"
+                placeholder={bidStrategy === 'COST_CAP' ? 'Ej: 5000' : 'Ej: 3000'}
+                min="100"
+                step="100"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+              />
+              <p className="hint">
+                {bidStrategy === 'COST_CAP'
+                  ? 'Meta intentará mantener un costo promedio por resultado cerca de este monto'
+                  : 'Meta no pujará más de este monto en cada subasta'}
+              </p>
+            </div>
+          )}
+        </div>
 
-          {/* End Date (Optional) */}
+        {/* Presupuesto y Calendario */}
+        <div className="targeting-section">
+          <h4>Presupuesto y Calendario</h4>
+
+          {/* Schedule: Start Date + End Date */}
           <div className="targeting-row">
-            <div className="targeting-field" style={{ flex: 2 }}>
-              <label>Fecha de Finalización (Opcional)</label>
+            <div className="targeting-field">
+              <label>Fecha de Inicio</label>
+              <input
+                type="datetime-local"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                Deja vacío para iniciar inmediatamente
+              </p>
+            </div>
+            <div className="targeting-field">
+              <label>Fecha de Finalización</label>
               <input
                 type="date"
                 value={endDate}
@@ -1559,10 +1683,39 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 min={new Date().toISOString().split('T')[0]}
               />
               <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-                Deja vacío para que la campaña corra indefinidamente
+                Deja vacío para correr indefinidamente
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Público / Audience Section */}
+        <div className="targeting-section">
+          <h4>Público</h4>
+
+          {/* Advantage+ Audience Toggle */}
+          {templateAdSetConfig.audienceConfig?.allowAdvantage !== false && (
+            <div className="targeting-row">
+              <div className="targeting-field" style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ margin: 0 }}>Advantage+ Público</label>
+                  <button
+                    type="button"
+                    className={`gender-btn ${advantageAudience ? 'active' : ''}`}
+                    onClick={() => setAdvantageAudience(!advantageAudience)}
+                    style={{ padding: '5px 14px', fontSize: '12px' }}
+                  >
+                    {advantageAudience ? 'Activado' : 'Desactivado'}
+                  </button>
+                </div>
+                <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                  {advantageAudience
+                    ? 'Meta ampliará automáticamente tu público para mejorar el rendimiento'
+                    : 'Solo se mostrará a tu público definido, sin expansión automática'}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Age Range */}
           <div className="targeting-row">
@@ -1611,6 +1764,105 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Ubicaciones / Placements */}
+        <div className="targeting-section">
+          <h4>Ubicaciones</h4>
+          <div className="targeting-row">
+            <div className="targeting-field" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ margin: 0 }}>Advantage+ Ubicaciones</label>
+                <button
+                  type="button"
+                  className={`gender-btn ${useAdvantagePlacements ? 'active' : ''}`}
+                  onClick={() => {
+                    setUseAdvantagePlacements(!useAdvantagePlacements);
+                    if (!useAdvantagePlacements) setExcludedPlacements([]);
+                  }}
+                  style={{ padding: '5px 14px', fontSize: '12px' }}
+                >
+                  {useAdvantagePlacements ? 'Activado' : 'Desactivado'}
+                </button>
+              </div>
+              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                {useAdvantagePlacements
+                  ? 'Meta mostrará los anuncios en los lugares donde generen respuesta'
+                  : 'Elige manualmente dónde mostrar tus anuncios'}
+              </p>
+            </div>
+          </div>
+
+          {/* Exclusiones de ubicaciones (siempre visible para excluir específicas) */}
+          {!useAdvantagePlacements && (
+            <div className="targeting-row" style={{ marginTop: '10px' }}>
+              <div className="targeting-field" style={{ flex: 1 }}>
+                <label>Ubicaciones excluidas</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {Object.entries(PLACEMENT_OPTIONS).map(([platform, placements]) => (
+                    <div key={platform}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94A3B8', textTransform: 'capitalize' }}>{platform}</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                        {placements.map(p => {
+                          const key = `${platform}_${p.id}`;
+                          const isExcluded = excludedPlacements.includes(key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              className={`gender-btn ${!isExcluded ? 'active' : ''}`}
+                              style={{ padding: '4px 10px', fontSize: '11px' }}
+                              onClick={() => {
+                                setExcludedPlacements(prev =>
+                                  isExcluded ? prev.filter(e => e !== key) : [...prev, key]
+                                );
+                              }}
+                            >
+                              {p.label} {isExcluded ? '(excluido)' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {useAdvantagePlacements && (
+            <div className="targeting-row" style={{ marginTop: '8px' }}>
+              <div className="targeting-field" style={{ flex: 1 }}>
+                <label>Ubicaciones excluidas (opcional)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    { key: 'facebook_marketplace', label: 'Facebook Marketplace' },
+                    { key: 'facebook_right_column', label: 'Columna derecha de Facebook' }
+                  ].map(p => {
+                    const isExcluded = excludedPlacements.includes(p.key);
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`gender-btn ${isExcluded ? 'active' : ''}`}
+                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                        onClick={() => {
+                          setExcludedPlacements(prev =>
+                            isExcluded ? prev.filter(e => e !== p.key) : [...prev, p.key]
+                          );
+                        }}
+                      >
+                        {isExcluded ? '×' : ''} {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                  Haz clic para excluir ubicaciones específicas
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ============ MULTI-AD SECTION ============ */}
@@ -2339,7 +2591,94 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </button>
         </div>
 
-        {error && <div className="error-message">⚠️ {error}</div>}
+        {/* Editor de Chats (solo para campañas WhatsApp) */}
+        {templateRequirements.whatsapp && (
+          <>
+            <div className="section-divider" style={{ margin: '25px 0 15px' }}>
+              <span>Editor de Chats</span>
+            </div>
+
+            <div className="chat-editor-section" style={{ background: '#1B2333', borderRadius: '12px', padding: '20px', marginBottom: '20px', border: '1px solid #2A3441' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div>
+                  <h4 style={{ margin: 0, color: '#E2E8F0' }}>Plantilla de Mensaje</h4>
+                  <p className="hint" style={{ margin: '4px 0 0' }}>
+                    Configura el mensaje que verán las personas cuando toquen tu anuncio
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={`gender-btn ${showChatEditor ? 'active' : ''}`}
+                  onClick={() => setShowChatEditor(!showChatEditor)}
+                  style={{ padding: '6px 14px', fontSize: '12px' }}
+                >
+                  {showChatEditor ? 'Ocultar' : 'Editar'}
+                </button>
+              </div>
+
+              {/* Preview siempre visible */}
+              <div style={{ background: '#0F1724', borderRadius: '10px', padding: '16px', border: '1px solid #2A3441' }}>
+                <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', fontWeight: 'bold' }}>Mensaje de bienvenida</div>
+                <div style={{ fontSize: '14px', color: '#E2E8F0', marginBottom: '12px' }}>{chatGreeting}</div>
+                <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', fontWeight: 'bold' }}>Detalles del formulario</div>
+                <div style={{ fontSize: '13px', color: '#CBD5E1', marginBottom: '4px' }}>Comparte tus datos de contacto</div>
+                <ol style={{ margin: '4px 0 0', paddingLeft: '20px', fontSize: '13px', color: '#E2E8F0' }}>
+                  {chatFormFields.map((field, i) => {
+                    const fieldInfo = CHAT_FORM_FIELDS.find(f => f.value === field);
+                    return <li key={i}>{fieldInfo?.label || field}</li>;
+                  })}
+                </ol>
+              </div>
+
+              {/* Editor expandido */}
+              {showChatEditor && (
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
+                    <textarea
+                      value={chatGreeting}
+                      onChange={(e) => setChatGreeting(e.target.value)}
+                      rows={3}
+                      style={{ width: '100%', background: '#0F1724', border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', color: '#E2E8F0', fontSize: '14px', resize: 'vertical' }}
+                      placeholder="Te damos la bienvenida. Completa el formulario..."
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {CHAT_FORM_FIELDS.map(field => {
+                        const isSelected = chatFormFields.includes(field.value);
+                        return (
+                          <button
+                            key={field.value}
+                            type="button"
+                            className={`gender-btn ${isSelected ? 'active' : ''}`}
+                            style={{ padding: '5px 12px', fontSize: '12px' }}
+                            onClick={() => {
+                              setChatFormFields(prev =>
+                                isSelected
+                                  ? prev.filter(f => f !== field.value)
+                                  : [...prev, field.value]
+                              );
+                            }}
+                          >
+                            {field.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="hint" style={{ margin: '6px 0 0' }}>
+                      Selecciona los campos que quieres pedir en el formulario de contacto
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {error && <div className="error-message">{error}</div>}
 
         <button type="submit" className="submit-button" disabled={uploading || loadingAudiences}>
           {uploading ? 'Procesando...' : 'Continuar a Crear Campaña'}
@@ -2408,11 +2747,28 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       addLog(`Público: ${job.savedAudienceName || 'Colombia 18-65'}`);
       addLog(`Edad: ${job.ageMin || 18} - ${job.ageMax || 65} años`);
       addLog(`Sexo: ${job.gender === 'male' ? 'Hombres' : job.gender === 'female' ? 'Mujeres' : 'Todos'}`);
+      if (job.startDate) {
+        addLog(`Fecha inicio: ${job.startDate}`);
+      }
       if (job.endDate) {
         addLog(`Fecha fin: ${job.endDate}`);
       }
       const budgetLevelLabel = job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO';
       addLog(`Presupuesto: $${formatCOP(job.dailyBudgetCOP)} COP/día (${budgetLevelLabel})`);
+      if (job.bidStrategy && job.bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+        addLog(`Puja: ${job.bidStrategy}${job.bidAmount ? ' - $' + formatCOP(job.bidAmount) + ' COP' : ''}`);
+      }
+      if (job.specialAdCategories?.length > 0) {
+        addLog(`Categorías especiales: ${job.specialAdCategories.join(', ')}`);
+      }
+      if (job.advantageAudience !== undefined) {
+        addLog(`Advantage+ Público: ${job.advantageAudience ? 'Activado' : 'Desactivado'}`);
+      }
+
+      // Aplicar Advantage+ Audience al targeting
+      if (job.advantageAudience) {
+        targeting.targeting_optimization = 'expansion_all';
+      }
 
       let result;
 
@@ -2422,6 +2778,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         addLog(`WhatsApp: ${job.whatsappNumber}`);
         if (job.whatsappNumberId) {
           addLog(`WhatsApp Business ID: ${job.whatsappNumberId}`);
+        }
+        if (job.chatGreeting) {
+          addLog(`Chat: "${job.chatGreeting.substring(0, 50)}..."`);
         }
         addLog(`Creando campaña para WhatsApp (${totalAds} anuncio(s), presupuesto ${budgetLevelLabel})...`);
 
@@ -2446,7 +2805,17 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           primaryTexts: job.primaryTexts || job.descriptions || [],
           callToAction: job.ctas?.[0] || 'SHOP_NOW',
           objective,
-          optimizationGoal
+          optimizationGoal,
+          // Nuevos campos
+          specialAdCategories: job.specialAdCategories || [],
+          bidStrategy: job.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
+          bidAmount: job.bidAmount || null,
+          startTime: job.startDate || null,
+          endTime: job.endDate || null,
+          pageWelcomeMessage: job.chatGreeting ? {
+            greeting: job.chatGreeting,
+            formFields: job.chatFormFields || []
+          } : null
         });
 
       } else if (conversionLocation === 'MESSENGER') {
@@ -2586,7 +2955,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           jobAds: job.ads || [],
           status: 'PAUSED',
           noImage: job.noImage || !job.imageUrl,
-          needsCreative: !hasAds
+          needsCreative: !hasAds,
+          // Nuevos campos
+          bidStrategy: job.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
+          startDate: job.startDate || null,
+          endDate: job.endDate || null,
+          specialAdCategories: job.specialAdCategories || [],
+          advantageAudience: job.advantageAudience,
+          chatGreeting: job.chatGreeting || null
         });
         setCreated(true);
       } else {
@@ -2630,6 +3006,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 <p className="hint">ID: {draftData.campaignId}</p>
                 <p className="hint">Objetivo: {draftData.objective || 'OUTCOME_TRAFFIC'}</p>
                 <p className="hint">Destino: {draftData.conversionLocation || 'WEBSITE'}</p>
+                {draftData.bidStrategy && draftData.bidStrategy !== 'LOWEST_COST_WITHOUT_CAP' && (
+                  <p className="hint">Puja: {draftData.bidStrategy}</p>
+                )}
+                {draftData.specialAdCategories?.length > 0 && (
+                  <p className="hint">Categorías: {draftData.specialAdCategories.join(', ')}</p>
+                )}
+                {draftData.startDate && <p className="hint">Inicio: {draftData.startDate}</p>}
+                {draftData.endDate && <p className="hint">Fin: {draftData.endDate}</p>}
                 <span className="status-badge paused">PAUSADO</span>
               </div>
             </div>

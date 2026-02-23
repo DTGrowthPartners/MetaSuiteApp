@@ -75,6 +75,30 @@ export const AD_FORMATS = {
   CAROUSEL: { label: 'Carrusel', icon: '🎠', minCards: 2, maxCards: 10 }
 };
 
+// Categorías de anuncios especiales (requerido por Meta para ciertas industrias)
+export const SPECIAL_AD_CATEGORIES = [
+  { value: 'CREDIT', label: 'Crédito / Servicios financieros' },
+  { value: 'EMPLOYMENT', label: 'Empleo' },
+  { value: 'HOUSING', label: 'Vivienda' },
+  { value: 'SOCIAL_ISSUES_ELECTIONS_POLITICS', label: 'Temas sociales, elecciones o política' }
+];
+
+// Estrategias de puja disponibles
+export const BID_STRATEGIES = [
+  { value: 'LOWEST_COST_WITHOUT_CAP', label: 'Volumen más alto', description: 'Meta busca el mayor volumen de resultados al menor costo posible.' },
+  { value: 'COST_CAP', label: 'Costo por resultado', description: 'Establece un costo promedio por resultado objetivo.' },
+  { value: 'BID_CAP', label: 'Límite de puja', description: 'Establece un límite máximo de puja en cada subasta.' }
+];
+
+// Campos predeterminados para el formulario de chat de WhatsApp
+export const CHAT_FORM_FIELDS = [
+  { value: 'name', label: 'Nombre' },
+  { value: 'email', label: 'Correo electrónico' },
+  { value: 'phone', label: 'Número de teléfono' },
+  { value: 'company', label: 'Empresa' },
+  { value: 'city', label: 'Ciudad' }
+];
+
 // ============================================
 // FUNCIONES HELPER
 // ============================================
@@ -285,12 +309,12 @@ export const CAMPAIGN_TEMPLATES = [
     icon: '📋',
     category: 'Clientes potenciales',
     description: 'Captura leads calificados a través de WhatsApp. Meta optimiza para personas que probablemente te escriban.',
-    objective: 'OUTCOME_LEADS',
+    objective: 'OUTCOME_ENGAGEMENT',
     specialAdCategories: [],
     buyingType: 'AUCTION',
     adSetConfig: {
       conversionLocation: 'WHATSAPP',
-      optimizationGoal: 'LEAD_GENERATION',
+      optimizationGoal: 'CONVERSATIONS',
       billingEvent: 'IMPRESSIONS',
       bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
       requiresPixel: false,
