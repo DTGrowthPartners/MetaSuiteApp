@@ -1283,7 +1283,34 @@ function getCampaignContext(objective, destType) {
   };
 }
 
-async function generateContentFromText(transcription, adIndex, category, objective, templateName, destType) {
+// Helper: get text length rules based on user selection
+function getTextLengthRules(textLength) {
+  switch (textLength) {
+    case 'short':
+      return {
+        headlineMax: 30,
+        headlineRule: 'máximo 30 caracteres. Cortos, directos y al grano.',
+        descMin: 50, descMax: 100,
+        descRule: 'entre 50 y 100 caracteres. Breves, directos, con 1 beneficio claro y un llamado a la acción corto.',
+      };
+    case 'long':
+      return {
+        headlineMax: 55,
+        headlineRule: 'máximo 55 caracteres. Impactantes, con gancho emocional fuerte.',
+        descMin: 250, descMax: 400,
+        descRule: 'entre 250 y 400 caracteres. MUY DETALLADOS, con múltiples beneficios, detalles específicos del producto/servicio, prueba social implícita y un cierre persuasivo con llamado a la acción.',
+      };
+    default: // 'medium'
+      return {
+        headlineMax: 50,
+        headlineRule: 'máximo 50 caracteres. Impactantes, con gancho emocional.',
+        descMin: 150, descMax: 250,
+        descRule: 'entre 150 y 250 caracteres. Persuasivos, con beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción.',
+      };
+  }
+}
+
+async function generateContentFromText(transcription, adIndex, category, objective, templateName, destType, textLength = 'medium', campaignContext = '') {
   const angleVariations = [
     'Enfócate en el beneficio principal y la propuesta de valor.',
     'Enfócate en la urgencia y escasez. Usa un tono más directo.',
@@ -1296,14 +1323,15 @@ async function generateContentFromText(transcription, adIndex, category, objecti
 
   const angle = angleVariations[adIndex % angleVariations.length];
   const ctx = getCampaignContext(objective, destType);
+  const len = getTextLengthRules(textLength);
 
   const systemPrompt = `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
 
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
-- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con beneficios claros y un llamado a la acción. Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
+- TÍTULOS (headlines): ${len.headlineRule} Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): ${len.descRule} Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
 - Todo en español
 - MÁXIMO 1 emoji por elemento (título o frase dentro de descripción). Menos es más. Si no aporta, no pongas emoji.
 - NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio
@@ -1315,18 +1343,19 @@ REGLAS ESTRICTAS:
 
 ${category ? `Categoría del negocio: ${category}` : ''}
 ${templateName ? `Tipo de campaña: ${templateName}` : ''}
+${campaignContext ? `\nCONTEXTO DE LA CAMPAÑA (proporcionado por el anunciante, PRIORIZA esta información):\n"${campaignContext}"\n` : ''}
 
 Instrucción de ángulo: ${angle}
 
 Genera exactamente:
-- 5 TÍTULOS llamativos (máx 55 chars) con máximo 1 emoji cada uno - que enganchen y generen curiosidad
-- 5 DESCRIPCIONES largas y persuasivas (150-300 chars cada una) - con beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Máximo 1 emoji por oración, no abuses
+- 5 TÍTULOS llamativos (máx ${len.headlineMax} chars) con máximo 1 emoji cada uno - que enganchen y generen curiosidad
+- 5 DESCRIPCIONES persuasivas (${len.descMin}-${len.descMax} chars cada una) - con beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Máximo 1 emoji por oración, no abuses
 - 5 CTAs variados de esta lista: ${ctx.ctas}
 
 JSON exacto:
 {
   "headlines": ["título", "título", "título", "título", "título"],
-  "descriptions": ["descripción larga y detallada con beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
+  "descriptions": ["descripción con beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }`;
 
@@ -1356,7 +1385,7 @@ JSON exacto:
 }
 
 // Helper: Generate 5+5+5 content from image (vision)
-async function generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType) {
+async function generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType, textLength = 'medium', campaignContext = '') {
   const angleVariations = [
     'Enfócate en el beneficio principal y la propuesta de valor.',
     'Enfócate en la urgencia y escasez. Usa un tono más directo.',
@@ -1369,6 +1398,7 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
 
   const angle = angleVariations[adIndex % angleVariations.length];
   const ctx = getCampaignContext(objective, destType);
+  const len = getTextLengthRules(textLength);
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -1380,8 +1410,8 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
 ${ctx.focus}
 
 REGLAS ESTRICTAS:
-- TÍTULOS (headlines): máximo 55 caracteres. Impactantes, con gancho emocional. Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
-- DESCRIPCIONES (texto principal): entre 150 y 300 caracteres. Este es el texto más visible del anuncio (aparece arriba de la imagen/video). Debe ser DETALLADO, persuasivo, con beneficios claros y un llamado a la acción. Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
+- TÍTULOS (headlines): ${len.headlineRule} Usa MÁXIMO 1 emoji por título (al inicio o final). Deben generar curiosidad o urgencia.
+- DESCRIPCIONES (texto principal): ${len.descRule} Usa MÁXIMO 1 emoji por oración para separar ideas. NO llenes de emojis, sé profesional.
 - Todo en español
 - MÁXIMO 1 emoji por elemento (título o frase dentro de descripción). Menos es más. Si no aporta, no pongas emoji.
 - NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio de la imagen
@@ -1396,12 +1426,13 @@ REGLAS ESTRICTAS:
 
 ${category ? `Categoría del negocio: ${category}` : ''}
 ${templateName ? `Tipo de campaña: ${templateName}` : ''}
+${campaignContext ? `\nCONTEXTO DE LA CAMPAÑA (proporcionado por el anunciante, PRIORIZA esta información):\n"${campaignContext}"\n` : ''}
 Instrucción de ángulo: ${angle}
 
 Genera exactamente en JSON:
 {
-  "headlines": ["título", "título", "título", "título", "título"],
-  "descriptions": ["descripción larga y detallada con beneficios (150-300 chars)...", "otra descripción persuasiva...", "...", "...", "..."],
+  "headlines": ["título (máx ${len.headlineMax} chars)", "título", "título", "título", "título"],
+  "descriptions": ["descripción persuasiva (${len.descMin}-${len.descMax} chars)...", "otra descripción...", "...", "...", "..."],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
@@ -1456,10 +1487,12 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
     const objective = req.body.objective || '';
     const templateName = req.body.templateName || '';
     const destType = req.body.destType || '';
+    const textLength = req.body.textLength || 'medium';
+    const campaignContext = req.body.campaignContext || '';
     const fileName = req.file.originalname || 'video.mp4';
     const fileSize = req.file.size;
 
-    console.log(`Analyzing video: ${fileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB) for ad index ${adIndex}, objective: ${objective}, dest: ${destType}`);
+    console.log(`Analyzing video: ${fileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB) for ad index ${adIndex}, objective: ${objective}, dest: ${destType}, length: ${textLength}`);
 
     let transcription = '';
 
@@ -1508,7 +1541,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
       try {
         const frameBuffer = await extractFrameFromBuffer(req.file.buffer, fileName);
         const base64Frame = frameBuffer.toString('base64');
-        const content = await generateContentFromImage(base64Frame, adIndex, category, objective, templateName, destType);
+        const content = await generateContentFromImage(base64Frame, adIndex, category, objective, templateName, destType, textLength, campaignContext);
 
         return res.json({
           success: true,
@@ -1531,7 +1564,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
     }
 
     // Generate content from transcription
-    const content = await generateContentFromText(transcription, adIndex, category, objective, templateName, destType);
+    const content = await generateContentFromText(transcription, adIndex, category, objective, templateName, destType, textLength, campaignContext);
 
     res.json({
       success: true,
@@ -1572,12 +1605,14 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
     const objective = req.body.objective || '';
     const templateName = req.body.templateName || '';
     const destType = req.body.destType || '';
+    const textLength = req.body.textLength || 'medium';
+    const campaignContext = req.body.campaignContext || '';
     const fileName = req.file.originalname || 'image.jpg';
 
-    console.log(`Analyzing image: ${fileName} for ad index ${adIndex}, objective: ${objective}, dest: ${destType}`);
+    console.log(`Analyzing image: ${fileName} for ad index ${adIndex}, objective: ${objective}, dest: ${destType}, length: ${textLength}`);
 
     const base64Image = req.file.buffer.toString('base64');
-    const content = await generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType);
+    const content = await generateContentFromImage(base64Image, adIndex, category, objective, templateName, destType, textLength, campaignContext);
 
     res.json({
       success: true,
@@ -1606,7 +1641,9 @@ app.post('/api/analyze-media-url', async (req, res) => {
       return res.status(503).json({ success: false, error: 'OpenAI no está configurado.' });
     }
 
-    const { url, type, adIndex: adIndexStr, category, objective, templateName, destType } = req.body;
+    const { url, type, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
+    const textLength = tl || 'medium';
+    const campaignContext = cc || '';
     if (!url) {
       return res.status(400).json({ success: false, error: 'URL requerida' });
     }
@@ -1651,7 +1688,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
         try {
           const frameBuffer = await extractFrameFromBuffer(buffer, 'video.mp4');
           const base64Frame = frameBuffer.toString('base64');
-          const content = await generateContentFromImage(base64Frame, adIndex, category || '', objective || '', templateName || '', destType || '');
+          const content = await generateContentFromImage(base64Frame, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
           return res.json({
             success: true,
             data: {
@@ -1666,7 +1703,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
         }
       }
 
-      const content = await generateContentFromText(transcription, adIndex, category || '', objective || '', templateName || '', destType || '');
+      const content = await generateContentFromText(transcription, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
       return res.json({
         success: true,
         data: {
@@ -1681,7 +1718,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
     } else {
       // Image: analyze with vision
       const base64Image = buffer.toString('base64');
-      const content = await generateContentFromImage(base64Image, adIndex, category || '', objective || '', templateName || '', destType || '');
+      const content = await generateContentFromImage(base64Image, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
       return res.json({
         success: true,
         data: {

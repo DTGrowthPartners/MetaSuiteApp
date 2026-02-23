@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import CampaignDashboard from './components/CampaignDashboard';
 import CreativeBuilder from './components/CreativeBuilder';
 import MetaAdsService from './services/metaAdsApi';
 import './App.css';
@@ -162,7 +161,6 @@ function App() {
     return localStorage.getItem('meta_user_picture') || null;
   });
 
-  const [currentView, setCurrentView] = useState('dashboard');
   const [adAccounts, setAdAccounts] = useState([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [accountsError, setAccountsError] = useState(null);
@@ -230,22 +228,6 @@ function App() {
           <span className="nav-logo">📊</span>
           <span className="nav-title">Meta Suite</span>
         </div>
-        <div className="nav-tabs">
-          <button
-            className={`nav-tab ${currentView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setCurrentView('dashboard')}
-          >
-            <span className="tab-icon">📈</span>
-            Dashboard
-          </button>
-          <button
-            className={`nav-tab ${currentView === 'creative-builder' ? 'active' : ''}`}
-            onClick={() => setCurrentView('creative-builder')}
-          >
-            <span className="tab-icon">🎨</span>
-            Creative Builder
-          </button>
-        </div>
         <div className="nav-info">
           {loadingAccounts ? (
             <span className="account-count">Cargando...</span>
@@ -290,17 +272,7 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        {currentView === 'dashboard' && (
-          <CampaignDashboard
-            apiKey={accessToken}
-            initialAdAccountId=""
-            businessId=""
-            onLogout={handleLogout}
-          />
-        )}
-        {currentView === 'creative-builder' && (
-          <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} />
-        )}
+        <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} />
       </main>
     </div>
   );

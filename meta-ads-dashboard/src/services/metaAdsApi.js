@@ -36,7 +36,7 @@ class MetaAdsService {
   }
 
   // Analyze video file - transcribe audio and generate 5+5+5
-  async analyzeVideoFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '') {
+  async analyzeVideoFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
     try {
       console.log(`Analyzing video for ad ${adIndex}: ${file.name}`);
       const formData = new globalThis.FormData();
@@ -46,6 +46,8 @@ class MetaAdsService {
       if (objective) formData.append('objective', objective);
       if (templateName) formData.append('templateName', templateName);
       if (destType) formData.append('destType', destType);
+      if (textLength) formData.append('textLength', textLength);
+      if (campaignContext) formData.append('campaignContext', campaignContext);
 
       const response = await axios.post(`${BACKEND_API_URL}/analyze-video`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -69,7 +71,7 @@ class MetaAdsService {
   }
 
   // Analyze image file - vision analysis and generate 5+5+5
-  async analyzeImageFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '') {
+  async analyzeImageFile(file, adIndex = 0, category = null, objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
     try {
       console.log(`Analyzing image for ad ${adIndex}: ${file.name}`);
       const formData = new globalThis.FormData();
@@ -79,6 +81,8 @@ class MetaAdsService {
       if (objective) formData.append('objective', objective);
       if (templateName) formData.append('templateName', templateName);
       if (destType) formData.append('destType', destType);
+      if (textLength) formData.append('textLength', textLength);
+      if (campaignContext) formData.append('campaignContext', campaignContext);
 
       const response = await axios.post(`${BACKEND_API_URL}/analyze-image`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -100,11 +104,11 @@ class MetaAdsService {
   }
 
   // Analyze media from URL (server-side download, for Meta library media)
-  async analyzeMediaUrl(url, type = 'image', adIndex = 0, category = '', objective = '', templateName = '', destType = '') {
+  async analyzeMediaUrl(url, type = 'image', adIndex = 0, category = '', objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
     try {
       console.log(`Analyzing ${type} from URL for ad ${adIndex}: ${url.substring(0, 80)}...`);
       const response = await axios.post(`${BACKEND_API_URL}/analyze-media-url`, {
-        url, type, adIndex, category, objective, templateName, destType
+        url, type, adIndex, category, objective, templateName, destType, textLength, campaignContext
       }, {
         timeout: type === 'video' ? 600000 : 60000 // 10min for video, 1min for image
       });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import MetaAdsService from '../services/metaAdsApi';
 import {
@@ -40,7 +40,7 @@ function TemplateSelector({ onSelectTemplate }) {
   return (
     <div className="template-selector">
       <h2>Selecciona una Plantilla</h2>
-      <p className="subtitle">Elige el tipo de campaña que quieres crear. Ya viene pre-configurada.</p>
+      <p className="subtitle">Eligue el tipo de campaña que quieres crear. Ya viene pre-configurada.</p>
 
       {/* Category Filter */}
       <div className="category-filter">
@@ -224,7 +224,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [mediaLibrary, setMediaLibrary] = useState({ images: [], videos: [] });
   const [loadingMedia, setLoadingMedia] = useState(false);
 
-  // (AI content is now auto-generated per-ad when media is uploaded)
+  // AI content generation settings
+  const [textLength, setTextLength] = useState('medium'); // 'short', 'medium', 'long'
+  const [campaignContext, setCampaignContext] = useState(''); // Optional manual context for AI
 
   // Multi-Ad System
   const [adSetMode, setAdSetMode] = useState('dynamic'); // 'single' = 1 AdSet sin 5+5+5, 'dynamic' = N AdSets con 5+5+5 mismo público, 'per-ad' = N AdSets público diferente
@@ -269,6 +271,226 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
   const updateAd = (index, updates) => {
     setAds(prev => prev.map((ad, i) => i === index ? { ...ad, ...updates } : ad));
+  };
+
+  // Multi-file upload ref
+  const multiFileInputRef = useRef(null);
+  const [multiUploadProgress, setMultiUploadProgress] = useState(''); // Progress message for batch upload
+
+  // Multi-file upload mode: 'per-ad' = 1 file per ad, 'single' = all files for 1 ad (upload to library)
+  const [multiUploadMode, setMultiUploadMode] = useState('per-ad');
+
+  // Library multi-select (always active)
+  const [selectedLibraryMedia, setSelectedLibraryMedia] = useState([]); // [{type: 'image'|'video', data: {...}}]
+  const [libraryMode, setLibraryMode] = useState('per-ad'); // 'per-ad' = 1 ad por contenido, 'single' = todo para este ad
+
+  const toggleLibraryMediaSelection = (type, data) => {
+    setSelectedLibraryMedia(prev => {
+      const id = type === 'image' ? data.hash : data.id;
+      const exists = prev.find(m => (type === 'image' ? m.data.hash : m.data.id) === id && m.type === type);
+      if (exists) return prev.filter(m => m !== exists);
+      return [...prev, { type, data }];
+    });
+  };
+
+  const isLibraryMediaSelected = (type, data) => {
+    const id = type === 'image' ? data.hash : data.id;
+    return selectedLibraryMedia.some(m => (type === 'image' ? m.data.hash : m.data.id) === id && m.type === type);
+  };
+
+  // Helper: assign media to an ad index (works even for newly created ads via prev callback)
+  // Helper: build ad fields from a library media item
+  const buildMediaFields = (media) => {
+    if (media.type === 'image') {
+      const img = media.data;
+      return {
+        mediaSource: 'library',
+        imageUrl: img.url || '',
+        imageHash: img.hash || '',
+        videoId: '',
+        videoThumbnailUrl: '',
+        uploadProgress: `Imagen seleccionada: ${img.name || 'Sin nombre'}`
+      };
+    } else {
+      const vid = media.data;
+      return {
+        mediaSource: 'library',
+        videoId: vid.id,
+        videoThumbnailUrl: vid.thumbnails?.data?.[0]?.uri || vid.picture || '',
+        imageUrl: '',
+        imageHash: '',
+        uploadProgress: `Video seleccionado: ${vid.title || 'Sin título'}`
+      };
+    }
+  };
+
+  // Helper: get the analysis URL/type for a library media item
+  const getAnalysisInfo = (media) => {
+    if (media.type === 'image') {
+      return { url: media.data.url || '', mediaType: 'image' };
+    } else {
+      const vid = media.data;
+      const videoSourceUrl = vid.source || '';
+      const thumbUrl = vid.thumbnails?.data?.[0]?.uri || vid.picture || '';
+      if (videoSourceUrl) return { url: videoSourceUrl, mediaType: 'video' };
+      if (thumbUrl) return { url: thumbUrl, mediaType: 'image' };
+      return { url: '', mediaType: 'image' };
+    }
+  };
+
+  // Apply library selection: currentAdIndex = the ad card where the library is open
+  const handleApplyLibrarySelection = async (currentAdIndex) => {
+    if (selectedLibraryMedia.length === 0) return;
+
+    const total = selectedLibraryMedia.length;
+
+    if (libraryMode === 'single' || total === 1) {
+      // Single mode or just 1 selected: assign to current ad
+      setMultiUploadProgress(`Asignando contenido al ad...`);
+      const fields = buildMediaFields(selectedLibraryMedia[0]);
+      setAds(prev => prev.map((ad, i) => i === currentAdIndex ? { ...ad, ...fields } : ad));
+      const info = getAnalysisInfo(selectedLibraryMedia[0]);
+      if (info.url) analyzeLibraryMedia(currentAdIndex, info.url, info.mediaType);
+      setMultiUploadProgress(`Contenido asignado al ad`);
+    } else {
+      // 1 ad por contenido: assign all media in ONE setAds call
+      setMultiUploadProgress(`Creando ${total} ad(s)...`);
+
+      // Build the full new state in a single setAds call
+      const adIndexMap = []; // [{adIndex, media}] for AI analysis after
+      setAds(prev => {
+        const updated = [...prev];
+
+        // First media → current ad
+        updated[currentAdIndex] = { ...updated[currentAdIndex], ...buildMediaFields(selectedLibraryMedia[0]) };
+        adIndexMap.push({ adIndex: currentAdIndex, media: selectedLibraryMedia[0] });
+
+        // Rest → create new ads with media pre-assigned
+        for (let i = 1; i < selectedLibraryMedia.length; i++) {
+          const newAd = { ...createEmptyAd(updated.length), ...buildMediaFields(selectedLibraryMedia[i]) };
+          adIndexMap.push({ adIndex: updated.length, media: selectedLibraryMedia[i] });
+          updated.push(newAd);
+        }
+
+        return updated;
+      });
+
+      // Wait for React to process the state update
+      await new Promise(r => setTimeout(r, 200));
+
+      // Now trigger AI analysis for each ad sequentially
+      for (let i = 0; i < adIndexMap.length; i++) {
+        const { adIndex, media } = adIndexMap[i];
+        const info = getAnalysisInfo(media);
+        if (info.url) {
+          setMultiUploadProgress(`Analizando con IA ${i + 1}/${total}...`);
+          analyzeLibraryMedia(adIndex, info.url, info.mediaType);
+          // Small delay between analyses to avoid rate limits
+          if (i < adIndexMap.length - 1) {
+            await new Promise(r => setTimeout(r, 800));
+          }
+        }
+      }
+
+      setMultiUploadProgress(`${total} ad(s) creado(s)`);
+    }
+
+    setSelectedLibraryMedia([]);
+    setTimeout(() => setMultiUploadProgress(''), 5000);
+  };
+
+  // Multi-file upload handler
+  const handleMultiFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !selectedAccount) return;
+
+    // Reset input so same files can be re-selected
+    e.target.value = '';
+
+    if (multiUploadMode === 'per-ad') {
+      // MODE: 1 file per ad — create N ads
+      setMultiUploadProgress(`Procesando ${files.length} archivo(s)...`);
+
+      // Figure out which files go to existing empty ads and which need new ads
+      const fileAdPairs = await new Promise(resolve => {
+        setAds(prev => {
+          const pairs = [];
+          let updatedAds = [...prev];
+          const usedIndices = new Set();
+
+          for (let i = 0; i < files.length; i++) {
+            const emptyIdx = updatedAds.findIndex((ad, idx) =>
+              ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId && !usedIndices.has(idx)
+            );
+
+            if (emptyIdx !== -1) {
+              pairs.push({ file: files[i], adIndex: emptyIdx });
+              usedIndices.add(emptyIdx);
+            } else {
+              const newAd = createEmptyAd(updatedAds.length);
+              updatedAds = [...updatedAds, newAd];
+              pairs.push({ file: files[i], adIndex: updatedAds.length - 1 });
+            }
+          }
+
+          resolve(pairs);
+          return updatedAds;
+        });
+      });
+
+      // Wait for state to flush
+      await new Promise(r => setTimeout(r, 100));
+
+      for (let i = 0; i < fileAdPairs.length; i++) {
+        const { file, adIndex } = fileAdPairs[i];
+        setMultiUploadProgress(`Subiendo ${i + 1}/${fileAdPairs.length}: ${file.name}`);
+        const fakeEvent = { target: { files: [file] } };
+        await handleAdFileUpload(adIndex, fakeEvent);
+        if (i < fileAdPairs.length - 1) {
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      setMultiUploadProgress(`${fileAdPairs.length} ad(s) creado(s)`);
+      setTimeout(() => setMultiUploadProgress(''), 5000);
+
+    } else {
+      // MODE: All files for 1 ad — upload all to the first empty ad (only first file used, rest go to Meta library)
+      // Find first empty ad or use first ad
+      const targetAdIdx = ads.findIndex(ad => ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId) !== -1
+        ? ads.findIndex(ad => ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId)
+        : 0;
+
+      // Upload first file to the ad (with AI analysis)
+      setMultiUploadProgress(`Subiendo archivo principal: ${files[0].name}`);
+      const fakeEvent = { target: { files: [files[0]] } };
+      await handleAdFileUpload(targetAdIdx, fakeEvent);
+
+      // Upload remaining files to Meta library only (no ad creation)
+      if (files.length > 1) {
+        const metaService = new MetaAdsService(accessToken);
+        for (let i = 1; i < files.length; i++) {
+          setMultiUploadProgress(`Subiendo a biblioteca ${i + 1}/${files.length}: ${files[i].name}`);
+          const file = files[i];
+          const isVideo = file.type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(file.name.toLowerCase().split('.').pop());
+          try {
+            if (isVideo) {
+              await metaService.uploadVideoFile(selectedAccount, file);
+            } else {
+              await metaService.uploadImageFile(selectedAccount, file);
+            }
+          } catch (err) {
+            console.error(`Error uploading ${file.name} to library:`, err);
+          }
+          if (i < files.length - 1) {
+            await new Promise(r => setTimeout(r, 500));
+          }
+        }
+      }
+
+      setMultiUploadProgress(`1 ad creado + ${files.length - 1} archivo(s) subido(s) a biblioteca`);
+      setTimeout(() => setMultiUploadProgress(''), 5000);
+    }
   };
 
   // Campos dinámicos según tipo de campaña
@@ -343,9 +565,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
       let result;
       if (isVideo) {
-        result = await metaService.analyzeVideoFile(file, adIndex, category, objective, templateName, destType);
+        result = await metaService.analyzeVideoFile(file, adIndex, category, objective, templateName, destType, textLength, campaignContext);
       } else {
-        result = await metaService.analyzeImageFile(file, adIndex, category, objective, templateName, destType);
+        result = await metaService.analyzeImageFile(file, adIndex, category, objective, templateName, destType, textLength, campaignContext);
       }
 
       if (result.success && result.data) {
@@ -499,7 +721,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const destType = templateAdConfig.destinationConfig?.type || '';
 
       const result = await metaService.analyzeMediaUrl(
-        mediaUrl, mediaType, adIndex, category, objective, templateName, destType
+        mediaUrl, mediaType, adIndex, category, objective, templateName, destType, textLength, campaignContext
       );
 
       if (result.success && result.data) {
@@ -1446,6 +1668,130 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
+        {/* AI Text Generation Settings */}
+        <div className="form-group" style={{ marginBottom: '15px' }}>
+          <label>Configuracion de textos IA</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#8899AA', alignSelf: 'center', marginRight: '4px' }}>Longitud:</span>
+            {[
+              { value: 'short', label: 'Corto', desc: 'Titulos ~30 chars, Textos ~80 chars' },
+              { value: 'medium', label: 'Medio', desc: 'Titulos ~50 chars, Textos ~200 chars' },
+              { value: 'long', label: 'Largo', desc: 'Titulos ~55 chars, Textos ~300 chars' }
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setTextLength(opt.value)}
+                title={opt.desc}
+                style={{
+                  padding: '6px 14px', borderRadius: '6px', border: '2px solid',
+                  borderColor: textLength === opt.value ? '#4A9FFF' : '#2A3441',
+                  background: textLength === opt.value ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
+                  cursor: 'pointer', fontSize: '12px', fontWeight: textLength === opt.value ? 'bold' : 'normal',
+                  color: textLength === opt.value ? '#4A9FFF' : '#8899AA'
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={campaignContext}
+            onChange={(e) => setCampaignContext(e.target.value)}
+            placeholder="Contexto adicional para la IA (opcional) - Ej: 'Somos una clinica de depilacion laser, enfocarnos en precios bajos y resultados rapidos, el publico es mujeres de 20-35 anos...'"
+            rows={2}
+            style={{
+              width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #2A3441',
+              background: '#1B2333', color: '#E0E0E0', fontSize: '13px', resize: 'vertical',
+              fontFamily: 'inherit'
+            }}
+          />
+          <p className="hint" style={{ marginTop: '4px' }}>
+            {campaignContext.trim()
+              ? 'La IA usara tu contexto para generar los textos.'
+              : 'Sin contexto: la IA generara textos basandose solo en el contenido multimedia que subas.'}
+          </p>
+        </div>
+
+        {/* Multi-file Upload Section */}
+        <div style={{ marginBottom: '15px', border: '1px solid #2A3441', borderRadius: '12px', padding: '14px', background: '#1B2333' }}>
+          <input
+            ref={multiFileInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.mov"
+            onChange={handleMultiFileUpload}
+            style={{ display: 'none' }}
+          />
+          {/* Mode selector */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: '#8899AA', marginRight: '4px' }}>Subida multiple:</span>
+            <button
+              type="button"
+              onClick={() => setMultiUploadMode('per-ad')}
+              style={{
+                padding: '6px 14px', borderRadius: '6px', border: '2px solid',
+                borderColor: multiUploadMode === 'per-ad' ? '#4A9FFF' : '#2A3441',
+                background: multiUploadMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
+                cursor: 'pointer', fontSize: '12px', fontWeight: multiUploadMode === 'per-ad' ? 'bold' : 'normal',
+                color: multiUploadMode === 'per-ad' ? '#4A9FFF' : '#8899AA'
+              }}
+            >
+              1 archivo por Ad
+            </button>
+            <button
+              type="button"
+              onClick={() => setMultiUploadMode('single')}
+              style={{
+                padding: '6px 14px', borderRadius: '6px', border: '2px solid',
+                borderColor: multiUploadMode === 'single' ? '#4A9FFF' : '#2A3441',
+                background: multiUploadMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
+                cursor: 'pointer', fontSize: '12px', fontWeight: multiUploadMode === 'single' ? 'bold' : 'normal',
+                color: multiUploadMode === 'single' ? '#4A9FFF' : '#8899AA'
+              }}
+            >
+              Todo para 1 Ad
+            </button>
+          </div>
+          <p className="hint" style={{ marginBottom: '10px', fontSize: '11px' }}>
+            {multiUploadMode === 'per-ad'
+              ? 'Cada archivo crea un ad nuevo automaticamente con su contenido IA.'
+              : 'El primer archivo se usa para el ad, el resto se sube a la biblioteca de Meta.'}
+          </p>
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => multiFileInputRef.current?.click()}
+              disabled={!selectedAccount}
+              style={{
+                padding: '10px 18px', borderRadius: '10px', border: '2px solid #4A9FFF',
+                background: 'rgba(74, 159, 255, 0.12)', color: '#4A9FFF',
+                cursor: selectedAccount ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 'bold',
+                opacity: selectedAccount ? 1 : 0.5
+              }}
+            >
+              Subir Multiples Archivos
+            </button>
+            <button
+              type="button"
+              onClick={addAd}
+              style={{
+                padding: '10px 18px', borderRadius: '10px', border: '2px dashed #4A9FFF',
+                background: 'transparent', color: '#4A9FFF',
+                cursor: 'pointer', fontSize: '13px', fontWeight: 'bold'
+              }}
+            >
+              + Agregar Ad Vacio
+            </button>
+            {multiUploadProgress && (
+              <span style={{ fontSize: '12px', color: '#4A9FFF' }}>
+                {multiUploadProgress}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Ad Cards */}
         <div className="ads-section">
           {ads.map((ad, adIndex) => (
@@ -1592,9 +1938,57 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   </button>
                 </div>
 
-                {/* Library Browser */}
+                {/* Library Browser — multi-select directo */}
                 {ad.mediaSource === 'library' && (
-                  <div style={{ border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', maxHeight: '250px', overflowY: 'auto' }}>
+                  <div style={{ border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', maxHeight: '350px', overflowY: 'auto' }}>
+                    {/* Mode selector + apply button (always visible) */}
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#8899AA' }}>Modo:</span>
+                      <button
+                        type="button"
+                        onClick={() => { setLibraryMode('single'); setSelectedLibraryMedia([]); }}
+                        style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
+                          border: `1px solid ${libraryMode === 'single' ? '#4A9FFF' : '#2A3441'}`,
+                          background: libraryMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
+                          color: libraryMode === 'single' ? '#4A9FFF' : '#8899AA', cursor: 'pointer',
+                          fontWeight: libraryMode === 'single' ? 'bold' : 'normal'
+                        }}
+                      >
+                        Para este Ad
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setLibraryMode('per-ad'); setSelectedLibraryMedia([]); }}
+                        style={{
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
+                          border: `1px solid ${libraryMode === 'per-ad' ? '#4A9FFF' : '#2A3441'}`,
+                          background: libraryMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
+                          color: libraryMode === 'per-ad' ? '#4A9FFF' : '#8899AA', cursor: 'pointer',
+                          fontWeight: libraryMode === 'per-ad' ? 'bold' : 'normal'
+                        }}
+                      >
+                        1 Ad por contenido
+                      </button>
+                      {selectedLibraryMedia.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleApplyLibrarySelection(adIndex)}
+                          style={{
+                            padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold',
+                            border: '2px solid #34D399', background: 'rgba(52, 211, 153, 0.15)',
+                            color: '#34D399', cursor: 'pointer', marginLeft: 'auto'
+                          }}
+                        >
+                          Aplicar ({selectedLibraryMedia.length})
+                        </button>
+                      )}
+                    </div>
+                    <p className="hint" style={{ fontSize: '10px', marginBottom: '8px' }}>
+                      {libraryMode === 'single'
+                        ? 'Haz click para seleccionar el contenido de este ad.'
+                        : 'Selecciona varios y haz click en "Aplicar" para crear 1 ad por cada uno.'}
+                    </p>
                     {loadingMedia ? (
                       <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>Cargando biblioteca...</p>
                     ) : (
@@ -1609,35 +2003,54 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                   Imágenes ({mediaLibrary.images.length})
                                 </p>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px' }}>
-                                  {mediaLibrary.images.map((img, i) => (
-                                    <div
-                                      key={img.hash || i}
-                                      onClick={() => handleAdSelectLibraryImage(adIndex, img)}
-                                      style={{
-                                        cursor: 'pointer',
-                                        border: ad.imageHash === img.hash ? '3px solid #4A9FFF' : '2px solid #2A3441',
-                                        borderRadius: '6px',
-                                        overflow: 'hidden',
-                                        position: 'relative',
-                                        aspectRatio: '1'
-                                      }}
-                                    >
-                                      <img
-                                        src={img.url}
-                                        alt={img.name || 'Ad image'}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                      />
-                                      {ad.imageHash === img.hash && (
-                                        <div style={{
-                                          position: 'absolute', top: '2px', right: '2px',
-                                          background: '#4A9FFF', color: 'white', borderRadius: '50%',
-                                          width: '16px', height: '16px', display: 'flex',
-                                          alignItems: 'center', justifyContent: 'center', fontSize: '10px'
-                                        }}>v</div>
-                                      )}
-                                    </div>
-                                  ))}
+                                  {mediaLibrary.images.map((img, i) => {
+                                    const isSel = isLibraryMediaSelected('image', img);
+                                    return (
+                                      <div
+                                        key={img.hash || i}
+                                        onClick={() => {
+                                          if (libraryMode === 'single') {
+                                            // Directo: asignar a este ad
+                                            handleAdSelectLibraryImage(adIndex, img);
+                                          } else {
+                                            // Multi: toggle seleccion
+                                            toggleLibraryMediaSelection('image', img);
+                                          }
+                                        }}
+                                        style={{
+                                          cursor: 'pointer',
+                                          border: (isSel || ad.imageHash === img.hash) ? '3px solid #4A9FFF' : '2px solid #2A3441',
+                                          borderRadius: '6px',
+                                          overflow: 'hidden',
+                                          position: 'relative',
+                                          aspectRatio: '1'
+                                        }}
+                                      >
+                                        <img
+                                          src={img.url}
+                                          alt={img.name || 'Ad image'}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        {isSel && (
+                                          <div style={{
+                                            position: 'absolute', top: '2px', right: '2px',
+                                            background: '#F59E0B', color: 'white', borderRadius: '50%',
+                                            width: '18px', height: '18px', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold'
+                                          }}>{selectedLibraryMedia.findIndex(m => m.type === 'image' && m.data.hash === img.hash) + 1}</div>
+                                        )}
+                                        {!isSel && ad.imageHash === img.hash && (
+                                          <div style={{
+                                            position: 'absolute', top: '2px', right: '2px',
+                                            background: '#4A9FFF', color: 'white', borderRadius: '50%',
+                                            width: '16px', height: '16px', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px'
+                                          }}>v</div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -1649,17 +2062,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '6px' }}>
                                   {mediaLibrary.videos.map((vid, i) => {
                                     const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
-                                    const isSelected = ad.videoId === vid.id;
+                                    const isSel = isLibraryMediaSelected('video', vid);
                                     return (
                                       <div
                                         key={vid.id || i}
-                                        onClick={() => handleAdSelectLibraryVideo(adIndex, vid)}
+                                        onClick={() => {
+                                          if (libraryMode === 'single') {
+                                            handleAdSelectLibraryVideo(adIndex, vid);
+                                          } else {
+                                            toggleLibraryMediaSelection('video', vid);
+                                          }
+                                        }}
                                         style={{
-                                          border: isSelected ? '3px solid #4A9FFF' : '2px solid #2A3441',
+                                          border: (isSel || ad.videoId === vid.id) ? '3px solid #4A9FFF' : '2px solid #2A3441',
                                           borderRadius: '6px',
                                           overflow: 'hidden',
                                           cursor: 'pointer',
-                                          background: isSelected ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
+                                          background: (isSel || ad.videoId === vid.id) ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
                                           position: 'relative'
                                         }}
                                       >
@@ -1676,7 +2095,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                           </p>
                                           {vid.length && <p style={{ color: '#94A3B8', margin: 0 }}>{Math.round(vid.length)}s</p>}
                                         </div>
-                                        {isSelected && (
+                                        {isSel && (
+                                          <div style={{
+                                            position: 'absolute', top: '2px', right: '2px',
+                                            background: '#F59E0B', color: 'white', borderRadius: '50%',
+                                            width: '18px', height: '18px', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold'
+                                          }}>{selectedLibraryMedia.findIndex(m => m.type === 'video' && m.data.id === vid.id) + 1}</div>
+                                        )}
+                                        {!isSel && ad.videoId === vid.id && (
                                           <div style={{
                                             position: 'absolute', top: '2px', right: '2px',
                                             background: '#4A9FFF', color: 'white', borderRadius: '50%',
