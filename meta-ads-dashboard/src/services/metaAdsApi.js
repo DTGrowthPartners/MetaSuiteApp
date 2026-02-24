@@ -2564,8 +2564,8 @@ class MetaAdsService {
       }];
     }
 
-    // WhatsApp: siempre usar creative estándar (no dynamic creative / asset_feed_spec)
-    // El CTA WHATSAPP_MESSAGE no es compatible con asset_feed_spec (requiere link_urls).
+    // WhatsApp: Meta NO soporta isDynamicCreative con objetivos de mensajería.
+    // Los modos dynamic/per-ad controlan la estructura de AdSets (N AdSets vs 1), no el tipo de creative.
     const useDynamicCreative = false;
 
     try {

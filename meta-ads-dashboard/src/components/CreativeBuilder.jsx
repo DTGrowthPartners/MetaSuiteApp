@@ -2872,10 +2872,15 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        const adsArray = job.ads?.length > 0 ? job.ads : [job]; // Fallback a legacy single-ad
+        const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
+        const mode = job.adSetMode || 'dynamic';
+        const useDynamic = mode === 'dynamic' || mode === 'per-ad';
+        const modeLabel = mode === 'single' ? `1 Ad Set → ${totalAds} Ads (sin 5+5+5)`
+          : mode === 'dynamic' ? `${totalAds} Ad Set(s) con 5+5+5 (mismo público)`
+          : `${totalAds} Ad Set(s) con 5+5+5 (público diferente)`;
 
-        addLog(`Creando campaña para ${destLabel} (${totalAds} ad${totalAds > 1 ? 's' : ''})...`);
+        addLog(`Creando campaña para ${destLabel} (${modeLabel})...`);
 
         // 1. Crear Campaña
         const campaignResult = await metaService.createCampaign(job.adAccountId, {
@@ -2889,29 +2894,110 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           result = { success: false, errors: [`Campaign: ${campaignResult.error}`] };
         } else {
           addLog(`Campaña creada: ${campaignResult.data.id}`);
+          const createdAds = [];
+          const createdAdSets = [];
+          const errors = [];
 
-          // 2. Crear Ad Set
-          const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
-          const adSetResult = await metaService[adSetMethod](job.adAccountId, {
-            name: `${job.campaignName} - Ad Set`,
-            campaignId: campaignResult.data.id,
-            targeting,
-            optimizationGoal,
-            promotedObject: { page_id: job.pageId }
-          });
+          if (mode === 'single') {
+            // ========== MODO SINGLE: 1 AdSet → N standard creatives (1-1-1) ==========
+            const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
+            const adSetResult = await metaService[adSetMethod](job.adAccountId, {
+              name: `${job.campaignName} - Ad Set`,
+              campaignId: campaignResult.data.id,
+              targeting,
+              optimizationGoal,
+              promotedObject: { page_id: job.pageId }
+            });
 
-          if (!adSetResult.success) {
-            result = { success: false, campaign: campaignResult.data, errors: [`AdSet: ${adSetResult.error}`] };
+            if (!adSetResult.success) {
+              errors.push(`AdSet: ${adSetResult.error}`);
+            } else {
+              addLog(`Ad Set creado: ${adSetResult.data.id}`);
+              createdAdSets.push(adSetResult.data);
+
+              for (let i = 0; i < totalAds; i++) {
+                const ad = adsArray[i];
+                const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
+                const adVideoId = ad.videoId || null;
+                const adImageUrl = ad.imageUrl || null;
+                const adImageHash = ad.imageHash || null;
+                const adThumbnailUrl = ad.videoThumbnailUrl || null;
+                const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
+                const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
+                const adCta = ad.ctas?.[0] || defaultCta;
+
+                addLog(`Creando standard creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+
+                const creativeMethod = isIgDM ? 'createCreativeForInstagramDM' : 'createCreativeForMessenger';
+                const creativeParams = {
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                  pageId: job.pageId,
+                  imageHash: adImageHash,
+                  imageUrl: adImageUrl,
+                  videoId: adVideoId,
+                  videoThumbnailUrl: adThumbnailUrl,
+                  primaryText: adDescriptions[0] || 'Envíanos un mensaje',
+                  headline: adHeadlines[0] || 'Contáctanos',
+                  description: adDescriptions[1] || adHeadlines[1] || '',
+                  callToAction: adCta
+                };
+                if (isIgDM) creativeParams.igActorId = job.igActorId;
+
+                const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);
+
+                if (!creativeResult.success) {
+                  errors.push(`Creative${adLabel}: ${creativeResult.error}`);
+                  addLog(`Error creative${adLabel}: ${creativeResult.error}`);
+                  continue;
+                }
+
+                const adResult = await metaService.createAd(job.adAccountId, {
+                  name: ad.adName || `${job.campaignName} - Ad${adLabel}`,
+                  adsetId: adSetResult.data.id,
+                  creativeId: creativeResult.data.id,
+                  status: 'PAUSED'
+                });
+
+                if (!adResult.success) {
+                  errors.push(`Ad${adLabel}: ${adResult.error}`);
+                  addLog(`Error ad${adLabel}: ${adResult.error}`);
+                } else {
+                  createdAds.push(adResult.data);
+                  addLog(`Ad${adLabel} creado: ${adResult.data.id}`);
+                }
+              }
+            }
           } else {
-            addLog(`Ad Set creado: ${adSetResult.data.id}`);
-
-            // 3. Iterar por cada ad: crear Creative + Ad
-            const createdAds = [];
-            const errors = [];
-
+            // ========== MODO DYNAMIC/PER-AD: N AdSets con standard creatives ==========
+            // Meta NO soporta isDynamicCreative con objetivos de mensajería.
+            // Los modos controlan la estructura de AdSets (N AdSets, CBO distribuye).
             for (let i = 0; i < totalAds; i++) {
               const ad = adsArray[i];
               const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
+              const adTargeting = (mode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : targeting;
+              const audienceLabel = (mode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : '';
+
+              addLog(`Creando Ad Set${adLabel} + creative${audienceLabel}...`);
+
+              // Crear AdSet usando método específico de messaging (sin isDynamicCreative)
+              const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
+              const adSetResult = await metaService[adSetMethod](job.adAccountId, {
+                name: `${job.campaignName} - Ad Set${adLabel}${audienceLabel}`,
+                campaignId: campaignResult.data.id,
+                targeting: adTargeting,
+                optimizationGoal,
+                promotedObject: { page_id: job.pageId }
+              });
+
+              if (!adSetResult.success) {
+                errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
+                addLog(`Error AdSet${adLabel}: ${adSetResult.error}`);
+                continue;
+              }
+              createdAdSets.push(adSetResult.data);
+              addLog(`Ad Set${adLabel} creado: ${adSetResult.data.id}`);
+
+              // Preparar datos del ad
               const adVideoId = ad.videoId || null;
               const adImageUrl = ad.imageUrl || null;
               const adImageHash = ad.imageHash || null;
@@ -2920,9 +3006,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
               const adCta = ad.ctas?.[0] || defaultCta;
 
-              addLog(`Creando creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+              addLog(`Creando standard creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
 
-              // Crear Creative
+              // Crear Standard Creative (messaging no soporta asset_feed_spec / 5+5+5)
               const creativeMethod = isIgDM ? 'createCreativeForInstagramDM' : 'createCreativeForMessenger';
               const creativeParams = {
                 name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
@@ -2946,7 +3032,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 continue;
               }
 
-              // Crear Ad
               const adResult = await metaService.createAd(job.adAccountId, {
                 name: ad.adName || `${job.campaignName} - Ad${adLabel}`,
                 adsetId: adSetResult.data.id,
@@ -2962,16 +3047,17 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 addLog(`Ad${adLabel} creado: ${adResult.data.id}`);
               }
             }
-
-            result = {
-              success: createdAds.length > 0,
-              campaign: campaignResult.data,
-              adSet: adSetResult.data,
-              ads: createdAds,
-              errors
-            };
-            addLog(`${destLabel}: ${createdAds.length}/${totalAds} ads creados exitosamente`);
           }
+
+          result = {
+            success: createdAds.length > 0,
+            campaign: campaignResult.data,
+            adSets: createdAdSets,
+            adSet: createdAdSets[0] || null,
+            ads: createdAds,
+            errors
+          };
+          addLog(`${destLabel}: ${createdAds.length}/${totalAds} ads creados exitosamente`);
         }
 
       } else {
