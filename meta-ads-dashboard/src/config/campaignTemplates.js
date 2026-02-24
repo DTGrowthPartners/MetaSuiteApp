@@ -1,10 +1,11 @@
 // ============================================
 // SISTEMA DE PLANTILLAS DE CAMPAÑAS META ADS
-// 7 plantillas principales para tu negocio
+// 8 plantillas principales para tu negocio
 // ============================================
 
 // Objetivos de campaña disponibles en Meta Ads
 export const CAMPAIGN_OBJECTIVES = {
+  OUTCOME_AWARENESS: { label: 'Reconocimiento', icon: '📢', description: 'Aumenta el reconocimiento de marca y alcanza más personas' },
   OUTCOME_TRAFFIC: { label: 'Tráfico', icon: '🌐', description: 'Lleva personas a tu sitio web o evento' },
   OUTCOME_LEADS: { label: 'Clientes potenciales', icon: '📋', description: 'Recopila información de personas interesadas' },
   OUTCOME_SALES: { label: 'Ventas', icon: '💰', description: 'Encuentra personas que comprarán tus productos' },
@@ -23,7 +24,9 @@ export const OPTIMIZATION_GOALS = {
   // Ventas
   VALUE: 'Valor de conversión',
   // Interacción
-  CONVERSATIONS: 'Conversaciones'
+  CONVERSATIONS: 'Conversaciones',
+  // Reconocimiento
+  THRUPLAY: 'Maximizar reproducciones de ThruPlay'
 };
 
 // Opciones de CTA disponibles
@@ -41,7 +44,8 @@ export const CTA_OPTIONS = [
   { value: 'CONTACT_US', label: 'Contactar' },
   { value: 'GET_QUOTE', label: 'Obtener cotización' },
   { value: 'WHATSAPP_MESSAGE', label: 'WhatsApp' },
-  { value: 'SEND_MESSAGE', label: 'Enviar mensaje' },
+  { value: 'MESSAGE_PAGE', label: 'Enviar mensaje (Messenger)' },
+  { value: 'INSTAGRAM_MESSAGE', label: 'Enviar mensaje (Instagram)' },
   { value: 'CALL_NOW', label: 'Llamar ahora' },
   { value: 'GET_DIRECTIONS', label: 'Cómo llegar' },
   { value: 'BOOK_TRAVEL', label: 'Reservar' },
@@ -139,7 +143,7 @@ export const getCTALabel = (ctaValue) => {
 };
 
 // ============================================
-// PLANTILLAS DE CAMPAÑAS (7 total)
+// PLANTILLAS DE CAMPAÑAS (8 total)
 // ============================================
 
 export const CAMPAIGN_TEMPLATES = [
@@ -342,7 +346,7 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_IMAGE',
       destinationConfig: { type: 'WHATSAPP', requiresUrl: false, requiresWhatsAppNumber: true },
-      allowedCtas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US', 'SEND_MESSAGE'],
+      allowedCtas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US', 'MESSAGE_PAGE'],
       defaultCta: 'WHATSAPP_MESSAGE',
       trackingConfig: { requiresPixel: false }
     },
@@ -487,7 +491,7 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_IMAGE',
       destinationConfig: { type: 'WHATSAPP', requiresUrl: false, requiresWhatsAppNumber: true },
-      allowedCtas: ['WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'GET_QUOTE', 'CONTACT_US'],
+      allowedCtas: ['WHATSAPP_MESSAGE', 'MESSAGE_PAGE', 'GET_QUOTE', 'CONTACT_US'],
       defaultCta: 'WHATSAPP_MESSAGE',
       trackingConfig: { requiresPixel: false }
     },
@@ -513,7 +517,7 @@ export const CAMPAIGN_TEMPLATES = [
         'No te quedes con la duda. Escríbenos por WhatsApp y te damos la información que necesitas. Es gratis y sin compromiso.',
         'Conecta con nosotros al instante. Nuestro equipo está listo para atenderte por WhatsApp. ¡Escríbenos!'
       ],
-      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US']
+      ctas: ['WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'WHATSAPP_MESSAGE', 'MESSAGE_PAGE', 'CONTACT_US']
     }
   },
 
@@ -633,8 +637,8 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_IMAGE',
       destinationConfig: { type: 'INSTAGRAM_DIRECT', requiresUrl: false },
-      allowedCtas: ['SEND_MESSAGE', 'CONTACT_US', 'GET_QUOTE'],
-      defaultCta: 'SEND_MESSAGE',
+      allowedCtas: ['INSTAGRAM_MESSAGE', 'CONTACT_US', 'GET_QUOTE'],
+      defaultCta: 'INSTAGRAM_MESSAGE',
       trackingConfig: { requiresPixel: false }
     },
     creativeContent: {
@@ -659,7 +663,93 @@ export const CAMPAIGN_TEMPLATES = [
         'Información exclusiva por DM. Escríbenos "Quiero saber más" y te enviamos todos los detalles al instante.',
         'Miles de personas ya nos escribieron por DM y obtuvieron la mejor asesoría. ¡Te estamos esperando!'
       ],
-      ctas: ['SEND_MESSAGE', 'SEND_MESSAGE', 'SEND_MESSAGE', 'CONTACT_US', 'GET_QUOTE']
+      ctas: ['INSTAGRAM_MESSAGE', 'INSTAGRAM_MESSAGE', 'INSTAGRAM_MESSAGE', 'CONTACT_US', 'GET_QUOTE']
+    }
+  },
+
+  // ==========================================
+  // 8. RECONOCIMIENTO THRUPLAY (MESSENGER)
+  // ==========================================
+  {
+    id: 'awareness_thruplay_messenger',
+    name: 'Reconocimiento ThruPlay',
+    icon: '📢',
+    category: 'Reconocimiento',
+    description: 'Maximiza reproducciones de video (ThruPlay) para reconocimiento de marca. Dirige a Messenger para iniciar conversaciones con personas interesadas.',
+    objective: 'OUTCOME_AWARENESS',
+    specialAdCategories: [],
+    buyingType: 'AUCTION',
+    adSetConfig: {
+      conversionLocation: 'MESSENGER', // Default, pero el usuario puede elegir
+      destinationOptions: [
+        { id: 'MESSENGER', label: 'Messenger', icon: '💭', description: 'Dirige a Messenger de Facebook' },
+        { id: 'INSTAGRAM_DIRECT', label: 'Instagram Direct', icon: '📸', description: 'Dirige a DMs de Instagram', requiresInstagram: true },
+        { id: 'WHATSAPP', label: 'WhatsApp', icon: '💬', description: 'Dirige a WhatsApp Business', requiresWhatsApp: true }
+      ],
+      optimizationGoal: 'THRUPLAY',
+      billingEvent: 'IMPRESSIONS',
+      bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
+      requiresPixel: false,
+      requiresWhatsApp: false,
+      requiresInstagram: false,
+      budgetType: 'daily',
+      suggestedBudget: 10000,
+      minBudget: 5000,
+      maxBudget: 300000,
+      scheduleConfig: { allowScheduling: true, allowEndDate: true },
+      audienceConfig: {
+        allowAdvantage: true,
+        allowCustomAudiences: true,
+        allowLookalikes: true,
+        defaultTargeting: { geo_locations: { countries: ['CO'] }, age_min: 18, age_max: 65, genders: [0] }
+      },
+      placementsConfig: {
+        allowAdvantage: true,
+        excludedPlacements: ['right_column', 'marketplace'],
+        defaultPlacements: {
+          facebook: ['feed', 'story', 'reels'],
+          instagram: ['stream', 'story', 'reels', 'explore'],
+          messenger: ['messenger_home', 'story']
+        }
+      }
+    },
+    adConfig: {
+      allowedFormats: ['SINGLE_VIDEO'],
+      defaultFormat: 'SINGLE_VIDEO',
+      destinationConfig: {
+        type: 'MESSENGER', // Default, se sobreescribe según selección del usuario
+        requiresUrl: false,
+        requiresWhatsAppNumber: false,
+        allowDisplayUrl: false,
+        allowUtmParams: true
+      },
+      allowedCtas: ['MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'LEARN_MORE', 'CONTACT_US'],
+      defaultCta: 'MESSAGE_PAGE',
+      trackingConfig: { requiresPixel: false, allowAppEvents: false }
+    },
+    creativeContent: {
+      headlines: [
+        'Chat with us',
+        'Conoce más de nosotros',
+        'Envíanos un mensaje',
+        'Descubre lo que hacemos',
+        'Hablemos por Messenger'
+      ],
+      descriptions: [
+        'Hacemos que tu negocio venda más con campañas digitales efectivas.',
+        'Resultados reales, no promesas. Escríbenos para saber más.',
+        'Tecnología que simplifica tu operación. Conoce cómo funciona.',
+        'Campañas digitales que generan resultados medibles para tu negocio.',
+        'Descubre cómo podemos ayudarte a crecer. Un mensaje y te contamos todo.'
+      ],
+      primaryTexts: [
+        'Hacemos que tu negocio venda más con campañas digitales efectivas y tecnología que simplifica tu operación. Resultados reales, no promesas.',
+        '¿Quieres llevar tu negocio al siguiente nivel? Te ayudamos con estrategias digitales probadas que generan resultados. Escríbenos por Messenger.',
+        'Deja de gastar en publicidad que no funciona. Nuestro equipo crea campañas optimizadas que realmente convierten. Envíanos un mensaje.',
+        'Tu negocio merece crecer. Con nuestra tecnología y estrategia digital, lo hacemos posible. ¿Hablamos?',
+        'Más de 100 negocios ya confían en nosotros para sus campañas digitales. Descubre por qué. Envía un mensaje ahora.'
+      ],
+      ctas: ['MESSAGE_PAGE', 'MESSAGE_PAGE', 'MESSAGE_PAGE', 'LEARN_MORE', 'CONTACT_US']
     }
   }
 ];

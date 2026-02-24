@@ -221,6 +221,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
+  // Destino seleccionable (para plantillas con destinationOptions)
+  const destinationOptions = templateAdSetConfig.destinationOptions || null;
+  const [selectedDestination, setSelectedDestination] = useState(
+    templateAdSetConfig.conversionLocation || 'WEBSITE'
+  );
+
   // Campos obligatorios para crear el anuncio
   const [linkUrl, setLinkUrl] = useState(''); // URL de destino
 
@@ -597,17 +603,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
 
       if (result.success && result.data) {
-        const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
-        const isIgProfile = templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : 'LEARN_MORE';
+        // Determinar destino efectivo (dinámico si hay destinationOptions, sino del template)
+        const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+        const isWhatsApp = effectiveDestination === 'WHATSAPP';
+        const isMessenger = effectiveDestination === 'MESSENGER';
+        const isIgDirect = effectiveDestination === 'INSTAGRAM_DIRECT';
+        const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
+        const isMessaging = isMessenger || isIgDirect;
+        // CTAs correctos por destino según Meta API
+        const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
-          // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
-          // Instagram Profile: usar VISIT_INSTAGRAM_PROFILE como CTA por defecto
-          ...(!isWhatsApp && { ctas: isIgProfile
-            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
-            : (result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]) }),
+          // Messaging destinations: forzar CTA de mensajería, no usar los generados por IA
+          ...((isWhatsApp || isMessaging || isIgProfile)
+            ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
+            : { ctas: result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method === 'whisper' ? 'audio transcrito' : 'análisis visual'})`,
@@ -751,17 +763,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       );
 
       if (result.success && result.data) {
-        const isWhatsApp = templateAdSetConfig?.conversionLocation === 'WHATSAPP';
-        const isIgProfile = templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : 'LEARN_MORE';
+        // Determinar destino efectivo (dinámico si hay destinationOptions, sino del template)
+        const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+        const isWhatsApp = effectiveDestination === 'WHATSAPP';
+        const isMessenger = effectiveDestination === 'MESSENGER';
+        const isIgDirect = effectiveDestination === 'INSTAGRAM_DIRECT';
+        const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
+        const isMessaging = isMessenger || isIgDirect;
+        // CTAs correctos por destino según Meta API
+        const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
-          // WhatsApp: no generar CTAs, siempre usar WHATSAPP_MESSAGE predeterminado
-          // Instagram Profile: usar VISIT_INSTAGRAM_PROFILE como CTA por defecto
-          ...(!isWhatsApp && { ctas: isIgProfile
-            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
-            : (result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]) }),
+          // Messaging destinations: forzar CTA de mensajería
+          ...((isWhatsApp || isMessaging || isIgProfile)
+            ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
+            : { ctas: result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method || mediaType})`,
@@ -1119,14 +1137,22 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       return;
     }
 
+    // Validar Instagram si el destino es Instagram Direct
+    const effectiveDestForValidation = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+    if ((effectiveDestForValidation === 'INSTAGRAM_DIRECT' || templateRequirements.instagram) && !selectedIgAccount) {
+      setError('Por favor selecciona una cuenta de Instagram (requerida para Instagram Direct)');
+      return;
+    }
+
     // Validar URL solo si es requerida
     if (templateRequirements.website && !linkUrl.trim()) {
       setError('Por favor ingresa la URL de destino');
       return;
     }
 
-    // Validar WhatsApp si es requerido
-    if (templateRequirements.whatsapp) {
+    // Validar WhatsApp si es requerido (por plantilla o por destino seleccionado)
+    const needsWhatsApp = templateRequirements.whatsapp || (destinationOptions && selectedDestination === 'WHATSAPP');
+    if (needsWhatsApp) {
       if (whatsappMode === 'per-ad') {
         // Validar que cada ad tenga un número seleccionado
         const adsMissingNumber = ads.filter(ad => !ad.whatsappNumberId);
@@ -1177,8 +1203,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       // Agregar prefijo "CARLOS - " al nombre de la campaña
       const fullCampaignName = `${CAMPAIGN_PREFIX}${campaignName.trim()}`;
 
-      // Determinar tipo de campaña basado en la plantilla
-      const conversionLocation = templateAdSetConfig.conversionLocation || 'WEBSITE';
+      // Determinar tipo de campaña basado en la plantilla (o destino seleccionado por el usuario)
+      const conversionLocation = destinationOptions ? selectedDestination : (templateAdSetConfig.conversionLocation || 'WEBSITE');
 
       // Build ads array for multi-ad
       const builtAds = ads.map((ad, i) => ({
@@ -1417,6 +1443,30 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
+        {/* Destination Selector - Para plantillas con múltiples destinos */}
+        {destinationOptions && destinationOptions.length > 1 && (
+          <div className="form-group">
+            <label>Destino del anuncio *</label>
+            <p className="hint" style={{ marginBottom: '8px' }}>Elige a dónde se dirigirán las personas al interactuar con tu anuncio</p>
+            <div className="budget-level-selector">
+              {destinationOptions.map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`budget-btn ${selectedDestination === opt.id ? 'active' : ''}`}
+                  onClick={() => setSelectedDestination(opt.id)}
+                  title={opt.description}
+                >
+                  {opt.icon} {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="hint" style={{ marginTop: '6px' }}>
+              {destinationOptions.find(o => o.id === selectedDestination)?.description || ''}
+            </p>
+          </div>
+        )}
+
         {/* Landing Page URL - Solo si es requerido */}
         {templateRequirements.website && (
           <div className="form-group">
@@ -1433,7 +1483,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         )}
 
         {/* WhatsApp Number - Selector de WhatsApp Business */}
-        {templateRequirements.whatsapp && (
+        {(templateRequirements.whatsapp || (destinationOptions && selectedDestination === 'WHATSAPP')) && (
           <div className="form-group">
             <label>Número de WhatsApp Business *</label>
             {loadingWhatsAppNumbers ? (
@@ -2818,46 +2868,111 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           } : null
         });
 
-      } else if (conversionLocation === 'MESSENGER') {
-        addLog('Creando campaña para Messenger...');
+      } else if (conversionLocation === 'MESSENGER' || conversionLocation === 'INSTAGRAM_DIRECT') {
+        const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
+        const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
+        const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const adsArray = job.ads?.length > 0 ? job.ads : [job]; // Fallback a legacy single-ad
+        const totalAds = adsArray.length;
 
-        result = await metaService.createCampaignForMessenger(job.adAccountId, {
-          campaignName: job.campaignName,
-          adSetName: `${job.campaignName} - Ad Set`,
-          adName: job.adName,
-          dailyBudget: Math.round(job.dailyBudgetCOP),
-          targeting,
-          pageId: job.pageId,
-          imageUrl: job.imageUrl,
-          imageHash: job.imageHash || null,
-          headlines: job.headlines || [],
-          descriptions: job.descriptions || [],
-          primaryTexts: job.primaryTexts || job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'SEND_MESSAGE',
+        addLog(`Creando campaña para ${destLabel} (${totalAds} ad${totalAds > 1 ? 's' : ''})...`);
+
+        // 1. Crear Campaña
+        const campaignResult = await metaService.createCampaign(job.adAccountId, {
+          name: job.campaignName,
           objective,
-          optimizationGoal
+          status: 'PAUSED',
+          dailyBudget: Math.round(job.dailyBudgetCOP)
         });
 
-      } else if (conversionLocation === 'INSTAGRAM_DIRECT') {
-        addLog('Creando campaña para Instagram Direct...');
+        if (!campaignResult.success) {
+          result = { success: false, errors: [`Campaign: ${campaignResult.error}`] };
+        } else {
+          addLog(`Campaña creada: ${campaignResult.data.id}`);
 
-        result = await metaService.createCampaignForInstagramDM(job.adAccountId, {
-          campaignName: job.campaignName,
-          adSetName: `${job.campaignName} - Ad Set`,
-          adName: job.adName,
-          dailyBudget: Math.round(job.dailyBudgetCOP),
-          targeting,
-          pageId: job.pageId,
-          igActorId: job.igActorId,
-          imageUrl: job.imageUrl,
-          imageHash: job.imageHash || null,
-          headlines: job.headlines || [],
-          descriptions: job.descriptions || [],
-          primaryTexts: job.primaryTexts || job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'SEND_MESSAGE',
-          objective,
-          optimizationGoal
-        });
+          // 2. Crear Ad Set
+          const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
+          const adSetResult = await metaService[adSetMethod](job.adAccountId, {
+            name: `${job.campaignName} - Ad Set`,
+            campaignId: campaignResult.data.id,
+            targeting,
+            optimizationGoal,
+            promotedObject: { page_id: job.pageId }
+          });
+
+          if (!adSetResult.success) {
+            result = { success: false, campaign: campaignResult.data, errors: [`AdSet: ${adSetResult.error}`] };
+          } else {
+            addLog(`Ad Set creado: ${adSetResult.data.id}`);
+
+            // 3. Iterar por cada ad: crear Creative + Ad
+            const createdAds = [];
+            const errors = [];
+
+            for (let i = 0; i < totalAds; i++) {
+              const ad = adsArray[i];
+              const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
+              const adVideoId = ad.videoId || null;
+              const adImageUrl = ad.imageUrl || null;
+              const adImageHash = ad.imageHash || null;
+              const adThumbnailUrl = ad.videoThumbnailUrl || null;
+              const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
+              const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
+              const adCta = ad.ctas?.[0] || defaultCta;
+
+              addLog(`Creando creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+
+              // Crear Creative
+              const creativeMethod = isIgDM ? 'createCreativeForInstagramDM' : 'createCreativeForMessenger';
+              const creativeParams = {
+                name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                pageId: job.pageId,
+                imageHash: adImageHash,
+                imageUrl: adImageUrl,
+                videoId: adVideoId,
+                videoThumbnailUrl: adThumbnailUrl,
+                primaryText: adDescriptions[0] || 'Envíanos un mensaje',
+                headline: adHeadlines[0] || 'Contáctanos',
+                description: adDescriptions[1] || adHeadlines[1] || '',
+                callToAction: adCta
+              };
+              if (isIgDM) creativeParams.igActorId = job.igActorId;
+
+              const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);
+
+              if (!creativeResult.success) {
+                errors.push(`Creative${adLabel}: ${creativeResult.error}`);
+                addLog(`Error creative${adLabel}: ${creativeResult.error}`);
+                continue;
+              }
+
+              // Crear Ad
+              const adResult = await metaService.createAd(job.adAccountId, {
+                name: ad.adName || `${job.campaignName} - Ad${adLabel}`,
+                adsetId: adSetResult.data.id,
+                creativeId: creativeResult.data.id,
+                status: 'PAUSED'
+              });
+
+              if (!adResult.success) {
+                errors.push(`Ad${adLabel}: ${adResult.error}`);
+                addLog(`Error ad${adLabel}: ${adResult.error}`);
+              } else {
+                createdAds.push(adResult.data);
+                addLog(`Ad${adLabel} creado: ${adResult.data.id}`);
+              }
+            }
+
+            result = {
+              success: createdAds.length > 0,
+              campaign: campaignResult.data,
+              adSet: adSetResult.data,
+              ads: createdAds,
+              errors
+            };
+            addLog(`${destLabel}: ${createdAds.length}/${totalAds} ads creados exitosamente`);
+          }
+        }
 
       } else {
         // Campaña estándar (website, traffic, etc.) - MULTI-AD

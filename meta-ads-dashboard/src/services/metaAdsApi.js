@@ -2435,43 +2435,79 @@ class MetaAdsService {
     pageId,
     imageHash = null,
     imageUrl = null, // URL directa de la imagen
+    videoId = null,
+    videoThumbnailUrl = null,
     primaryText,
     headline,
     description,
-    callToAction = 'SEND_MESSAGE'
+    callToAction = 'MESSAGE_PAGE'
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      const linkData = {
-        link: `https://m.me/${pageId}`,
-        message: primaryText,
-        name: headline,
-        description: description,
-        call_to_action: {
-          type: callToAction,
-          value: {
-            app_destination: 'MESSENGER'
+      const objectStorySpec = { page_id: pageId };
+
+      const messengerLink = `https://m.me/${pageId}`;
+
+      if (videoId) {
+        // Video creative para Messenger
+        const videoData = {
+          video_id: videoId,
+          message: primaryText,
+          title: headline,
+          call_to_action: {
+            type: callToAction,
+            value: {
+              app_destination: 'MESSENGER',
+              link: messengerLink
+            }
           }
+        };
+        if (videoThumbnailUrl && videoThumbnailUrl.startsWith('http')) {
+          videoData.image_url = videoThumbnailUrl;
         }
-      };
+        if (description?.trim()) videoData.link_description = description;
+        objectStorySpec.video_data = videoData;
+      } else {
+        // Image creative para Messenger
+        const linkData = {
+          link: messengerLink,
+          message: primaryText,
+          name: headline,
+          description: description,
+          call_to_action: {
+            type: callToAction,
+            value: { app_destination: 'MESSENGER' }
+          }
+        };
 
-      // Usar image_hash si está disponible, sino usar picture (URL directa)
-      if (imageHash) {
-        linkData.image_hash = imageHash;
-      } else if (imageUrl) {
-        linkData.picture = imageUrl;
+        if (imageHash) {
+          linkData.image_hash = imageHash;
+        } else if (imageUrl) {
+          linkData.picture = imageUrl;
+        }
+        objectStorySpec.link_data = linkData;
       }
-
-      const objectStorySpec = {
-        page_id: pageId,
-        link_data: linkData
-      };
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      // Contenido multimedia flexible (Advantage+ creative) + otras optimizaciones
+      formData.append('degrees_of_freedom_spec', JSON.stringify({
+        creative_features_spec: {
+          image_auto_crop: { enroll_status: 'OPT_IN' },
+          video_auto_crop: { enroll_status: 'OPT_IN' },
+          text_optimizations: { enroll_status: 'OPT_IN' },
+          enhance_cta: { enroll_status: 'OPT_IN' },
+          image_touchups: { enroll_status: 'OPT_IN' },
+          inline_comment: { enroll_status: 'OPT_IN' }
+        },
+        text_transformation_types: ['TEXT_LIQUIDITY']
+      }));
+
+      console.log('Messenger objectStorySpec:', JSON.stringify(objectStorySpec, null, 2));
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2784,10 +2820,12 @@ class MetaAdsService {
     pageId,
     imageUrl,
     imageHash = null,
+    videoId = null,
+    videoThumbnailUrl = null,
     headlines = [],
     descriptions = [],
     primaryTexts = [],
-    callToAction = 'SEND_MESSAGE',
+    callToAction = 'MESSAGE_PAGE',
     objective = 'OUTCOME_ENGAGEMENT',
     optimizationGoal = 'CONVERSATIONS'
   }) {
@@ -2825,13 +2863,15 @@ class MetaAdsService {
       }
       results.adSet = adSetResult.data;
 
-      // 3. Crear Creative para Messenger (usando URL directa, sin subir imagen)
-      console.log('Step 3/4: Creating creative (using image URL directly)...');
+      // 3. Crear Creative para Messenger (soporta imagen o video)
+      console.log(`Step 3/4: Creating creative (${videoId ? 'video' : 'image'})...`);
       const creativeResult = await this.createCreativeForMessenger(adAccountId, {
         name: `${campaignName} - Creative`,
         pageId,
         imageHash,
         imageUrl,
+        videoId,
+        videoThumbnailUrl,
         primaryText: primaryTexts[0] || descriptions[0] || 'Envíanos un mensaje',
         headline: headlines[0] || 'Contáctanos',
         description: descriptions[0] || '',
@@ -2921,43 +2961,82 @@ class MetaAdsService {
     igActorId,
     imageHash = null,
     imageUrl = null,
+    videoId = null,
+    videoThumbnailUrl = null,
     primaryText,
     headline,
     description,
-    callToAction = 'SEND_MESSAGE'
+    callToAction = 'INSTAGRAM_MESSAGE'
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      const linkData = {
-        link: `https://ig.me/m/${igActorId}`,
-        message: primaryText,
-        name: headline,
-        description: description,
-        call_to_action: {
-          type: callToAction,
-          value: {
-            app_destination: 'INSTAGRAM_DIRECT'
-          }
-        }
-      };
-
-      if (imageHash) {
-        linkData.image_hash = imageHash;
-      } else if (imageUrl) {
-        linkData.picture = imageUrl;
-      }
-
       const objectStorySpec = {
         page_id: pageId,
-        instagram_user_id: igActorId,
-        link_data: linkData
+        instagram_user_id: igActorId
       };
+
+      const igDirectLink = `https://ig.me/m/${igActorId}`;
+
+      if (videoId) {
+        // Video creative para Instagram DM
+        const videoData = {
+          video_id: videoId,
+          message: primaryText,
+          title: headline,
+          call_to_action: {
+            type: callToAction,
+            value: {
+              app_destination: 'INSTAGRAM_DIRECT',
+              link: igDirectLink
+            }
+          }
+        };
+        if (videoThumbnailUrl && videoThumbnailUrl.startsWith('http')) {
+          videoData.image_url = videoThumbnailUrl;
+        }
+        if (description?.trim()) videoData.link_description = description;
+        objectStorySpec.video_data = videoData;
+      } else {
+        // Image creative para Instagram DM
+        const linkData = {
+          link: igDirectLink,
+          message: primaryText,
+          name: headline,
+          description: description,
+          call_to_action: {
+            type: callToAction,
+            value: { app_destination: 'INSTAGRAM_DIRECT' }
+          }
+        };
+
+        if (imageHash) {
+          linkData.image_hash = imageHash;
+        } else if (imageUrl) {
+          linkData.picture = imageUrl;
+        }
+        objectStorySpec.link_data = linkData;
+      }
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
+
+      // Contenido multimedia flexible (Advantage+ creative) + otras optimizaciones
+      formData.append('degrees_of_freedom_spec', JSON.stringify({
+        creative_features_spec: {
+          image_auto_crop: { enroll_status: 'OPT_IN' },
+          video_auto_crop: { enroll_status: 'OPT_IN' },
+          text_optimizations: { enroll_status: 'OPT_IN' },
+          enhance_cta: { enroll_status: 'OPT_IN' },
+          image_touchups: { enroll_status: 'OPT_IN' },
+          inline_comment: { enroll_status: 'OPT_IN' }
+        },
+        text_transformation_types: ['TEXT_LIQUIDITY']
+      }));
+
+      console.log('Instagram DM objectStorySpec:', JSON.stringify(objectStorySpec, null, 2));
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
@@ -2982,10 +3061,12 @@ class MetaAdsService {
     igActorId,
     imageUrl,
     imageHash = null,
+    videoId = null,
+    videoThumbnailUrl = null,
     headlines = [],
     descriptions = [],
     primaryTexts = [],
-    callToAction = 'SEND_MESSAGE',
+    callToAction = 'INSTAGRAM_MESSAGE',
     objective = 'OUTCOME_ENGAGEMENT',
     optimizationGoal = 'CONVERSATIONS'
   }) {
@@ -3023,14 +3104,16 @@ class MetaAdsService {
       }
       results.adSet = adSetResult.data;
 
-      // 3. Crear Creative para Instagram Direct
-      console.log('Step 3/4: Creating creative for Instagram Direct...');
+      // 3. Crear Creative para Instagram Direct (soporta imagen o video)
+      console.log(`Step 3/4: Creating creative for Instagram Direct (${videoId ? 'video' : 'image'})...`);
       const creativeResult = await this.createCreativeForInstagramDM(adAccountId, {
         name: `${campaignName} - Creative`,
         pageId,
         igActorId,
         imageHash,
         imageUrl,
+        videoId,
+        videoThumbnailUrl,
         primaryText: primaryTexts[0] || descriptions[0] || 'Envíanos un DM',
         headline: headlines[0] || 'Escríbenos',
         description: descriptions[0] || '',
@@ -3090,7 +3173,7 @@ class MetaAdsService {
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
       'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE',
       'BUY_NOW', 'ORDER_NOW', 'BOOK_TRAVEL',
-      'SEND_MESSAGE', 'WHATSAPP_MESSAGE',
+      'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE',
       'CALL_NOW', 'GET_DIRECTIONS'
     ];
 
