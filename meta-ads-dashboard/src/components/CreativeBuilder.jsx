@@ -3034,6 +3034,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               addLog(`Creando dynamic creative 5+5+5 + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
 
+              // OUTCOME_SALES + IG DM requiere link_urls en asset_feed_spec
+              const needsLinkUrl = isIgDM && objective === 'OUTCOME_SALES';
+              const igDmLink = needsLinkUrl ? `https://ig.me/m/${job.igActorId}` : null;
+              const messengerLink = (!isIgDM && objective === 'OUTCOME_SALES') ? `https://m.me/${job.pageId}` : null;
+              const dcLinkUrl = igDmLink || messengerLink || null;
+              const dcIsWhatsApp = !needsLinkUrl && !messengerLink; // Solo skip link_urls para mensajería sin SALES
+
               // Crear Dynamic Creative con asset_feed_spec (5+5+5)
               let creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
                 name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
@@ -3046,9 +3053,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 bodies: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
                 descriptions: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
                 callToActionTypes: validCTAs,
-                linkUrl: null,
+                linkUrl: dcLinkUrl,
                 igActorId: isIgDM ? job.igActorId : null,
-                isWhatsApp: true // Sin link_urls ni asset_customization_rules
+                isWhatsApp: dcIsWhatsApp
               });
 
               // Si falla por igActorId, reintentar sin IG
@@ -3065,9 +3072,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                   bodies: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
                   descriptions: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
                   callToActionTypes: validCTAs,
-                  linkUrl: null,
+                  linkUrl: dcLinkUrl,
                   igActorId: null,
-                  isWhatsApp: true
+                  isWhatsApp: dcIsWhatsApp
                 });
               }
 
