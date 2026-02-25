@@ -1,6 +1,6 @@
 // ============================================
 // SISTEMA DE PLANTILLAS DE CAMPAÑAS META ADS
-// 8 plantillas principales para tu negocio
+// 9 plantillas principales para tu negocio
 // ============================================
 
 // Objetivos de campaña disponibles en Meta Ads
@@ -143,7 +143,7 @@ export const getCTALabel = (ctaValue) => {
 };
 
 // ============================================
-// PLANTILLAS DE CAMPAÑAS (8 total)
+// PLANTILLAS DE CAMPAÑAS (9 total)
 // ============================================
 
 export const CAMPAIGN_TEMPLATES = [
@@ -668,7 +668,81 @@ export const CAMPAIGN_TEMPLATES = [
   },
 
   // ==========================================
-  // 8. RECONOCIMIENTO THRUPLAY (MESSENGER)
+  // 8. VENTAS INSTAGRAM DM
+  // ==========================================
+  {
+    id: 'ventas_instagram_direct',
+    name: 'Ventas Instagram DM',
+    icon: '💰',
+    category: 'Ventas',
+    description: 'Genera ventas directamente por DM de Instagram. Meta optimiza para personas con alta intención de compra que inicien conversación.',
+    objective: 'OUTCOME_SALES',
+    specialAdCategories: [],
+    buyingType: 'AUCTION',
+    adSetConfig: {
+      conversionLocation: 'INSTAGRAM_DIRECT',
+      optimizationGoal: 'CONVERSATIONS',
+      billingEvent: 'IMPRESSIONS',
+      bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
+      requiresPixel: false,
+      requiresInstagram: true,
+      allowBudgetLevel: true,
+      budgetType: 'daily',
+      suggestedBudget: 50000,
+      minBudget: 15000,
+      maxBudget: 500000,
+      scheduleConfig: { allowScheduling: true, allowEndDate: true },
+      audienceConfig: {
+        allowAdvantage: true,
+        allowCustomAudiences: true,
+        allowLookalikes: true,
+        defaultTargeting: { geo_locations: { countries: ['CO'] }, age_min: 18, age_max: 65, genders: [0] }
+      },
+      placementsConfig: {
+        allowAdvantage: true,
+        defaultPlacements: {
+          facebook: ['feed', 'story', 'reels', 'marketplace'],
+          instagram: ['stream', 'story', 'reels', 'explore'],
+          messenger: []
+        }
+      }
+    },
+    adConfig: {
+      allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
+      defaultFormat: 'SINGLE_IMAGE',
+      destinationConfig: { type: 'INSTAGRAM_DIRECT', requiresUrl: false },
+      allowedCtas: ['INSTAGRAM_MESSAGE', 'SHOP_NOW', 'GET_QUOTE', 'ORDER_NOW', 'CONTACT_US'],
+      defaultCta: 'INSTAGRAM_MESSAGE',
+      trackingConfig: { requiresPixel: false }
+    },
+    creativeContent: {
+      headlines: [
+        'Haz tu pedido por DM',
+        'Compra fácil por Instagram',
+        'Precio especial por DM',
+        'Reserva el tuyo hoy',
+        'Pago contra entrega'
+      ],
+      descriptions: [
+        'Escríbenos por DM y te procesamos tu pedido al instante.',
+        'Pago contra entrega o transferencia. Tú eliges cómo pagar.',
+        'Envío a todo el país. Tu pedido llega a la puerta de tu casa.',
+        'Atención personalizada. Te ayudamos a elegir la mejor opción.',
+        'Precio especial solo por DM de Instagram. Escríbenos para conocerlo.'
+      ],
+      primaryTexts: [
+        '¡Haz tu pedido por DM! Es súper fácil: escríbenos, elige tu producto, y te lo enviamos. Pago contra entrega disponible.',
+        '¿Te gusta lo que ves? Escríbenos ahora por DM y te damos un precio especial. Stock limitado, no te quedes sin el tuyo.',
+        'Comprar por Instagram es más fácil de lo que piensas. Un DM, eliges tu talla/modelo, pagas y listo. Envío rápido.',
+        'Oferta exclusiva por DM. Escríbenos ahora y recibe un descuento especial en tu primera compra. No dejes pasar esta oportunidad.',
+        '¿Tienes dudas sobre el producto? Escríbenos por DM, te asesoramos y si quieres, haces tu pedido en el momento. Sin presión.'
+      ],
+      ctas: ['INSTAGRAM_MESSAGE', 'INSTAGRAM_MESSAGE', 'SHOP_NOW', 'INSTAGRAM_MESSAGE', 'GET_QUOTE']
+    }
+  },
+
+  // ==========================================
+  // 9. RECONOCIMIENTO THRUPLAY (MESSENGER)
   // ==========================================
   {
     id: 'awareness_thruplay_messenger',
