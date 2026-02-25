@@ -684,7 +684,8 @@ export const CAMPAIGN_TEMPLATES = [
       destinationOptions: [
         { id: 'MESSENGER', label: 'Messenger', icon: '💭', description: 'Dirige a Messenger de Facebook' },
         { id: 'INSTAGRAM_DIRECT', label: 'Instagram Direct', icon: '📸', description: 'Dirige a DMs de Instagram', requiresInstagram: true },
-        { id: 'WHATSAPP', label: 'WhatsApp', icon: '💬', description: 'Dirige a WhatsApp Business', requiresWhatsApp: true }
+        { id: 'WHATSAPP', label: 'WhatsApp', icon: '💬', description: 'Dirige a WhatsApp Business', requiresWhatsApp: true },
+        { id: 'WEBSITE', label: 'Sitio Web', icon: '🌐', description: 'Dirige a tu sitio web o landing page' }
       ],
       optimizationGoal: 'THRUPLAY',
       billingEvent: 'IMPRESSIONS',

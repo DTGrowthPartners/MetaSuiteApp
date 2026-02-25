@@ -253,9 +253,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     uploadProgress: '',
     headlines: templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', ''],
     descriptions: templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', ''],
-    ctas: templateContent.ctas || selectedTemplate?.ctas || (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
-      ? ['VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE']
-      : ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE']),
+    ctas: templateContent.ctas || (() => {
+      const dc = templateAdConfig?.defaultCta
+        || (templateAdSetConfig?.conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
+          : templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+          : templateAdSetConfig?.conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
+          : templateAdSetConfig?.conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'
+          : 'LEARN_MORE');
+      return [dc, dc, dc, dc, dc];
+    })(),
     showEditContent: false,
     analyzingMedia: false, // AI is analyzing the media
     contentGenerated: false, // AI has generated content
@@ -1144,8 +1150,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       return;
     }
 
-    // Validar URL solo si es requerida
-    if (templateRequirements.website && !linkUrl.trim()) {
+    // Validar URL solo si es requerida (por template o por destino seleccionado)
+    const needsWebsite = templateRequirements.website || (destinationOptions && selectedDestination === 'WEBSITE');
+    if (needsWebsite && !linkUrl.trim()) {
       setError('Por favor ingresa la URL de destino');
       return;
     }
@@ -1454,7 +1461,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   key={opt.id}
                   type="button"
                   className={`budget-btn ${selectedDestination === opt.id ? 'active' : ''}`}
-                  onClick={() => setSelectedDestination(opt.id)}
+                  onClick={() => {
+                    setSelectedDestination(opt.id);
+                    // Actualizar CTAs de todos los ads cuando cambia el destino
+                    const newCta = opt.id === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
+                      : opt.id === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
+                      : opt.id === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+                      : opt.id === 'MESSENGER' ? 'MESSAGE_PAGE'
+                      : opt.id === 'WEBSITE' ? 'LEARN_MORE'
+                      : 'LEARN_MORE';
+                    setAds(prev => prev.map(ad => ({
+                      ...ad,
+                      ctas: ad.ctas.map(() => newCta)
+                    })));
+                  }}
                   title={opt.description}
                 >
                   {opt.icon} {opt.label}
@@ -1467,8 +1487,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </div>
         )}
 
-        {/* Landing Page URL - Solo si es requerido */}
-        {templateRequirements.website && (
+        {/* Landing Page URL - Solo si es requerido (por template o por destino seleccionado) */}
+        {(templateRequirements.website || (destinationOptions && selectedDestination === 'WEBSITE')) && (
           <div className="form-group">
             <label>URL de Destino (Landing Page) *</label>
             <input
@@ -2853,7 +2873,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           headlines: job.headlines || [],
           descriptions: job.descriptions || [],
           primaryTexts: job.primaryTexts || job.descriptions || [],
-          callToAction: job.ctas?.[0] || 'SHOP_NOW',
+          callToAction: job.ctas?.[0] || 'WHATSAPP_MESSAGE',
           objective,
           optimizationGoal,
           // Nuevos campos
@@ -2968,25 +2988,25 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               }
             }
           } else {
-            // ========== MODO DYNAMIC/PER-AD: N AdSets con standard creatives ==========
-            // Meta NO soporta isDynamicCreative con objetivos de mensajería.
-            // Los modos controlan la estructura de AdSets (N AdSets, CBO distribuye).
+            // ========== MODO DYNAMIC/PER-AD: N AdSets con Dynamic Creative 5+5+5 ==========
+            // Probar isDynamicCreative con asset_feed_spec para mensajería
             for (let i = 0; i < totalAds; i++) {
               const ad = adsArray[i];
               const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
               const adTargeting = (mode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : targeting;
               const audienceLabel = (mode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : '';
 
-              addLog(`Creando Ad Set${adLabel} + creative${audienceLabel}...`);
+              addLog(`Creando Ad Set${adLabel} + dynamic creative 5+5+5${audienceLabel}...`);
 
-              // Crear AdSet usando método específico de messaging (sin isDynamicCreative)
+              // Crear AdSet con isDynamicCreative: true
               const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
               const adSetResult = await metaService[adSetMethod](job.adAccountId, {
                 name: `${job.campaignName} - Ad Set${adLabel}${audienceLabel}`,
                 campaignId: campaignResult.data.id,
                 targeting: adTargeting,
                 optimizationGoal,
-                promotedObject: { page_id: job.pageId }
+                promotedObject: { page_id: job.pageId },
+                isDynamicCreative: true
               });
 
               if (!adSetResult.success) {
@@ -2995,7 +3015,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 continue;
               }
               createdAdSets.push(adSetResult.data);
-              addLog(`Ad Set${adLabel} creado: ${adSetResult.data.id}`);
+              addLog(`Ad Set${adLabel} creado (DC): ${adSetResult.data.id}`);
 
               // Preparar datos del ad
               const adVideoId = ad.videoId || null;
@@ -3004,27 +3024,52 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const adThumbnailUrl = ad.videoThumbnailUrl || null;
               const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
               const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
-              const adCta = ad.ctas?.[0] || defaultCta;
+              // OUTCOME_AWARENESS + DC: filtrar CTAs no compatibles (GET_OFFER, APPLY_NOW, etc.)
+              const AWARENESS_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE', 'VISIT_INSTAGRAM_PROFILE'];
+              let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))];
+              if (objective === 'OUTCOME_AWARENESS') {
+                validCTAs = validCTAs.filter(c => AWARENESS_VALID_CTAS.includes(c));
+                if (validCTAs.length === 0) validCTAs = [defaultCta];
+              }
 
-              addLog(`Creando standard creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+              addLog(`Creando dynamic creative 5+5+5 + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
 
-              // Crear Standard Creative (messaging no soporta asset_feed_spec / 5+5+5)
-              const creativeMethod = isIgDM ? 'createCreativeForInstagramDM' : 'createCreativeForMessenger';
-              const creativeParams = {
+              // Crear Dynamic Creative con asset_feed_spec (5+5+5)
+              let creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
                 name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
                 pageId: job.pageId,
                 imageHash: adImageHash,
                 imageUrl: adImageUrl,
                 videoId: adVideoId,
-                videoThumbnailUrl: adThumbnailUrl,
-                primaryText: adDescriptions[0] || 'Envíanos un mensaje',
-                headline: adHeadlines[0] || 'Contáctanos',
-                description: adDescriptions[1] || adHeadlines[1] || '',
-                callToAction: adCta
-              };
-              if (isIgDM) creativeParams.igActorId = job.igActorId;
+                thumbnailUrl: adThumbnailUrl,
+                titles: adHeadlines.length > 0 ? adHeadlines : ['Contáctanos'],
+                bodies: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
+                descriptions: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
+                callToActionTypes: validCTAs,
+                linkUrl: null,
+                igActorId: isIgDM ? job.igActorId : null,
+                isWhatsApp: true // Sin link_urls ni asset_customization_rules
+              });
 
-              const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);
+              // Si falla por igActorId, reintentar sin IG
+              if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+                addLog(`Creative${adLabel}: igActorId rejected, reintentando sin IG...`);
+                creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                  pageId: job.pageId,
+                  imageHash: adImageHash,
+                  imageUrl: adImageUrl,
+                  videoId: adVideoId,
+                  thumbnailUrl: adThumbnailUrl,
+                  titles: adHeadlines.length > 0 ? adHeadlines : ['Contáctanos'],
+                  bodies: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
+                  descriptions: adDescriptions.length > 0 ? adDescriptions : ['Envíanos un mensaje'],
+                  callToActionTypes: validCTAs,
+                  linkUrl: null,
+                  igActorId: null,
+                  isWhatsApp: true
+                });
+              }
 
               if (!creativeResult.success) {
                 errors.push(`Creative${adLabel}: ${creativeResult.error}`);
@@ -3105,7 +3150,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             videoThumbnailUrl: job.videoThumbnailUrl,
             headlines: job.headlines || [],
             descriptions: job.descriptions || [],
-            ctas: job.ctas || ['LEARN_MORE']
+            ctas: job.ctas || [conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+              : conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
+              : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
+              : conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'
+              : selectedTemplate?.adConfig?.defaultCta || 'LEARN_MORE']
           }]
         });
       }
