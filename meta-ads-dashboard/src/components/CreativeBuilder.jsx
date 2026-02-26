@@ -293,6 +293,34 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const multiFileInputRef = useRef(null);
   const [multiUploadProgress, setMultiUploadProgress] = useState(''); // Progress message for batch upload
 
+  // Sticky nav: track which section is visible
+  const [activeSection, setActiveSection] = useState('section-campana');
+  useEffect(() => {
+    const sectionIds = [
+      'section-campana', 'section-identidad', 'section-destino',
+      'section-publico', 'section-presupuesto', 'section-segmentacion',
+      'section-ubicaciones', 'section-anuncios'
+    ];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+            break;
+          }
+        }
+      },
+      { rootMargin: '-120px 0px -60% 0px', threshold: 0 }
+    );
+    const timer = setTimeout(() => {
+      sectionIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) observer.observe(el);
+      });
+    }, 300);
+    return () => { clearTimeout(timer); observer.disconnect(); };
+  }, []);
+
   // Multi-file upload mode: 'per-ad' = 1 file per ad, 'single' = all files for 1 ad (upload to library)
   const [multiUploadMode, setMultiUploadMode] = useState('per-ad');
 
@@ -562,6 +590,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [selectedAudience, setSelectedAudience] = useState('');
   const [loadingAudiences, setLoadingAudiences] = useState(false);
   const [audienceError, setAudienceError] = useState('');
+  // Múltiples públicos (replicar ads en varios AdSets con diferente público)
+  const [multiAudiences, setMultiAudiences] = useState([]); // Array de { id, name, targeting, audienceType }
+  const [showMultiAudienceSelector, setShowMultiAudienceSelector] = useState(false);
 
   // (headlines, descriptions, ctas are now per-ad in the ads array)
 
@@ -1276,6 +1307,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         advantageAudience: advantageAudience,
         useAdvantagePlacements: useAdvantagePlacements,
         excludedPlacements: excludedPlacements,
+        // Múltiples públicos (replicar estructura por cada público adicional)
+        multiAudiences: adSetMode !== 'per-ad' && multiAudiences.length > 0 ? multiAudiences : [],
         // Chat editor (WhatsApp leads)
         chatGreeting: chatGreeting || null,
         chatFormFields: chatFormFields.length > 0 ? chatFormFields : null,
@@ -1335,10 +1368,40 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <TemplatePreview template={selectedTemplate} onClose={() => setShowPreview(false)} />
       )}
 
-      <h2>Configuración Rápida</h2>
-      <p className="subtitle">Solo necesitas ajustar estos campos básicos. El contenido ya está listo.</p>
+      <h2>Configuración de Campaña</h2>
+      <p className="subtitle">Configura tu campaña siguiendo el flujo de Meta Ads Manager</p>
 
       <form onSubmit={handleSubmit}>
+
+        {/* Sticky section navigation */}
+        <nav className="config-nav">
+          {[
+            { id: 'section-campana', label: 'Campaña' },
+            { id: 'section-identidad', label: 'Identidad' },
+            { id: 'section-destino', label: 'Destino' },
+            { id: 'section-publico', label: 'Público' },
+            { id: 'section-presupuesto', label: 'Presupuesto' },
+            { id: 'section-segmentacion', label: 'Segmentación' },
+            { id: 'section-ubicaciones', label: 'Ubicaciones' },
+            { id: 'section-anuncios', label: 'Anuncios' },
+          ].map(nav => (
+            <button
+              key={nav.id}
+              type="button"
+              className={`config-nav-item ${activeSection === nav.id ? 'active' : ''}`}
+              onClick={() => {
+                document.getElementById(nav.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              {nav.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* ===================== SECCIÓN: CAMPAÑA ===================== */}
+        <div className="section-card" id="section-campana">
+          <h4><span className="section-icon">📋</span> Campaña</h4>
+
         {/* Campaign Name */}
         <div className="form-group">
           <label>Nombre de la Campaña *</label>
@@ -1373,14 +1436,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             ))}
           </select>
           {specialAdCategories.length > 0 && (
-            <div className="selected-categories" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            <div className="toggle-group" style={{ marginTop: '8px' }}>
               {specialAdCategories.map(cat => {
                 const catInfo = SPECIAL_AD_CATEGORIES.find(c => c.value === cat);
                 return (
-                  <span key={cat} className="requirement-badge" style={{ backgroundColor: '#3498db', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  <span key={cat} className="chip"
                     onClick={() => setSpecialAdCategories(prev => prev.filter(c => c !== cat))}
+                    style={{ cursor: 'pointer' }}
                   >
-                    {catInfo?.label || cat} ×
+                    {catInfo?.label || cat} <span className="chip-remove">×</span>
                   </span>
                 );
               })}
@@ -1405,6 +1469,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             ))}
           </select>
         </div>
+
+        </div>{/* fin section-card Campaña */}
+
+        {/* ===================== SECCIÓN: IDENTIDAD ===================== */}
+        <div className="section-card" id="section-identidad">
+          <h4><span className="section-icon">👤</span> Identidad</h4>
 
         {/* Facebook Page Selection */}
         <div className="form-group">
@@ -1450,11 +1520,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
+        </div>{/* fin section-card Identidad */}
+
+        {/* ===================== SECCIÓN: DESTINO ===================== */}
+        <div className="section-card" id="section-destino">
+          <h4><span className="section-icon">🎯</span> Destino</h4>
+
         {/* Destination Selector - Para plantillas con múltiples destinos */}
         {destinationOptions && destinationOptions.length > 1 && (
           <div className="form-group">
             <label>Destino del anuncio *</label>
-            <p className="hint" style={{ marginBottom: '8px' }}>Elige a dónde se dirigirán las personas al interactuar con tu anuncio</p>
+            <p className="hint mb-sm">Elige a dónde se dirigirán las personas al interactuar con tu anuncio</p>
             <div className="budget-level-selector">
               {destinationOptions.map(opt => (
                 <button
@@ -1481,7 +1557,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 </button>
               ))}
             </div>
-            <p className="hint" style={{ marginTop: '6px' }}>
+            <p className="hint mt-sm">
               {destinationOptions.find(o => o.id === selectedDestination)?.description || ''}
             </p>
           </div>
@@ -1605,6 +1681,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </div>
         )}
 
+        </div>{/* fin section-card Destino */}
+
+        {/* ===================== SECCIÓN: PÚBLICO ===================== */}
+        <div className="section-card" id="section-publico">
+          <h4><span className="section-icon">👥</span> Público</h4>
+
         {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
           <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
@@ -1629,7 +1711,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             ))}
           </select>
           {audienceError && (
-            <p className="hint" style={{ color: '#F59E0B' }}>
+            <p className="hint text-warning">
               {audienceError}
             </p>
           )}
@@ -1638,23 +1720,103 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               Público seleccionado: {allAudiences.find(a => a.id === selectedAudience)?.name}
             </p>
           )}
+
+          {/* Multi-Audience Selector (oculto en per-ad mode) */}
+          {adSetMode !== 'per-ad' && selectedAudience && allAudiences.length > 1 && (
+            <div className="mt-sm">
+              {/* Chips de públicos adicionales seleccionados */}
+              {multiAudiences.length > 0 && (
+                <div className="toggle-group mb-sm">
+                  {multiAudiences.map((aud) => (
+                    <span key={aud.id} className="chip">
+                      {aud.audienceType === 'custom' ? '[C] ' : ''}{aud.name}
+                      <span
+                        onClick={() => setMultiAudiences(prev => prev.filter(a => a.id !== aud.id))}
+                        className="chip-remove"
+                      >×</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="add-ad-btn"
+                onClick={() => setShowMultiAudienceSelector(!showMultiAudienceSelector)}
+                style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px' }}
+              >
+                {showMultiAudienceSelector ? 'Ocultar lista' : `+ Agregar más públicos (${multiAudiences.length} adicional${multiAudiences.length !== 1 ? 'es' : ''})`}
+              </button>
+
+              {showMultiAudienceSelector && (
+                <div className="library-grid" style={{ display: 'block', gridTemplateColumns: 'none', maxHeight: '180px' }}>
+                  {allAudiences
+                    .filter(a => a.id !== selectedAudience)
+                    .map((audience) => {
+                      const isSelected = multiAudiences.some(ma => ma.id === audience.id);
+                      return (
+                        <label key={audience.id} style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 4px',
+                          cursor: 'pointer', fontSize: '12px', color: isSelected ? 'var(--accent)' : 'var(--text-muted)',
+                          borderBottom: '1px solid var(--border)'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              if (isSelected) {
+                                setMultiAudiences(prev => prev.filter(a => a.id !== audience.id));
+                              } else {
+                                setMultiAudiences(prev => [...prev, {
+                                  id: audience.id,
+                                  name: audience.name,
+                                  targeting: audience.targeting,
+                                  audienceType: audience.audienceType
+                                }]);
+                              }
+                            }}
+                          />
+                          {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                        </label>
+                      );
+                    })}
+                </div>
+              )}
+
+              {multiAudiences.length > 0 && (
+                <p className="hint mt-sm text-accent">
+                  {multiAudiences.length + 1} públicos total = {
+                    adSetMode === 'single'
+                      ? `${multiAudiences.length + 1} Ad Sets (cada uno con ${ads.length} ad${ads.length > 1 ? 's' : ''})`
+                      : `${(multiAudiences.length + 1) * ads.length} Ad Sets con 5+5+5`
+                  }
+                </p>
+              )}
+            </div>
+          )}
         </div>
+
+        </div>{/* fin section-card Público */}
+
+        {/* ===================== SECCIÓN: PRESUPUESTO Y CALENDARIO ===================== */}
+        <div className="section-card" id="section-presupuesto">
+          <h4><span className="section-icon">💰</span> Presupuesto y Calendario</h4>
 
         {/* Budget Level Selector (only for templates that allow it) */}
         {templateAdSetConfig.allowBudgetLevel && (
           <div className="form-group">
             <label>Nivel de Presupuesto</label>
-            <div className="budget-level-buttons" style={{ display: 'flex', gap: '10px' }}>
+            <div className="toggle-group">
               <button
                 type="button"
-                className={`gender-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
+                className={`toggle-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
                 onClick={() => setBudgetLevel('campaign')}
               >
                 Por Campaña (CBO)
               </button>
               <button
                 type="button"
-                className={`gender-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
+                className={`toggle-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
                 onClick={() => setBudgetLevel('adset')}
               >
                 Por Conjunto de Anuncios
@@ -1688,12 +1850,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Estrategia de Puja */}
         <div className="form-group">
           <label>Estrategia de Puja de la Campaña</label>
-          <div className="budget-level-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="toggle-group">
             {BID_STRATEGIES.map(bs => (
               <button
                 key={bs.value}
                 type="button"
-                className={`gender-btn ${bidStrategy === bs.value ? 'active' : ''}`}
+                className={`toggle-btn ${bidStrategy === bs.value ? 'active' : ''}`}
                 onClick={() => {
                   setBidStrategy(bs.value);
                   if (bs.value === 'LOWEST_COST_WITHOUT_CAP') setBidAmount('');
@@ -1707,7 +1869,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             {BID_STRATEGIES.find(bs => bs.value === bidStrategy)?.description || ''}
           </p>
           {bidStrategy !== 'LOWEST_COST_WITHOUT_CAP' && (
-            <div style={{ marginTop: '10px' }}>
+            <div className="mt-sm">
               <label>{bidStrategy === 'COST_CAP' ? 'Costo por Resultado Objetivo (COP)' : 'Límite de Puja (COP)'}</label>
               <input
                 type="number"
@@ -1726,11 +1888,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
         </div>
 
-        {/* Presupuesto y Calendario */}
-        <div className="targeting-section">
-          <h4>Presupuesto y Calendario</h4>
-
-          {/* Schedule: Start Date + End Date */}
+        {/* Schedule: Start Date + End Date */}
           <div className="targeting-row">
             <div className="targeting-field">
               <label>Fecha de Inicio</label>
@@ -1740,7 +1898,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onChange={(e) => setStartDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 16)}
               />
-              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+              <p className="hint">
                 Deja vacío para iniciar inmediatamente
               </p>
             </div>
@@ -1752,33 +1910,33 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onChange={(e) => setEndDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
               />
-              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+              <p className="hint">
                 Deja vacío para correr indefinidamente
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Público / Audience Section */}
-        <div className="targeting-section">
-          <h4>Público</h4>
+        </div>{/* fin section-card Presupuesto */}
+
+        {/* ===================== SECCIÓN: SEGMENTACIÓN ===================== */}
+        <div className="section-card" id="section-segmentacion">
+          <h4><span className="section-icon">🎯</span> Segmentación</h4>
 
           {/* Advantage+ Audience Toggle */}
           {templateAdSetConfig.audienceConfig?.allowAdvantage !== false && (
             <div className="targeting-row">
               <div className="targeting-field" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ margin: 0 }}>Advantage+ Público</label>
+                <div className="toggle-inline">
+                  <label>Advantage+ Público</label>
                   <button
                     type="button"
-                    className={`gender-btn ${advantageAudience ? 'active' : ''}`}
+                    className={`toggle-btn ${advantageAudience ? 'active' : ''}`}
                     onClick={() => setAdvantageAudience(!advantageAudience)}
-                    style={{ padding: '5px 14px', fontSize: '12px' }}
                   >
                     {advantageAudience ? 'Activado' : 'Desactivado'}
                   </button>
                 </div>
-                <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                <p className="hint">
                   {advantageAudience
                     ? 'Meta ampliará automáticamente tu público para mejorar el rendimiento'
                     : 'Solo se mostrará a tu público definido, sin expansión automática'}
@@ -1812,21 +1970,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <div className="targeting-row">
             <div className="targeting-field" style={{ flex: 1 }}>
               <label>Sexo</label>
-              <div className="gender-options">
+              <div className="toggle-options">
                 <div
-                  className={`gender-option ${gender === 'all' ? 'selected' : ''}`}
+                  className={`toggle-option ${gender === 'all' ? 'selected' : ''}`}
                   onClick={() => setGender('all')}
                 >
                   <span className="icon">Todos</span>
                 </div>
                 <div
-                  className={`gender-option ${gender === 'male' ? 'selected' : ''}`}
+                  className={`toggle-option ${gender === 'male' ? 'selected' : ''}`}
                   onClick={() => setGender('male')}
                 >
                   <span className="icon">Hombres</span>
                 </div>
                 <div
-                  className={`gender-option ${gender === 'female' ? 'selected' : ''}`}
+                  className={`toggle-option ${gender === 'female' ? 'selected' : ''}`}
                   onClick={() => setGender('female')}
                 >
                   <span className="icon">Mujeres</span>
@@ -1834,28 +1992,28 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Ubicaciones / Placements */}
-        <div className="targeting-section">
-          <h4>Ubicaciones</h4>
+        </div>{/* fin section-card Segmentación */}
+
+        {/* ===================== SECCIÓN: UBICACIONES ===================== */}
+        <div className="section-card" id="section-ubicaciones">
+          <h4><span className="section-icon">📍</span> Ubicaciones</h4>
           <div className="targeting-row">
             <div className="targeting-field" style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label style={{ margin: 0 }}>Advantage+ Ubicaciones</label>
+              <div className="toggle-inline">
+                <label>Advantage+ Ubicaciones</label>
                 <button
                   type="button"
-                  className={`gender-btn ${useAdvantagePlacements ? 'active' : ''}`}
+                  className={`toggle-btn ${useAdvantagePlacements ? 'active' : ''}`}
                   onClick={() => {
                     setUseAdvantagePlacements(!useAdvantagePlacements);
                     if (!useAdvantagePlacements) setExcludedPlacements([]);
                   }}
-                  style={{ padding: '5px 14px', fontSize: '12px' }}
                 >
                   {useAdvantagePlacements ? 'Activado' : 'Desactivado'}
                 </button>
               </div>
-              <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+              <p className="hint">
                 {useAdvantagePlacements
                   ? 'Meta mostrará los anuncios en los lugares donde generen respuesta'
                   : 'Elige manualmente dónde mostrar tus anuncios'}
@@ -1865,14 +2023,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
           {/* Exclusiones de ubicaciones (siempre visible para excluir específicas) */}
           {!useAdvantagePlacements && (
-            <div className="targeting-row" style={{ marginTop: '10px' }}>
+            <div className="targeting-row mt-sm">
               <div className="targeting-field" style={{ flex: 1 }}>
                 <label>Ubicaciones excluidas</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {Object.entries(PLACEMENT_OPTIONS).map(([platform, placements]) => (
                     <div key={platform}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94A3B8', textTransform: 'capitalize' }}>{platform}</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'bold', textTransform: 'capitalize' }}>{platform}</span>
+                      <div className="toggle-group" style={{ marginTop: '4px' }}>
                         {placements.map(p => {
                           const key = `${platform}_${p.id}`;
                           const isExcluded = excludedPlacements.includes(key);
@@ -1880,8 +2038,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             <button
                               key={key}
                               type="button"
-                              className={`gender-btn ${!isExcluded ? 'active' : ''}`}
-                              style={{ padding: '4px 10px', fontSize: '11px' }}
+                              className={`toggle-btn ${!isExcluded ? 'active' : ''}`}
                               onClick={() => {
                                 setExcludedPlacements(prev =>
                                   isExcluded ? prev.filter(e => e !== key) : [...prev, key]
@@ -1901,10 +2058,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
 
           {useAdvantagePlacements && (
-            <div className="targeting-row" style={{ marginTop: '8px' }}>
+            <div className="targeting-row mt-sm">
               <div className="targeting-field" style={{ flex: 1 }}>
                 <label>Ubicaciones excluidas (opcional)</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <div className="toggle-group">
                   {[
                     { key: 'facebook_marketplace', label: 'Facebook Marketplace' },
                     { key: 'facebook_right_column', label: 'Columna derecha de Facebook' }
@@ -1914,8 +2071,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       <button
                         key={p.key}
                         type="button"
-                        className={`gender-btn ${isExcluded ? 'active' : ''}`}
-                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                        className={`toggle-btn ${isExcluded ? 'active' : ''}`}
                         onClick={() => {
                           setExcludedPlacements(prev =>
                             isExcluded ? prev.filter(e => e !== p.key) : [...prev, p.key]
@@ -1927,58 +2083,46 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     );
                   })}
                 </div>
-                <p className="hint" style={{ margin: '5px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                <p className="hint">
                   Haz clic para excluir ubicaciones específicas
                 </p>
               </div>
             </div>
           )}
-        </div>
 
-        {/* ============ MULTI-AD SECTION ============ */}
-        <div className="section-divider" style={{ margin: '25px 0 15px' }}>
-          <span>Anuncios ({ads.length})</span>
-        </div>
+        </div>{/* fin section-card Ubicaciones */}
+
+        {/* ===================== SECCIÓN: ANUNCIOS ===================== */}
+        <div className="section-card" id="section-anuncios">
+          <h4><span className="section-icon">🎬</span> Anuncios ({ads.length})</h4>
 
         {/* AdSet Mode Toggle */}
-        <div className="form-group" style={{ marginBottom: '15px' }}>
+        <div className="form-group">
           <label>Estructura de Anuncios</label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="toggle-group">
             <button
               type="button"
+              className={`ad-mode-btn ${adSetMode === 'single' ? 'active' : ''}`}
               onClick={() => setAdSetMode('single')}
-              style={{
-                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'single' ? '#4A9FFF' : '#2A3441',
-                background: adSetMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'single' ? 'bold' : 'normal'
-              }}
             >
-              1 Ad Set (sin 5+5+5)
+              <strong>1 Ad Set</strong>
+              <small>Sin 5+5+5</small>
             </button>
             <button
               type="button"
+              className={`ad-mode-btn ${adSetMode === 'dynamic' ? 'active' : ''}`}
               onClick={() => setAdSetMode('dynamic')}
-              style={{
-                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'dynamic' ? '#4A9FFF' : '#2A3441',
-                background: adSetMode === 'dynamic' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'dynamic' ? 'bold' : 'normal'
-              }}
             >
-              5+5+5 por Ad (recomendado)
+              <strong>5+5+5 por Ad</strong>
+              <small>Recomendado</small>
             </button>
             <button
               type="button"
+              className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
               onClick={() => setAdSetMode('per-ad')}
-              style={{
-                padding: '10px 18px', borderRadius: '8px', border: '2px solid',
-                borderColor: adSetMode === 'per-ad' ? '#4A9FFF' : '#2A3441',
-                background: adSetMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                cursor: 'pointer', fontSize: '13px', fontWeight: adSetMode === 'per-ad' ? 'bold' : 'normal'
-              }}
             >
-              Público diferente por Ad
+              <strong>Público por Ad</strong>
+              <small>Diferente audiencia</small>
             </button>
           </div>
           <p className="hint">
@@ -1991,10 +2135,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>
 
         {/* AI Text Generation Settings */}
-        <div className="form-group" style={{ marginBottom: '15px' }}>
-          <label>Configuracion de textos IA</label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#8899AA', alignSelf: 'center', marginRight: '4px' }}>Longitud:</span>
+        <div className="form-group">
+          <label>Configuración de textos IA</label>
+          <div className="toggle-group mb-sm" style={{ alignItems: 'center' }}>
+            <span className="text-muted" style={{ fontSize: '12px', marginRight: '4px' }}>Longitud:</span>
             {[
               { value: 'short', label: 'Corto', desc: 'Titulos ~30 chars, Textos ~80 chars' },
               { value: 'medium', label: 'Medio', desc: 'Titulos ~50 chars, Textos ~200 chars' },
@@ -2005,13 +2149,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 type="button"
                 onClick={() => setTextLength(opt.value)}
                 title={opt.desc}
-                style={{
-                  padding: '6px 14px', borderRadius: '6px', border: '2px solid',
-                  borderColor: textLength === opt.value ? '#4A9FFF' : '#2A3441',
-                  background: textLength === opt.value ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                  cursor: 'pointer', fontSize: '12px', fontWeight: textLength === opt.value ? 'bold' : 'normal',
-                  color: textLength === opt.value ? '#4A9FFF' : '#8899AA'
-                }}
+                className={`toggle-btn ${textLength === opt.value ? 'active' : ''}`}
               >
                 {opt.label}
               </button>
@@ -2022,13 +2160,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             onChange={(e) => setCampaignContext(e.target.value)}
             placeholder="Contexto adicional para la IA (opcional) - Ej: 'Somos una clinica de depilacion laser, enfocarnos en precios bajos y resultados rapidos, el publico es mujeres de 20-35 anos...'"
             rows={2}
-            style={{
-              width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #2A3441',
-              background: '#1B2333', color: '#E0E0E0', fontSize: '13px', resize: 'vertical',
-              fontFamily: 'inherit'
-            }}
+            style={{ resize: 'vertical' }}
           />
-          <p className="hint" style={{ marginTop: '4px' }}>
+          <p className="hint">
             {campaignContext.trim()
               ? 'La IA usara tu contexto para generar los textos.'
               : 'Sin contexto: la IA generara textos basandose solo en el contenido multimedia que subas.'}
@@ -2036,7 +2170,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>
 
         {/* Multi-file Upload Section */}
-        <div style={{ marginBottom: '15px', border: '1px solid #2A3441', borderRadius: '12px', padding: '14px', background: '#1B2333' }}>
+        <div className="upload-area">
           <input
             ref={multiFileInputRef}
             type="file"
@@ -2046,68 +2180,49 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             style={{ display: 'none' }}
           />
           {/* Mode selector */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#8899AA', marginRight: '4px' }}>Subida multiple:</span>
+          <div className="toggle-group mb-sm" style={{ alignItems: 'center' }}>
+            <span className="text-muted" style={{ fontSize: '12px', marginRight: '4px' }}>Subida multiple:</span>
             <button
               type="button"
               onClick={() => setMultiUploadMode('per-ad')}
-              style={{
-                padding: '6px 14px', borderRadius: '6px', border: '2px solid',
-                borderColor: multiUploadMode === 'per-ad' ? '#4A9FFF' : '#2A3441',
-                background: multiUploadMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
-                cursor: 'pointer', fontSize: '12px', fontWeight: multiUploadMode === 'per-ad' ? 'bold' : 'normal',
-                color: multiUploadMode === 'per-ad' ? '#4A9FFF' : '#8899AA'
-              }}
+              className={`toggle-btn ${multiUploadMode === 'per-ad' ? 'active' : ''}`}
             >
               1 archivo por Ad
             </button>
             <button
               type="button"
               onClick={() => setMultiUploadMode('single')}
-              style={{
-                padding: '6px 14px', borderRadius: '6px', border: '2px solid',
-                borderColor: multiUploadMode === 'single' ? '#4A9FFF' : '#2A3441',
-                background: multiUploadMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
-                cursor: 'pointer', fontSize: '12px', fontWeight: multiUploadMode === 'single' ? 'bold' : 'normal',
-                color: multiUploadMode === 'single' ? '#4A9FFF' : '#8899AA'
-              }}
+              className={`toggle-btn ${multiUploadMode === 'single' ? 'active' : ''}`}
             >
               Todo para 1 Ad
             </button>
           </div>
-          <p className="hint" style={{ marginBottom: '10px', fontSize: '11px' }}>
+          <p className="hint mb-sm">
             {multiUploadMode === 'per-ad'
               ? 'Cada archivo crea un ad nuevo automaticamente con su contenido IA.'
               : 'El primer archivo se usa para el ad, el resto se sube a la biblioteca de Meta.'}
           </p>
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="toggle-group" style={{ alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => multiFileInputRef.current?.click()}
               disabled={!selectedAccount}
-              style={{
-                padding: '10px 18px', borderRadius: '10px', border: '2px solid #4A9FFF',
-                background: 'rgba(74, 159, 255, 0.12)', color: '#4A9FFF',
-                cursor: selectedAccount ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 'bold',
-                opacity: selectedAccount ? 1 : 0.5
-              }}
+              className="toggle-btn active"
+              style={{ padding: '10px 18px', opacity: selectedAccount ? 1 : 0.5 }}
             >
               Subir Multiples Archivos
             </button>
             <button
               type="button"
               onClick={addAd}
-              style={{
-                padding: '10px 18px', borderRadius: '10px', border: '2px dashed #4A9FFF',
-                background: 'transparent', color: '#4A9FFF',
-                cursor: 'pointer', fontSize: '13px', fontWeight: 'bold'
-              }}
+              className="add-ad-btn"
+              style={{ padding: '10px 18px', borderRadius: '10px' }}
             >
               + Agregar Ad Vacio
             </button>
             {multiUploadProgress && (
-              <span style={{ fontSize: '12px', color: '#4A9FFF' }}>
+              <span className="text-accent" style={{ fontSize: '12px' }}>
                 {multiUploadProgress}
               </span>
             )}
@@ -2117,18 +2232,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Ad Cards */}
         <div className="ads-section">
           {ads.map((ad, adIndex) => (
-            <div key={ad.id} className="ad-card" style={{
-              border: '2px solid #2A3441',
-              borderRadius: '12px',
-              padding: '16px',
-              marginBottom: '16px',
-              background: '#212B3D'
-            }}>
+            <div key={ad.id} className="ad-card">
               {/* Ad Card Header */}
-              <div className="ad-card-header" style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'
-              }}>
-                <h4 style={{ margin: 0, fontSize: '15px', color: '#E2E8F0' }}>
+              <div className="ad-card-header">
+                <h4>
                   Anuncio {adIndex + 1}
                 </h4>
                 {ads.length > 1 && (
@@ -2136,10 +2243,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     type="button"
                     onClick={() => removeAd(adIndex)}
                     className="remove-ad-btn"
-                    style={{
-                      background: '#F87171', color: 'white', border: 'none',
-                      borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px'
-                    }}
                   >
                     Eliminar
                   </button>
@@ -2147,21 +2250,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </div>
 
               {/* Ad Name */}
-              <div className="form-group" style={{ marginBottom: '10px' }}>
-                <label style={{ fontSize: '13px' }}>Nombre del anuncio</label>
+              <div className="form-group">
+                <label>Nombre del anuncio</label>
                 <input
                   type="text"
                   placeholder={`Ad ${adIndex + 1}`}
                   value={ad.adName}
                   onChange={(e) => updateAd(adIndex, { adName: e.target.value })}
-                  style={{ fontSize: '13px' }}
                 />
               </div>
 
               {/* Per-ad Audience (only in per-ad mode) */}
               {adSetMode === 'per-ad' && (
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '13px' }}>Público para este anuncio</label>
+                <div className="form-group">
+                  <label>Público para este anuncio</label>
                   <select
                     value={ad.audienceId}
                     onChange={(e) => {
@@ -2172,7 +2274,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         audienceTargeting: aud?.targeting || null
                       });
                     }}
-                    style={{ fontSize: '13px' }}
                   >
                     <option value="">Usar público por defecto</option>
                     {allAudiences.map((audience) => (
@@ -2186,8 +2287,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
               {/* Per-ad WhatsApp Number (only in per-ad whatsapp mode) */}
               {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '13px' }}>Número de WhatsApp para este Ad Set *</label>
+                <div className="form-group">
+                  <label>Número de WhatsApp para este Ad Set *</label>
                   <select
                     value={ad.whatsappNumberId}
                     onChange={(e) => {
@@ -2199,7 +2300,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         whatsappDisplayNumber: selected ? selected.display_phone_number : ''
                       });
                     }}
-                    style={{ fontSize: '13px' }}
                   >
                     <option value="">Selecciona un número</option>
                     {whatsAppNumbers.map(num => {
@@ -2219,42 +2319,27 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               )}
 
               {/* Media Source Tabs */}
-              <div className="form-group" style={{ marginBottom: '10px' }}>
-                <label style={{ fontSize: '13px' }}>Contenido (imagen/video)</label>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <div className="form-group">
+                <label>Contenido (imagen/video)</label>
+                <div className="toggle-group mb-sm">
                   <button
                     type="button"
+                    className={`media-tab ${ad.mediaSource === 'none' ? 'active' : ''}`}
                     onClick={() => updateAd(adIndex, { mediaSource: 'none' })}
-                    style={{
-                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'none' ? '#4A9FFF' : '#2A3441',
-                      background: ad.mediaSource === 'none' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'none' ? 'bold' : 'normal'
-                    }}
                   >
                     Vacío
                   </button>
                   <button
                     type="button"
+                    className={`media-tab ${ad.mediaSource === 'library' ? 'active' : ''}`}
                     onClick={() => { updateAd(adIndex, { mediaSource: 'library' }); handleLoadMediaLibrary(); }}
-                    style={{
-                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'library' ? '#4A9FFF' : '#2A3441',
-                      background: ad.mediaSource === 'library' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'library' ? 'bold' : 'normal'
-                    }}
                   >
                     Biblioteca
                   </button>
                   <button
                     type="button"
+                    className={`media-tab ${ad.mediaSource === 'upload' ? 'active' : ''}`}
                     onClick={() => updateAd(adIndex, { mediaSource: 'upload' })}
-                    style={{
-                      padding: '6px 12px', borderRadius: '6px', border: '2px solid',
-                      borderColor: ad.mediaSource === 'upload' ? '#4A9FFF' : '#2A3441',
-                      background: ad.mediaSource === 'upload' ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: ad.mediaSource === 'upload' ? 'bold' : 'normal'
-                    }}
                   >
                     Subir archivo
                   </button>
@@ -2262,69 +2347,54 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
                 {/* Library Browser — multi-select directo */}
                 {ad.mediaSource === 'library' && (
-                  <div style={{ border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', maxHeight: '350px', overflowY: 'auto' }}>
+                  <div className="library-grid" style={{ display: 'block', gridTemplateColumns: 'none', maxHeight: '350px', padding: '10px' }}>
                     {/* Mode selector + apply button (always visible) */}
-                    <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', color: '#8899AA' }}>Modo:</span>
+                    <div className="toggle-group mb-sm" style={{ alignItems: 'center' }}>
+                      <span className="text-muted" style={{ fontSize: '11px' }}>Modo:</span>
                       <button
                         type="button"
+                        className={`toggle-btn ${libraryMode === 'single' ? 'active' : ''}`}
                         onClick={() => { setLibraryMode('single'); setSelectedLibraryMedia([]); }}
-                        style={{
-                          padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
-                          border: `1px solid ${libraryMode === 'single' ? '#4A9FFF' : '#2A3441'}`,
-                          background: libraryMode === 'single' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
-                          color: libraryMode === 'single' ? '#4A9FFF' : '#8899AA', cursor: 'pointer',
-                          fontWeight: libraryMode === 'single' ? 'bold' : 'normal'
-                        }}
                       >
                         Para este Ad
                       </button>
                       <button
                         type="button"
+                        className={`toggle-btn ${libraryMode === 'per-ad' ? 'active' : ''}`}
                         onClick={() => { setLibraryMode('per-ad'); setSelectedLibraryMedia([]); }}
-                        style={{
-                          padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
-                          border: `1px solid ${libraryMode === 'per-ad' ? '#4A9FFF' : '#2A3441'}`,
-                          background: libraryMode === 'per-ad' ? 'rgba(74, 159, 255, 0.12)' : 'transparent',
-                          color: libraryMode === 'per-ad' ? '#4A9FFF' : '#8899AA', cursor: 'pointer',
-                          fontWeight: libraryMode === 'per-ad' ? 'bold' : 'normal'
-                        }}
                       >
                         1 Ad por contenido
                       </button>
                       {selectedLibraryMedia.length > 1 && (
                         <button
                           type="button"
+                          className="toggle-btn active"
                           onClick={() => handleApplyLibrarySelection(adIndex)}
-                          style={{
-                            padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold',
-                            border: '2px solid #34D399', background: 'rgba(52, 211, 153, 0.15)',
-                            color: '#34D399', cursor: 'pointer', marginLeft: 'auto'
-                          }}
+                          style={{ marginLeft: 'auto', borderColor: 'var(--success)', color: 'var(--success)', background: 'rgba(52, 211, 153, 0.15)' }}
                         >
                           Aplicar ({selectedLibraryMedia.length})
                         </button>
                       )}
                     </div>
-                    <p className="hint" style={{ fontSize: '10px', marginBottom: '8px' }}>
+                    <p className="hint mb-sm" style={{ fontSize: '10px' }}>
                       {libraryMode === 'single'
                         ? 'Haz click para seleccionar el contenido de este ad.'
                         : 'Selecciona varios y haz click en "Aplicar" para crear 1 ad por cada uno.'}
                     </p>
                     {loadingMedia ? (
-                      <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>Cargando biblioteca...</p>
+                      <p className="text-muted" style={{ textAlign: 'center', fontSize: '13px' }}>Cargando biblioteca...</p>
                     ) : (
                       <>
                         {mediaLibrary.images.length === 0 && mediaLibrary.videos.length === 0 ? (
-                          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '13px' }}>No hay medios en esta cuenta</p>
+                          <p className="text-muted" style={{ textAlign: 'center', fontSize: '13px' }}>No hay medios en esta cuenta</p>
                         ) : (
                           <>
                             {mediaLibrary.images.length > 0 && (
                               <div>
-                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px' }}>
+                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px', color: 'var(--text-primary)' }}>
                                   Imágenes ({mediaLibrary.images.length})
                                 </p>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '6px' }}>
+                                <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}>
                                   {mediaLibrary.images.map((img, i) => {
                                     const isSel = isLibraryMediaSelected('image', img);
                                     return (
@@ -2339,36 +2409,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                             toggleLibraryMediaSelection('image', img);
                                           }
                                         }}
-                                        style={{
-                                          cursor: 'pointer',
-                                          border: (isSel || ad.imageHash === img.hash) ? '3px solid #4A9FFF' : '2px solid #2A3441',
-                                          borderRadius: '6px',
-                                          overflow: 'hidden',
-                                          position: 'relative',
-                                          aspectRatio: '1'
-                                        }}
+                                        className={`library-item ${(isSel || ad.imageHash === img.hash) ? 'selected' : ''}`}
                                       >
                                         <img
                                           src={img.url}
                                           alt={img.name || 'Ad image'}
-                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                           onError={(e) => { e.target.style.display = 'none'; }}
                                         />
                                         {isSel && (
-                                          <div style={{
-                                            position: 'absolute', top: '2px', right: '2px',
-                                            background: '#F59E0B', color: 'white', borderRadius: '50%',
-                                            width: '18px', height: '18px', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold'
-                                          }}>{selectedLibraryMedia.findIndex(m => m.type === 'image' && m.data.hash === img.hash) + 1}</div>
+                                          <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'image' && m.data.hash === img.hash) + 1}</div>
                                         )}
                                         {!isSel && ad.imageHash === img.hash && (
-                                          <div style={{
-                                            position: 'absolute', top: '2px', right: '2px',
-                                            background: '#4A9FFF', color: 'white', borderRadius: '50%',
-                                            width: '16px', height: '16px', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px'
-                                          }}>v</div>
+                                          <div className="library-item-badge">{'\u2713'}</div>
                                         )}
                                       </div>
                                     );
@@ -2377,11 +2429,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                               </div>
                             )}
                             {mediaLibrary.videos.length > 0 && (
-                              <div style={{ marginTop: '10px' }}>
-                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px' }}>
+                              <div className="mt-sm">
+                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px', color: 'var(--text-primary)' }}>
                                   Videos ({mediaLibrary.videos.length})
                                 </p>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '6px' }}>
+                                <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
                                   {mediaLibrary.videos.map((vid, i) => {
                                     const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
                                     const isSel = isLibraryMediaSelected('video', vid);
@@ -2395,43 +2447,27 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                             toggleLibraryMediaSelection('video', vid);
                                           }
                                         }}
-                                        style={{
-                                          border: (isSel || ad.videoId === vid.id) ? '3px solid #4A9FFF' : '2px solid #2A3441',
-                                          borderRadius: '6px',
-                                          overflow: 'hidden',
-                                          cursor: 'pointer',
-                                          background: (isSel || ad.videoId === vid.id) ? 'rgba(74, 159, 255, 0.12)' : '#1B2333',
-                                          position: 'relative'
-                                        }}
+                                        className={`library-item ${(isSel || ad.videoId === vid.id) ? 'selected' : ''}`}
+                                        style={{ aspectRatio: 'auto' }}
                                       >
                                         {thumbnail ? (
-                                          <img src={thumbnail} alt={vid.title} style={{ width: '100%', height: '70px', objectFit: 'cover' }} />
+                                          <img src={thumbnail} alt={vid.title} style={{ height: '70px', objectFit: 'cover' }} />
                                         ) : (
-                                          <div style={{ width: '100%', height: '70px', background: '#2A3441', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                                          <div className="text-muted" style={{ width: '100%', height: '70px', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                                             V
                                           </div>
                                         )}
                                         <div style={{ padding: '4px 6px', fontSize: '10px' }}>
-                                          <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
                                             {vid.title || 'Sin título'}
                                           </p>
-                                          {vid.length && <p style={{ color: '#94A3B8', margin: 0 }}>{Math.round(vid.length)}s</p>}
+                                          {vid.length && <p className="text-muted" style={{ margin: 0 }}>{Math.round(vid.length)}s</p>}
                                         </div>
                                         {isSel && (
-                                          <div style={{
-                                            position: 'absolute', top: '2px', right: '2px',
-                                            background: '#F59E0B', color: 'white', borderRadius: '50%',
-                                            width: '18px', height: '18px', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold'
-                                          }}>{selectedLibraryMedia.findIndex(m => m.type === 'video' && m.data.id === vid.id) + 1}</div>
+                                          <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'video' && m.data.id === vid.id) + 1}</div>
                                         )}
                                         {!isSel && ad.videoId === vid.id && (
-                                          <div style={{
-                                            position: 'absolute', top: '2px', right: '2px',
-                                            background: '#4A9FFF', color: 'white', borderRadius: '50%',
-                                            width: '16px', height: '16px', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center', fontSize: '10px'
-                                          }}>v</div>
+                                          <div className="library-item-badge">{'✓'}</div>
                                         )}
                                       </div>
                                     );
@@ -2448,15 +2484,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
                 {/* Upload from device */}
                 {ad.mediaSource === 'upload' && (
-                  <div style={{ border: '2px dashed #2A3441', borderRadius: '8px', padding: '15px', textAlign: 'center' }}>
+                  <div className="upload-area" style={{ borderStyle: 'dashed', textAlign: 'center' }}>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.mov"
                       onChange={(e) => handleAdFileUpload(adIndex, e)}
                       disabled={ad.uploadingFile || !selectedAccount}
-                      style={{ marginBottom: '8px', fontSize: '12px' }}
+                      style={{ marginBottom: '8px' }}
                     />
-                    <p className="hint" style={{ fontSize: '12px' }}>
+                    <p className="hint">
                       {!selectedAccount
                         ? 'Selecciona una cuenta publicitaria primero'
                         : ad.uploadingFile
@@ -2468,76 +2504,56 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
                 {/* Media & AI analysis status */}
                 {ad.analyzingMedia && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    background: 'rgba(74, 159, 255, 0.12)', borderRadius: '6px', padding: '8px 12px', marginTop: '6px'
-                  }}>
+                  <div className="chip mt-sm" style={{ gap: '8px' }}>
                     <span className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
-                    <span style={{ fontSize: '12px', color: '#4A9FFF' }}>
+                    <span className="text-accent" style={{ fontSize: '12px' }}>
                       {ad.uploadProgress || 'Analizando con IA...'}
                     </span>
                   </div>
                 )}
                 {!ad.analyzingMedia && ad.uploadProgress && ad.mediaSource !== 'none' && (
-                  <p className="hint" style={{ color: ad.contentGenerated ? '#34D399' : ad.imageUrl || ad.imageHash || ad.videoId ? '#34D399' : '#F59E0B', marginTop: '6px', fontSize: '12px' }}>
+                  <p className={`hint mt-sm ${ad.contentGenerated || ad.imageUrl || ad.imageHash || ad.videoId ? 'text-success' : 'text-warning'}`}>
                     {ad.uploadProgress}
                   </p>
                 )}
                 {ad.mediaSource === 'none' && (
-                  <p className="hint" style={{ fontSize: '12px' }}>Sin imagen/video, usará la vista previa del link.</p>
+                  <p className="hint">Sin imagen/video, usará la vista previa del link.</p>
                 )}
               </div>
 
               {/* Content Summary & Edit Toggle */}
-              <div style={{ marginTop: '10px' }}>
+              <div className="mt-sm">
                 <button
                   type="button"
+                  className={`content-editor-toggle ${ad.contentGenerated ? 'generated' : ''}`}
                   onClick={() => updateAd(adIndex, { showEditContent: !ad.showEditContent })}
-                  style={{
-                    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: ad.contentGenerated ? 'linear-gradient(135deg, #e8f5e9, #c8e6c9)' : '#f0f4f8',
-                    borderRadius: '10px', padding: '10px 14px', cursor: 'pointer',
-                    border: ad.contentGenerated ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid #2A3441',
-                    transition: 'all 0.2s'
-                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="flex-row" style={{ gap: '8px', alignItems: 'center' }}>
                     {ad.contentGenerated && (
-                      <span style={{
-                        background: '#34D399', color: '#064E3B', borderRadius: '4px',
-                        padding: '2px 6px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'
-                      }}>IA</span>
+                      <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px' }}>IA</span>
                     )}
-                    <span style={{ fontSize: '13px', color: ad.contentGenerated ? '#34D399' : '#94A3B8', fontWeight: '500' }}>
+                    <span className={ad.contentGenerated ? 'text-success' : 'text-muted'} style={{ fontSize: '13px', fontWeight: '500' }}>
                       {ad.headlines.filter(h => h.trim()).length} Títulos + {ad.descriptions.filter(d => d.trim()).length} Descripciones + {[...new Set(ad.ctas)].length} CTAs
                     </span>
                   </div>
-                  <span style={{ fontSize: '18px', color: '#64748B', transform: ad.showEditContent ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <span className="content-editor-arrow" style={{ transform: ad.showEditContent ? 'rotate(180deg)' : 'none' }}>
                     {ad.showEditContent ? 'v' : '>'}
                   </span>
                 </button>
 
                 {/* Inline Content Editor */}
                 {ad.showEditContent && (
-                  <div style={{
-                    marginTop: '8px', padding: '16px', background: '#1B2333', borderRadius: '10px',
-                    border: '1px solid #2A3441', boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
-                  }}>
+                  <div className="content-editor">
                     {/* Headlines */}
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
-                      }}>
-                        <span style={{
-                          background: '#4A9FFF', color: 'white', borderRadius: '4px',
-                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
-                        }}>H</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
+                    <div className="content-editor-section">
+                      <div className="content-editor-section-header">
+                        <span className="content-badge content-badge--h">H</span>
+                        <label>
                           Títulos ({ad.headlines.filter(h => h.trim()).length}/5)
                         </label>
                       </div>
                       {ad.headlines.map((headline, hi) => (
-                        <div key={`ad${adIndex}-h${hi}`} style={{ position: 'relative', marginBottom: '6px' }}>
+                        <div key={`ad${adIndex}-h${hi}`} className="content-input-wrapper">
                           <input
                             type="text"
                             placeholder={`Título ${hi + 1}`}
@@ -2548,36 +2564,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                               updateAd(adIndex, { headlines: newHeadlines });
                             }}
                             maxLength={55}
-                            style={{
-                              fontSize: '13px', padding: '8px 40px 8px 10px',
-                              borderRadius: '6px', border: headline.trim() ? '1px solid rgba(74, 159, 255, 0.4)' : '1px solid #2A3441',
-                              background: headline.trim() ? 'rgba(74, 159, 255, 0.05)' : '#1B2333', color: '#E2E8F0',
-                              width: '100%', boxSizing: 'border-box'
-                            }}
+                            className={`content-input ${headline.trim() ? 'filled' : ''}`}
                           />
-                          <span style={{
-                            position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-                            fontSize: '10px', color: headline.length > 50 ? '#F87171' : '#475569'
-                          }}>{headline.length}/55</span>
+                          <span className={`char-count ${headline.length > 50 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{headline.length}/55</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Descriptions */}
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
-                      }}>
-                        <span style={{
-                          background: '#F59E0B', color: '#1B2333', borderRadius: '4px',
-                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
-                        }}>D</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
+                    <div className="content-editor-section">
+                      <div className="content-editor-section-header">
+                        <span className="content-badge content-badge--d">D</span>
+                        <label>
                           Textos Principales ({ad.descriptions.filter(d => d.trim()).length}/5)
                         </label>
                       </div>
                       {ad.descriptions.map((desc, di) => (
-                        <div key={`ad${adIndex}-d${di}`} style={{ position: 'relative', marginBottom: '6px' }}>
+                        <div key={`ad${adIndex}-d${di}`} className="content-input-wrapper">
                           <textarea
                             placeholder={`Texto principal ${di + 1} - Escribe un texto atractivo con emojis y beneficios`}
                             value={desc}
@@ -2588,35 +2591,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             }}
                             maxLength={500}
                             rows={3}
-                            style={{
-                              fontSize: '13px', padding: '8px 10px', resize: 'vertical',
-                              borderRadius: '6px', border: desc.trim() ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid #2A3441',
-                              background: desc.trim() ? 'rgba(245, 158, 11, 0.05)' : '#1B2333', color: '#E2E8F0',
-                              width: '100%', boxSizing: 'border-box'
-                            }}
+                            className={`content-input ${desc.trim() ? 'filled-desc' : ''}`}
+                            style={{ padding: '8px 10px', resize: 'vertical' }}
                           />
-                          <span style={{
-                            position: 'absolute', right: '8px', bottom: '8px',
-                            fontSize: '10px', color: desc.length > 280 ? '#F87171' : '#475569'
-                          }}>{desc.length}/500</span>
+                          <span className={`char-count ${desc.length > 280 ? 'error' : ''}`} style={{ top: 'auto', bottom: '8px' }}>{desc.length}/500</span>
                         </div>
                       ))}
                     </div>
 
                     {/* CTAs */}
                     <div>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
-                      }}>
-                        <span style={{
-                          background: '#9c27b0', color: 'white', borderRadius: '4px',
-                          padding: '2px 8px', fontSize: '11px', fontWeight: 'bold'
-                        }}>CTA</span>
-                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>
+                      <div className="content-editor-section-header">
+                        <span className="content-badge content-badge--cta">CTA</span>
+                        <label>
                           Call to Actions ({[...new Set(ad.ctas)].length} únicos)
                         </label>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <div className="cta-grid">
                         {ad.ctas.map((cta, ci) => (
                           <select
                             key={`ad${adIndex}-c${ci}`}
@@ -2626,10 +2617,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                               newCtas[ci] = e.target.value;
                               updateAd(adIndex, { ctas: newCtas });
                             }}
-                            style={{
-                              fontSize: '12px', padding: '7px 8px', borderRadius: '6px',
-                              border: '1px solid #2A3441', background: 'rgba(156, 39, 176, 0.08)', cursor: 'pointer', color: '#E2E8F0'
-                            }}
+                            className="cta-select"
                           >
                             {CTA_OPTIONS.map(option => (
                               <option key={option.value} value={option.value}>
@@ -2651,11 +2639,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             type="button"
             className="add-ad-btn"
             onClick={addAd}
-            style={{
-              width: '100%', padding: '14px', border: '2px dashed #4A9FFF',
-              borderRadius: '12px', background: 'transparent', color: '#4A9FFF',
-              cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', marginBottom: '15px'
-            }}
           >
             + Agregar Otro Anuncio
           </button>
@@ -2664,35 +2647,34 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Editor de Chats (solo para campañas WhatsApp) */}
         {templateRequirements.whatsapp && (
           <>
-            <div className="section-divider" style={{ margin: '25px 0 15px' }}>
+            <div className="section-divider">
               <span>Editor de Chats</span>
             </div>
 
-            <div className="chat-editor-section" style={{ background: '#1B2333', borderRadius: '12px', padding: '20px', marginBottom: '20px', border: '1px solid #2A3441' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div className="chat-editor-section">
+              <div className="toggle-inline" style={{ marginBottom: '12px' }}>
                 <div>
-                  <h4 style={{ margin: 0, color: '#E2E8F0' }}>Plantilla de Mensaje</h4>
-                  <p className="hint" style={{ margin: '4px 0 0' }}>
+                  <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Plantilla de Mensaje</h4>
+                  <p className="hint">
                     Configura el mensaje que verán las personas cuando toquen tu anuncio
                   </p>
                 </div>
                 <button
                   type="button"
-                  className={`gender-btn ${showChatEditor ? 'active' : ''}`}
+                  className={`toggle-btn ${showChatEditor ? 'active' : ''}`}
                   onClick={() => setShowChatEditor(!showChatEditor)}
-                  style={{ padding: '6px 14px', fontSize: '12px' }}
                 >
                   {showChatEditor ? 'Ocultar' : 'Editar'}
                 </button>
               </div>
 
               {/* Preview siempre visible */}
-              <div style={{ background: '#0F1724', borderRadius: '10px', padding: '16px', border: '1px solid #2A3441' }}>
-                <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', fontWeight: 'bold' }}>Mensaje de bienvenida</div>
-                <div style={{ fontSize: '14px', color: '#E2E8F0', marginBottom: '12px' }}>{chatGreeting}</div>
-                <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', fontWeight: 'bold' }}>Detalles del formulario</div>
-                <div style={{ fontSize: '13px', color: '#CBD5E1', marginBottom: '4px' }}>Comparte tus datos de contacto</div>
-                <ol style={{ margin: '4px 0 0', paddingLeft: '20px', fontSize: '13px', color: '#E2E8F0' }}>
+              <div className="chat-preview">
+                <div className="chat-preview-label">Mensaje de bienvenida</div>
+                <div className="chat-preview-content mb-md">{chatGreeting}</div>
+                <div className="chat-preview-label">Detalles del formulario</div>
+                <div className="chat-preview-sublabel">Comparte tus datos de contacto</div>
+                <ol className="chat-preview-list">
                   {chatFormFields.map((field, i) => {
                     const fieldInfo = CHAT_FORM_FIELDS.find(f => f.value === field);
                     return <li key={i}>{fieldInfo?.label || field}</li>;
@@ -2704,27 +2686,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               {showChatEditor && (
                 <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <label style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
+                    <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
                     <textarea
                       value={chatGreeting}
                       onChange={(e) => setChatGreeting(e.target.value)}
                       rows={3}
-                      style={{ width: '100%', background: '#0F1724', border: '1px solid #2A3441', borderRadius: '8px', padding: '10px', color: '#E2E8F0', fontSize: '14px', resize: 'vertical' }}
+                      style={{ resize: 'vertical' }}
                       placeholder="Te damos la bienvenida. Completa el formulario..."
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
+                    <div className="toggle-group">
                       {CHAT_FORM_FIELDS.map(field => {
                         const isSelected = chatFormFields.includes(field.value);
                         return (
                           <button
                             key={field.value}
                             type="button"
-                            className={`gender-btn ${isSelected ? 'active' : ''}`}
-                            style={{ padding: '5px 12px', fontSize: '12px' }}
+                            className={`toggle-btn ${isSelected ? 'active' : ''}`}
                             onClick={() => {
                               setChatFormFields(prev =>
                                 isSelected
@@ -2738,7 +2719,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         );
                       })}
                     </div>
-                    <p className="hint" style={{ margin: '6px 0 0' }}>
+                    <p className="hint mt-sm">
                       Selecciona los campos que quieres pedir en el formulario de contacto
                     </p>
                   </div>
@@ -2747,6 +2728,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             </div>
           </>
         )}
+
+        </div>{/* fin section-card Anuncios */}
 
         {error && <div className="error-message">{error}</div>}
 
@@ -2835,12 +2818,21 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         addLog(`Advantage+ Público: ${job.advantageAudience ? 'Activado' : 'Desactivado'}`);
       }
 
-      // Aplicar Advantage+ Audience al targeting
-      if (job.advantageAudience) {
-        targeting.targeting_optimization = 'expansion_all';
-      }
+      // Nota: targeting_optimization fue eliminado por Meta (Feb 2026)
+      // Advantage+ Audience se aplica automáticamente a los conjuntos de anuncios
 
       let result;
+
+      // Debug: mostrar exactamente qué conversionLocation y CTAs se están usando
+      console.log('ROUTING DEBUG:', {
+        conversionLocation,
+        whatsappNumber: job.whatsappNumber,
+        whatsappNumberId: job.whatsappNumberId,
+        adSetMode: job.adSetMode,
+        adCTAs: job.ads?.map(a => a.ctas?.[0]),
+        templateId: job.templateId,
+        selectedDestination: job.conversionLocation
+      });
 
       // Seleccionar método de creación según el tipo de campaña
       if (conversionLocation === 'WHATSAPP' && job.whatsappNumber) {
@@ -2885,7 +2877,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           pageWelcomeMessage: job.chatGreeting ? {
             greeting: job.chatGreeting,
             formFields: job.chatFormFields || []
-          } : null
+          } : null,
+          multiAudiences: job.multiAudiences || []
         });
 
       } else if (conversionLocation === 'MESSENGER' || conversionLocation === 'INSTAGRAM_DIRECT') {
@@ -2918,21 +2911,52 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           const createdAdSets = [];
           const errors = [];
 
+          // Construir array de públicos a procesar (principal + adicionales)
+          const multiAuds = job.multiAudiences || [];
+          const primaryAud = {
+            name: job.savedAudienceName || 'Principal',
+            targeting: targeting
+          };
+          const audiencesToProcess = mode === 'per-ad'
+            ? [primaryAud] // per-ad ya maneja públicos por ad
+            : (multiAuds.length > 0
+              ? [primaryAud, ...multiAuds.map(a => ({
+                  name: a.name,
+                  targeting: {
+                    ...(a.targeting || { geo_locations: { countries: ['CO'] } }),
+                    age_min: job.ageMin || 18,
+                    age_max: job.ageMax || 65,
+                    ...(job.gender && job.gender !== 'all' ? { genders: job.gender === 'male' ? [1] : [2] } : {})
+                  }
+                }))]
+              : [primaryAud]);
+
+          if (audiencesToProcess.length > 1) {
+            addLog(`Múltiples públicos: ${audiencesToProcess.length} (se replicarán los ads para cada público)`);
+          }
+
+          for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
+            const currentAudience = audiencesToProcess[audIdx];
+            const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+            if (audiencesToProcess.length > 1) {
+              addLog(`--- Público ${audIdx + 1}/${audiencesToProcess.length}: ${currentAudience.name} ---`);
+            }
+
           if (mode === 'single') {
-            // ========== MODO SINGLE: 1 AdSet → N standard creatives (1-1-1) ==========
+            // ========== MODO SINGLE: 1 AdSet por público → N standard creatives (1-1-1) ==========
             const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
             const adSetResult = await metaService[adSetMethod](job.adAccountId, {
-              name: `${job.campaignName} - Ad Set`,
+              name: `${job.campaignName} - Ad Set${audPrefix}`,
               campaignId: campaignResult.data.id,
-              targeting,
+              targeting: currentAudience.targeting,
               optimizationGoal,
               promotedObject: { page_id: job.pageId }
             });
 
             if (!adSetResult.success) {
-              errors.push(`AdSet: ${adSetResult.error}`);
+              errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
             } else {
-              addLog(`Ad Set creado: ${adSetResult.data.id}`);
+              addLog(`Ad Set creado${audPrefix}: ${adSetResult.data.id}`);
               createdAdSets.push(adSetResult.data);
 
               for (let i = 0; i < totalAds; i++) {
@@ -2946,11 +2970,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
                 const adCta = ad.ctas?.[0] || defaultCta;
 
-                addLog(`Creando standard creative + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+                addLog(`Creando standard creative + ad${adLabel}${audPrefix} (${adVideoId ? 'video' : 'imagen'})...`);
 
                 const creativeMethod = isIgDM ? 'createCreativeForInstagramDM' : 'createCreativeForMessenger';
                 const creativeParams = {
-                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audPrefix} - Creative`,
                   pageId: job.pageId,
                   imageHash: adImageHash,
                   imageUrl: adImageUrl,
@@ -2966,37 +2990,36 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);
 
                 if (!creativeResult.success) {
-                  errors.push(`Creative${adLabel}: ${creativeResult.error}`);
-                  addLog(`Error creative${adLabel}: ${creativeResult.error}`);
+                  errors.push(`Creative${adLabel}${audPrefix}: ${creativeResult.error}`);
+                  addLog(`Error creative${adLabel}${audPrefix}: ${creativeResult.error}`);
                   continue;
                 }
 
                 const adResult = await metaService.createAd(job.adAccountId, {
-                  name: ad.adName || `${job.campaignName} - Ad${adLabel}`,
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audPrefix}`,
                   adsetId: adSetResult.data.id,
                   creativeId: creativeResult.data.id,
                   status: 'PAUSED'
                 });
 
                 if (!adResult.success) {
-                  errors.push(`Ad${adLabel}: ${adResult.error}`);
-                  addLog(`Error ad${adLabel}: ${adResult.error}`);
+                  errors.push(`Ad${adLabel}${audPrefix}: ${adResult.error}`);
+                  addLog(`Error ad${adLabel}${audPrefix}: ${adResult.error}`);
                 } else {
                   createdAds.push(adResult.data);
-                  addLog(`Ad${adLabel} creado: ${adResult.data.id}`);
+                  addLog(`Ad${adLabel}${audPrefix} creado: ${adResult.data.id}`);
                 }
               }
             }
           } else {
             // ========== MODO DYNAMIC/PER-AD: N AdSets con Dynamic Creative 5+5+5 ==========
-            // Probar isDynamicCreative con asset_feed_spec para mensajería
             for (let i = 0; i < totalAds; i++) {
               const ad = adsArray[i];
               const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
-              const adTargeting = (mode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : targeting;
-              const audienceLabel = (mode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : '';
+              const adTargeting = (mode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
+              const audienceLabel = (mode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
 
-              addLog(`Creando Ad Set${adLabel} + dynamic creative 5+5+5${audienceLabel}...`);
+              addLog(`Creando Ad Set${adLabel}${audienceLabel} + dynamic creative 5+5+5...`);
 
               // Crear AdSet con isDynamicCreative: true
               const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
@@ -3010,12 +3033,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               });
 
               if (!adSetResult.success) {
-                errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
-                addLog(`Error AdSet${adLabel}: ${adSetResult.error}`);
+                errors.push(`AdSet${adLabel}${audienceLabel}: ${adSetResult.error}`);
+                addLog(`Error AdSet${adLabel}${audienceLabel}: ${adSetResult.error}`);
                 continue;
               }
               createdAdSets.push(adSetResult.data);
-              addLog(`Ad Set${adLabel} creado (DC): ${adSetResult.data.id}`);
+              addLog(`Ad Set${adLabel}${audienceLabel} creado (DC): ${adSetResult.data.id}`);
 
               // Preparar datos del ad
               const adVideoId = ad.videoId || null;
@@ -3024,7 +3047,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const adThumbnailUrl = ad.videoThumbnailUrl || null;
               const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
               const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
-              // OUTCOME_AWARENESS + DC: filtrar CTAs no compatibles (GET_OFFER, APPLY_NOW, etc.)
               const AWARENESS_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE', 'VISIT_INSTAGRAM_PROFILE'];
               let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))];
               if (objective === 'OUTCOME_AWARENESS') {
@@ -3032,18 +3054,16 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 if (validCTAs.length === 0) validCTAs = [defaultCta];
               }
 
-              addLog(`Creando dynamic creative 5+5+5 + ad${adLabel} (${adVideoId ? 'video' : 'imagen'})...`);
+              addLog(`Creando dynamic creative 5+5+5 + ad${adLabel}${audienceLabel} (${adVideoId ? 'video' : 'imagen'})...`);
 
-              // OUTCOME_SALES + IG DM requiere link_urls en asset_feed_spec
               const needsLinkUrl = isIgDM && objective === 'OUTCOME_SALES';
               const igDmLink = needsLinkUrl ? `https://ig.me/m/${job.igActorId}` : null;
               const messengerLink = (!isIgDM && objective === 'OUTCOME_SALES') ? `https://m.me/${job.pageId}` : null;
               const dcLinkUrl = igDmLink || messengerLink || null;
-              const dcIsWhatsApp = !needsLinkUrl && !messengerLink; // Solo skip link_urls para mensajería sin SALES
+              const dcIsWhatsApp = !needsLinkUrl && !messengerLink;
 
-              // Crear Dynamic Creative con asset_feed_spec (5+5+5)
               let creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
-                name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audienceLabel} - Creative`,
                 pageId: job.pageId,
                 imageHash: adImageHash,
                 imageUrl: adImageUrl,
@@ -3058,11 +3078,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 isWhatsApp: dcIsWhatsApp
               });
 
-              // Si falla por igActorId, reintentar sin IG
               if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
                 addLog(`Creative${adLabel}: igActorId rejected, reintentando sin IG...`);
                 creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
-                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel} - Creative`,
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audienceLabel} - Creative`,
                   pageId: job.pageId,
                   imageHash: adImageHash,
                   imageUrl: adImageUrl,
@@ -3079,28 +3098,33 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               }
 
               if (!creativeResult.success) {
-                errors.push(`Creative${adLabel}: ${creativeResult.error}`);
-                addLog(`Error creative${adLabel}: ${creativeResult.error}`);
+                errors.push(`Creative${adLabel}${audienceLabel}: ${creativeResult.error}`);
+                addLog(`Error creative${adLabel}${audienceLabel}: ${creativeResult.error}`);
                 continue;
               }
 
               const adResult = await metaService.createAd(job.adAccountId, {
-                name: ad.adName || `${job.campaignName} - Ad${adLabel}`,
+                name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audienceLabel}`,
                 adsetId: adSetResult.data.id,
                 creativeId: creativeResult.data.id,
                 status: 'PAUSED'
               });
 
               if (!adResult.success) {
-                errors.push(`Ad${adLabel}: ${adResult.error}`);
-                addLog(`Error ad${adLabel}: ${adResult.error}`);
+                errors.push(`Ad${adLabel}${audienceLabel}: ${adResult.error}`);
+                addLog(`Error ad${adLabel}${audienceLabel}: ${adResult.error}`);
               } else {
                 createdAds.push(adResult.data);
-                addLog(`Ad${adLabel} creado: ${adResult.data.id}`);
+                addLog(`Ad${adLabel}${audienceLabel} creado: ${adResult.data.id}`);
               }
             }
           }
 
+          } // fin loop audiencesToProcess
+
+          const totalExpected = audiencesToProcess.length > 1
+            ? (mode === 'single' ? totalAds * audiencesToProcess.length : totalAds * audiencesToProcess.length)
+            : totalAds;
           result = {
             success: createdAds.length > 0,
             campaign: campaignResult.data,
@@ -3109,7 +3133,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             ads: createdAds,
             errors
           };
-          addLog(`${destLabel}: ${createdAds.length}/${totalAds} ads creados exitosamente`);
+          addLog(`${destLabel}: ${createdAds.length}/${totalExpected} ads creados exitosamente`);
         }
 
       } else {
@@ -3148,7 +3172,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           igActorId: job.igActorId || null,
           linkUrl: job.linkUrl,
           conversionLocation,
+          whatsappNumber: job.whatsappNumber || null,
           adSetMode: job.adSetMode || 'single',
+          multiAudiences: job.multiAudiences || [],
           ads: job.ads || [{
             adName: job.adName,
             imageUrl: job.imageUrl,
@@ -3297,7 +3323,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             </div>
 
             {adWasCreated ? (
-              <div className="draft-card" style={{ background: 'rgba(52, 211, 153, 0.1)', border: '2px solid #34D399' }}>
+              <div className="draft-card draft-card--success">
                 <span className="card-icon">Ad</span>
                 <div>
                   <h4>Anuncios ({draftData.totalAdsCreated})</h4>
@@ -3318,14 +3344,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 </div>
               </div>
             ) : (
-              <div className="draft-card" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '2px dashed #F59E0B' }}>
+              <div className="draft-card draft-card--pending">
                 <span className="card-icon">Ad</span>
                 <div>
                   <h4>Anuncio (Pendiente)</h4>
-                  <p style={{ color: '#F59E0B' }}>Crear manualmente en Meta Ads Manager</p>
+                  <p className="text-warning">Crear manualmente en Meta Ads Manager</p>
                   <p className="hint">Página: {draftData.pageName}</p>
                   <p className="hint">Destino: {draftData.linkUrl}</p>
-                  <span className="status-badge" style={{ background: '#F59E0B', color: '#1B2333' }}>PENDIENTE</span>
+                  <span className="status-badge pending">PENDIENTE</span>
                 </div>
               </div>
             )}
@@ -3334,19 +3360,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           {/* Contenido - diferente según si se creó el Ad o no */}
           {adWasCreated ? (
             // Ads fueron creados - mostrar resumen de todas las variaciones
-            <div className="generated-content-box" style={{
-              background: 'rgba(52, 211, 153, 0.1)',
-              border: '2px solid #34D399',
-              borderRadius: '12px',
-              padding: '20px',
-              marginTop: '20px'
-            }}>
-              <h3 style={{ color: '#34D399', marginBottom: '10px' }}>
+            <div className="generated-content-box generated-content--success">
+              <h3>
                 🎉 {draftData.totalAdsCreated > 1
                   ? `¡${draftData.totalAdsCreated} Anuncios Creados!`
                   : '¡Anuncio Creado Exitosamente!'}
               </h3>
-              <p style={{ color: '#34D399', marginBottom: '15px', fontSize: '14px' }}>
+              <p className="text-success" style={{ marginBottom: '15px', fontSize: '14px' }}>
                 {draftData.totalAdsCreated > 1
                   ? `Se crearon ${draftData.totalAdsCreated} variaciones de anuncio. Meta optimizará y mostrará el de mejor rendimiento.`
                   : 'Tu anuncio está listo. Solo necesitas activar la campaña cuando quieras que empiece a correr.'}
@@ -3356,90 +3376,59 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               {draftData.headlines?.filter(h => h?.trim()).map((headline, i) => {
                 if (i >= (draftData.totalAdsCreated || 1)) return null;
                 return (
-                  <div key={i} style={{ background: '#212B3D', padding: '12px 15px', borderRadius: '8px', marginBottom: '10px', borderLeft: '4px solid #34D399' }}>
-                    <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '5px' }}>Variación {i + 1}</p>
+                  <div key={i} className="draft-variation-card">
+                    <p className="text-muted" style={{ fontSize: '12px', marginBottom: '5px' }}>Variación {i + 1}</p>
                     <p><strong>Título:</strong> {headline}</p>
                     <p><strong>Texto:</strong> {draftData.descriptions?.[i]?.substring(0, 80) || draftData.descriptions?.[0]?.substring(0, 80) || 'N/A'}...</p>
                   </div>
                 );
               })}
 
-              <div style={{ background: '#212B3D', padding: '12px 15px', borderRadius: '8px', marginTop: '10px' }}>
+              <div className="draft-variation-card" style={{ marginTop: '10px', marginBottom: 0, borderLeft: 'none' }}>
                 <p><strong>Destino:</strong> {draftData.linkUrl}</p>
                 <p><strong>CTA:</strong> {CTA_OPTIONS.find(c => c.value === draftData.ctas?.[0])?.label || draftData.ctas?.[0] || 'LEARN_MORE'}</p>
                 {draftData.igUsername && <p><strong>Instagram:</strong> @{draftData.igUsername}</p>}
               </div>
 
               {!draftData.imageUrl && (
-                <p style={{ fontSize: '13px', color: '#F59E0B', marginTop: '10px' }}>
-                  💡 Nota: Los anuncios usan la imagen de vista previa del link. Puedes editarlos en Meta Ads Manager para agregar una imagen personalizada.
+                <p className="text-warning mt-sm" style={{ fontSize: '13px' }}>
+                  Nota: Los anuncios usan la imagen de vista previa del link. Puedes editarlos en Meta Ads Manager para agregar una imagen personalizada.
                 </p>
               )}
             </div>
           ) : (
             // Ad NO fue creado - mostrar contenido para copiar
-            <div className="generated-content-box" style={{
-              background: 'rgba(251, 191, 36, 0.1)',
-              border: '2px solid #FBBF24',
-              borderRadius: '12px',
-              padding: '20px',
-              marginTop: '20px'
-            }}>
-              <h3 style={{ color: '#FBBF24', marginBottom: '10px' }}>
+            <div className="generated-content-box generated-content--pending">
+              <h3>
                 📋 Contenido para crear tu Anuncio
               </h3>
-              <p style={{ color: '#F59E0B', marginBottom: '15px', fontSize: '14px' }}>
+              <p className="text-warning" style={{ marginBottom: '15px', fontSize: '14px' }}>
                 Usa este contenido al crear el Anuncio en Meta Ads Manager. <strong>Click para copiar.</strong>
               </p>
 
               {draftData.imageUrl && (
-                <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🖼️ URL de Imagen</label>
-                  <div className="copy-item" style={{
-                    background: '#212B3D',
-                    padding: '8px 12px',
-                    margin: '5px 0',
-                    borderRadius: '6px',
-                    border: '2px solid #34D399',
-                    cursor: 'pointer',
-                    wordBreak: 'break-all',
-                    fontSize: '13px'
-                  }} onClick={() => navigator.clipboard.writeText(draftData.imageUrl)} title="Click para copiar URL de imagen">
+                <div className="copy-section mb-md">
+                  <label>URL de Imagen</label>
+                  <div className="copy-item copy-item--highlight" onClick={() => navigator.clipboard.writeText(draftData.imageUrl)} title="Click para copiar URL de imagen">
                     {draftData.imageUrl}
                   </div>
                 </div>
               )}
 
               {draftData.linkUrl && (
-                <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🔗 URL de Destino</label>
-                  <div className="copy-item" style={{
-                    background: '#212B3D',
-                    padding: '8px 12px',
-                    margin: '5px 0',
-                    borderRadius: '6px',
-                    border: '1px solid #2A3441',
-                    cursor: 'pointer',
-                    wordBreak: 'break-all',
-                    fontSize: '13px'
-                  }} onClick={() => navigator.clipboard.writeText(draftData.linkUrl)} title="Click para copiar">
+                <div className="copy-section mb-md">
+                  <label>URL de Destino</label>
+                  <div className="copy-item" onClick={() => navigator.clipboard.writeText(draftData.linkUrl)} title="Click para copiar">
                     {draftData.linkUrl}
                   </div>
                 </div>
               )}
 
               {draftData.headlines?.length > 0 && (
-                <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>📝 Títulos ({draftData.headlines.length})</label>
+                <div className="copy-section mb-md">
+                  <label>Títulos ({draftData.headlines.length})</label>
                   {draftData.headlines.map((h, i) => (
-                    <div key={i} className="copy-item" style={{
-                      background: '#212B3D',
-                      padding: '8px 12px',
-                      margin: '5px 0',
-                      borderRadius: '6px',
-                      border: '1px solid #2A3441',
-                      cursor: 'pointer'
-                    }} onClick={() => navigator.clipboard.writeText(h)} title="Click para copiar">
+                    <div key={i} className="copy-item" onClick={() => navigator.clipboard.writeText(h)} title="Click para copiar">
                       {h}
                     </div>
                   ))}
@@ -3447,17 +3436,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               )}
 
               {draftData.descriptions?.length > 0 && (
-                <div className="copy-section" style={{ marginBottom: '15px' }}>
-                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>💬 Descripciones ({draftData.descriptions.length})</label>
+                <div className="copy-section mb-md">
+                  <label>Descripciones ({draftData.descriptions.length})</label>
                   {draftData.descriptions.map((d, i) => (
-                    <div key={i} className="copy-item" style={{
-                      background: '#212B3D',
-                      padding: '8px 12px',
-                      margin: '5px 0',
-                      borderRadius: '6px',
-                      border: '1px solid #2A3441',
-                      cursor: 'pointer'
-                    }} onClick={() => navigator.clipboard.writeText(d)} title="Click para copiar">
+                    <div key={i} className="copy-item" onClick={() => navigator.clipboard.writeText(d)} title="Click para copiar">
                       {d}
                     </div>
                   ))}
@@ -3466,24 +3448,17 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               {draftData.ctas?.length > 0 && (
                 <div className="copy-section">
-                  <label style={{ fontWeight: 'bold', color: '#E2E8F0' }}>🎯 CTAs Recomendados</label>
-                  <div className="cta-badges" style={{ marginTop: '8px' }}>
+                  <label>CTAs Recomendados</label>
+                  <div className="toggle-group mt-sm">
                     {[...new Set(draftData.ctas)].map((cta, i) => (
-                      <span key={i} className="cta-badge" style={{
-                        background: 'rgba(74, 159, 255, 0.12)',
-                        color: '#4A9FFF',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        marginRight: '8px',
-                        fontSize: '13px'
-                      }}>{CTA_OPTIONS.find(c => c.value === cta)?.label || cta}</span>
+                      <span key={i} className="chip">{CTA_OPTIONS.find(c => c.value === cta)?.label || cta}</span>
                     ))}
                   </div>
                 </div>
               )}
 
-              <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '15px' }}>
-                💡 Tip: Haz click en cualquier texto para copiarlo al portapapeles
+              <p className="hint mt-md">
+                Tip: Haz click en cualquier texto para copiarlo al portapapeles
               </p>
             </div>
           )}
@@ -3546,7 +3521,22 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           </div>
           <div className="summary-item">
             <label>Anuncios</label>
-            <p>{job.totalAds || 1} anuncio(s) | {job.adSetMode === 'single' ? '1 Ad Set' : `${job.totalAds || 1} Ad Sets${job.adSetMode === 'dynamic' ? ' con 5+5+5' : ' (público diferente)'}`}</p>
+            <p>{(() => {
+              const totalAds = job.totalAds || 1;
+              const numAudiences = (job.multiAudiences?.length || 0) + 1;
+              const hasMulti = numAudiences > 1 && job.adSetMode !== 'per-ad';
+              if (job.adSetMode === 'single') {
+                return hasMulti
+                  ? `${totalAds} ad(s) x ${numAudiences} públicos = ${numAudiences} Ad Sets`
+                  : `${totalAds} anuncio(s) | 1 Ad Set`;
+              } else if (job.adSetMode === 'dynamic') {
+                return hasMulti
+                  ? `${totalAds} ad(s) x ${numAudiences} públicos = ${totalAds * numAudiences} Ad Sets con 5+5+5`
+                  : `${totalAds} Ad Sets con 5+5+5`;
+              } else {
+                return `${totalAds} Ad Sets (público diferente)`;
+              }
+            })()}</p>
           </div>
           <div className="summary-item">
             <label>Presupuesto Diario ({job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO'})</label>
@@ -3561,8 +3551,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             <p>{job.pageName}</p>
           </div>
           <div className="summary-item">
-            <label>Público</label>
-            <p>{job.savedAudienceName || 'Colombia 18-65'}</p>
+            <label>Público{job.multiAudiences?.length > 0 ? `s (${job.multiAudiences.length + 1})` : ''}</label>
+            <p>{job.savedAudienceName || 'Colombia 18-65'}
+            {job.multiAudiences?.length > 0 && job.multiAudiences.map((a, i) => (
+              <span key={i} className="text-accent" style={{ display: 'block', fontSize: '12px' }}>+ {a.name}</span>
+            ))}</p>
           </div>
           <div className="summary-item">
             <label>Segmentación</label>
@@ -3579,14 +3572,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           )}
           {/* URL de destino - solo si aplica */}
           {job.linkUrl && (
-            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+            <div className="summary-item summary-item--full">
               <label>URL de Destino</label>
               <p style={{ wordBreak: 'break-all' }}>{job.linkUrl}</p>
             </div>
           )}
           {/* WhatsApp - solo si aplica */}
           {job.whatsappNumber && (
-            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+            <div className="summary-item summary-item--full">
               <label>Número de WhatsApp</label>
               <p>{job.whatsappNumber}</p>
             </div>
@@ -3600,12 +3593,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           )}
           {/* Teléfono - solo si aplica */}
           {job.phoneNumber && (
-            <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+            <div className="summary-item summary-item--full">
               <label>Número de Teléfono</label>
               <p>{job.phoneNumber}</p>
             </div>
           )}
-          <div className="summary-item" style={{ gridColumn: '1 / -1' }}>
+          <div className="summary-item summary-item--full">
             <label>Media por Anuncio</label>
             {job.ads?.map((ad, i) => (
               <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
@@ -3620,16 +3613,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           <div className="creative-summary">
             <h4>Contenido de los Anuncios ({job.ads.length})</h4>
             {job.ads.map((ad, i) => (
-              <div key={i} style={{
-                background: '#212B3D', borderRadius: '8px', padding: '10px', marginBottom: '8px',
-                borderLeft: '3px solid #4A9FFF'
-              }}>
+              <div key={i} className="draft-variation-card" style={{ borderLeftColor: 'var(--accent)' }}>
                 <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
                   {ad.adName || `Ad ${i + 1}`}
                   {ad.videoId ? ' (Video)' : ad.imageUrl || ad.imageHash ? ' (Imagen)' : ' (Sin media)'}
                   {job.adSetMode === 'per-ad' && ad.audienceName ? ` - ${ad.audienceName}` : ''}
                 </p>
-                <p style={{ fontSize: '12px', color: '#94A3B8' }}>
+                <p className="text-muted" style={{ fontSize: '12px' }}>
                   {ad.headlines?.length || 0} títulos + {ad.descriptions?.length || 0} descripciones + {[...new Set(ad.ctas || [])].length} CTAs
                 </p>
               </div>
@@ -3644,12 +3634,30 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           <p><strong>Se creará en Meta Ads:</strong></p>
           <ul>
             <li><strong>1 Campaña</strong> - Objetivo: {job.objective || 'Tráfico'} (PAUSADA)</li>
-            <li><strong>{job.adSetMode === 'single' ? '1 Ad Set' : (job.ads?.length || 1) + ' Ad Sets'}</strong> - {job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}</li>
+            <li><strong>{(() => {
+              const numAds = job.ads?.length || 1;
+              const numAuds = (job.multiAudiences?.length || 0) + 1;
+              if (job.adSetMode === 'single') {
+                return numAuds > 1 ? `${numAuds} Ad Sets` : '1 Ad Set';
+              } else {
+                return numAuds > 1 ? `${numAds * numAuds} Ad Sets` : `${numAds} Ad Sets`;
+              }
+            })()}</strong> - {job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}
+            {(job.multiAudiences?.length || 0) > 0 && <span className="text-accent"> ({(job.multiAudiences.length || 0) + 1} públicos)</span>}
+            </li>
             <li><strong>{job.ads?.length || 1} Creative(s)</strong>{job.adSetMode !== 'single' ? ' - Cada uno con 5+5+5' : ''}</li>
-            <li><strong>{job.ads?.length || 1} Anuncio(s)</strong></li>
+            <li><strong>{(() => {
+              const numAds = job.ads?.length || 1;
+              const numAuds = (job.multiAudiences?.length || 0) + 1;
+              if (job.adSetMode === 'single') {
+                return numAuds > 1 ? `${numAds * numAuds} Anuncio(s)` : `${numAds} Anuncio(s)`;
+              } else {
+                return numAuds > 1 ? `${numAds * numAuds} Anuncio(s)` : `${numAds} Anuncio(s)`;
+              }
+            })()}</strong></li>
           </ul>
           {job.ads?.length > 1 && (
-            <div style={{ fontSize: '13px', marginTop: '10px', color: '#94A3B8' }}>
+            <div className="text-muted mt-sm" style={{ fontSize: '13px' }}>
               {job.ads.map((ad, i) => (
                 <p key={i} style={{ margin: '3px 0' }}>
                   Ad {i + 1}: {ad.adName || `Ad ${i + 1}`} | {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
@@ -3658,11 +3666,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               ))}
             </div>
           )}
-          <p style={{ fontSize: '13px', marginTop: '10px', color: '#94A3B8' }}>
+          <p className="hint mt-sm">
             Meta probará automáticamente las diferentes combinaciones de títulos, descripciones y CTAs para encontrar la mejor.
           </p>
           {job.igActorId && (
-            <p style={{ fontSize: '13px', marginTop: '5px', color: '#94A3B8' }}>
+            <p className="hint mt-sm">
               Instagram: @{job.igUsername || 'vinculada'} - Los anuncios aparecerán también en Instagram.
             </p>
           )}

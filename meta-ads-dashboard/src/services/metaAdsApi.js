@@ -1144,7 +1144,10 @@ class MetaAdsService {
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
       // NO enviamos bid_strategy cuando usamos CBO - se hereda de la campaña
-      formData.append('targeting', JSON.stringify(targeting));
+      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      const cleanTargeting = { ...targeting };
+      delete cleanTargeting.targeting_optimization;
+      formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
 
       // destination_type para indicar a Meta a dónde va el tráfico
@@ -1504,6 +1507,122 @@ class MetaAdsService {
     }
   }
 
+  // ============================================
+  // Crear Ad con Formato Flexible (creative_asset_groups_spec)
+  // Solo OUTCOME_SALES y OUTCOME_APP_PROMOTION
+  // Permite 1 AdSet → N Ads con múltiples assets (5+5+5) SIN isDynamicCreative
+  // ============================================
+  async createAdWithFlexibleCreative(adAccountId, {
+    name,
+    adsetId,
+    pageId,
+    igActorId = null,
+    // Media (al menos 1 imagen o 1 video)
+    imageHashes = [],     // Array de hashes de imágenes
+    videoEntries = [],    // Array de { video_id, image_hash? (thumbnail) }
+    // Content 5+5+5
+    primaryTexts = [],    // Array de textos primarios (max 5)
+    headlines = [],       // Array de headlines (max 5)
+    // CTA
+    callToAction = { type: 'LEARN_MORE', value: { link: 'https://example.com' } },
+    // Link obligatorio para el grupo (link_urls)
+    linkUrl = null,
+    status = 'PAUSED'
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      // Construir texts[] con text_type según docs de Meta
+      const texts = [];
+      primaryTexts.slice(0, 5).forEach(text => {
+        if (text?.trim()) texts.push({ text: text.trim(), text_type: 'primary_text' });
+      });
+      headlines.slice(0, 5).forEach(text => {
+        if (text?.trim()) texts.push({ text: text.trim(), text_type: 'headline' });
+      });
+
+      // Construir group
+      const group = { texts, call_to_action: callToAction };
+
+      // link_urls obligatorio según Meta API
+      if (linkUrl) {
+        group.link_urls = [{ website_url: linkUrl }];
+      }
+
+      // Media: imágenes
+      if (imageHashes.length > 0) {
+        group.images = imageHashes.map(hash => ({ hash }));
+      }
+
+      // Media: videos
+      if (videoEntries.length > 0) {
+        group.videos = videoEntries.map(v => {
+          const entry = { video_id: v.video_id };
+          if (v.image_hash) entry.image_hash = v.image_hash;
+          return entry;
+        });
+      }
+
+      const creativeSpec = {
+        creative_asset_groups_spec: {
+          groups: [group]
+        }
+      };
+
+      // object_story_spec con page_id, instagram_user_id y link_data
+      if (pageId) {
+        const oss = { page_id: pageId };
+        if (igActorId) {
+          oss.instagram_user_id = igActorId;
+        }
+        // Meta requiere link_data.link en object_story_spec para messaging
+        if (linkUrl) {
+          oss.link_data = {
+            link: linkUrl,
+            call_to_action: callToAction
+          };
+        }
+        creativeSpec.object_story_spec = oss;
+      }
+
+      console.log('Creating Ad with Flexible Creative (creative_asset_groups_spec):', {
+        name, adsetId, pageId, igActorId,
+        images: imageHashes.length, videos: videoEntries.length,
+        primaryTexts: primaryTexts.length, headlines: headlines.length,
+        cta: callToAction.type
+      });
+      console.log('Flexible creative_asset_groups_spec:', JSON.stringify(creativeSpec, null, 2));
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('adset_id', adsetId);
+      formData.append('creative', JSON.stringify(creativeSpec));
+      formData.append('status', status);
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/ads`,
+        formData,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Flexible Ad creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      console.log('Flexible Ad creation SUCCESS:', JSON.stringify(response.data));
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Flexible Ad creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      const errData = error.response?.data?.error;
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
+    }
+  }
+
   // Crear Ad Creative estándar (sin DCO) - Soporta imagen Y video
   async createStandardAdCreative(adAccountId, {
     name,
@@ -1517,7 +1636,8 @@ class MetaAdsService {
     description = '',
     linkUrl,
     callToAction = 'LEARN_MORE',
-    igActorId = null
+    igActorId = null,
+    whatsappNumber = null
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1530,6 +1650,10 @@ class MetaAdsService {
         console.log('Using instagram_user_id in objectStorySpec:', igActorId);
       }
 
+      // Determinar CTA value según tipo
+      const isMessagingCTA = ['WHATSAPP_MESSAGE', 'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE'].includes(callToAction);
+      const ctaValue = isMessagingCTA ? {} : { link: linkUrl };
+
       if (videoId) {
         // Video creative usando video_data
         const videoData = {
@@ -1538,9 +1662,7 @@ class MetaAdsService {
           title: headline,
           call_to_action: {
             type: callToAction,
-            value: callToAction === 'WHATSAPP_MESSAGE'
-              ? { wa_id: whatsappNumber || linkUrl }
-              : { link: linkUrl }
+            value: ctaValue
           }
         };
         if (thumbnailUrl) videoData.image_url = thumbnailUrl;
@@ -1549,11 +1671,14 @@ class MetaAdsService {
       } else {
         // Image creative usando link_data
         const linkData = {
-          link: linkUrl,
           message: primaryText,
           name: headline,
-          call_to_action: { type: callToAction }
+          call_to_action: { type: callToAction, value: ctaValue }
         };
+        // Solo agregar link para destinos no-messaging (WhatsApp/Messenger/IG DM no usan link)
+        if (!isMessagingCTA && linkUrl) {
+          linkData.link = linkUrl;
+        }
         if (imageHash) {
           linkData.image_hash = imageHash;
         } else if (imageUrl && imageUrl.trim()) {
@@ -2189,7 +2314,10 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      formData.append('targeting', JSON.stringify(targeting));
+      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      const cleanTargeting = { ...targeting };
+      delete cleanTargeting.targeting_optimization;
+      formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'WHATSAPP');
 
@@ -2290,7 +2418,10 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      formData.append('targeting', JSON.stringify(targeting));
+      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      const cleanTargeting = { ...targeting };
+      delete cleanTargeting.targeting_optimization;
+      formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'MESSENGER');
 
@@ -2555,7 +2686,8 @@ class MetaAdsService {
     startTime = null,
     endTime = null,
     linkUrl = null,
-    pageWelcomeMessage = null // Plantilla de mensaje de bienvenida para WhatsApp
+    pageWelcomeMessage = null, // Plantilla de mensaje de bienvenida para WhatsApp
+    multiAudiences = [] // Múltiples públicos: replicar AdSets por cada público
   }) {
     const results = { campaign: null, adSets: [], creatives: [], ads: [], errors: [] };
 
@@ -2592,16 +2724,31 @@ class MetaAdsService {
       results.campaign = campaignResult.data;
 
       // 2. Crear AdSet(s) + Creative(s) + Ad(s) según adSetMode
-      let sharedAdSetId = null;
+      // Construir array de públicos a procesar
+      const primaryAud = { name: 'Principal', targeting };
+      const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
+        ? [primaryAud, ...multiAudiences.map(a => ({
+            name: a.name,
+            targeting: { ...(a.targeting || targeting) }
+          }))]
+        : [primaryAud];
+
+      if (audiencesToProcess.length > 1) {
+        console.log(`Multi-audience: ${audiencesToProcess.length} públicos`);
+      }
+
+      for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
+        const currentAudience = audiencesToProcess[audIdx];
+        const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+        let sharedAdSetId = null;
 
       if (adSetMode === 'single') {
-        // MODO SINGLE: 1 AdSet → N Ads (standard creatives, isDynamicCreative limita a 1 ad por AdSet)
-        console.log(`Mode: 1 ADSET → ${ads.length} ADS (standard creatives en 1 Ad Set)`);
+        console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (standard creatives en 1 Ad Set)`);
 
         const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-          name: `${campaignName} - Ad Set`,
+          name: `${campaignName} - Ad Set${audPrefix}`,
           campaignId: results.campaign.id,
-          targeting,
+          targeting: currentAudience.targeting,
           optimizationGoal,
           promotedObject: { page_id: pageId },
           whatsappPhoneNumber: whatsappNumber,
@@ -2614,8 +2761,8 @@ class MetaAdsService {
         });
 
         if (!adSetResult.success) {
-          results.errors.push(`AdSet: ${adSetResult.error}`);
-          return { success: false, ...results };
+          results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
+          continue; // Seguir con el siguiente público
         }
         results.adSets.push(adSetResult.data);
         sharedAdSetId = adSetResult.data.id;
@@ -2628,13 +2775,15 @@ class MetaAdsService {
 
         if (adSetMode !== 'single') {
           // MODO DYNAMIC/PER-AD: crear 1 AdSet por cada ad
-          console.log(`Creating Ad Set${adLabel} + ${useDynamicCreative ? 'Dynamic Creative 5+5+5' : 'Standard Creative'} + Ad (${i + 1}/${ads.length})...`);
+          const adAudienceLabel = (adSetMode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
+          console.log(`Creating Ad Set${adLabel}${adAudienceLabel} + ${useDynamicCreative ? 'Dynamic Creative 5+5+5' : 'Standard Creative'} + Ad (${i + 1}/${ads.length})...`);
           console.log(`  WhatsApp: ${adWhatsappNumber}${ad.whatsappNumber ? ' (per-ad)' : ' (global)'}`);
 
+          const adTargeting = (adSetMode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
           const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-            name: `${campaignName} - Ad Set${adLabel}`,
+            name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel}`,
             campaignId: results.campaign.id,
-            targeting: ad.audienceTargeting || targeting,
+            targeting: adTargeting,
             optimizationGoal,
             promotedObject: { page_id: pageId },
             whatsappPhoneNumber: adWhatsappNumber,
@@ -2647,13 +2796,13 @@ class MetaAdsService {
           });
 
           if (!adSetResult.success) {
-            results.errors.push(`AdSet${adLabel}: ${adSetResult.error}`);
+            results.errors.push(`AdSet${adLabel}${adAudienceLabel}: ${adSetResult.error}`);
             continue;
           }
           results.adSets.push(adSetResult.data);
           sharedAdSetId = adSetResult.data.id;
         } else {
-          console.log(`Creating Standard Creative + Ad ${i + 1}/${ads.length} in shared AdSet...`);
+          console.log(`Creating Standard Creative + Ad ${i + 1}/${ads.length} in shared AdSet${audPrefix}...`);
         }
 
         const adVideoId = ad.videoId || null;
@@ -2716,6 +2865,7 @@ class MetaAdsService {
           }
         } else {
           // ====== STANDARD CREATIVE para WhatsApp ======
+          // Nota: creative_asset_groups_spec (flexible) fue probado pero Meta lo ignora silenciosamente vía API
           const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
           const headline = adHeadlines[0] || 'Contáctanos';
           const description = adDescriptions[1] || adHeadlines[1] || '';
@@ -2814,8 +2964,10 @@ class MetaAdsService {
         results.ads.push(adResult.data);
       }
 
+      } // fin loop audiencesToProcess
+
       const totalCreated = results.ads.length;
-      console.log(`WhatsApp campaign done: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads`);
+      console.log(`WhatsApp campaign done: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads (${audiencesToProcess.length} públicos)`);
 
       return { success: totalCreated > 0, ...results };
 
@@ -2942,7 +3094,10 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      formData.append('targeting', JSON.stringify(targeting));
+      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      const cleanTargeting = { ...targeting };
+      delete cleanTargeting.targeting_optimization;
+      formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'INSTAGRAM_DIRECT');
 
@@ -3186,8 +3341,10 @@ class MetaAdsService {
     igActorId = null,
     linkUrl = null,
     conversionLocation = null, // 'WEBSITE', 'INSTAGRAM_PROFILE', etc.
+    whatsappNumber = null, // Número de WhatsApp (ej: "573005410171")
     adSetMode = 'single', // 'single' | 'per-ad'
-    ads = []
+    ads = [],
+    multiAudiences = [] // Múltiples públicos: replicar AdSets por cada público
   }) {
     const VALID_LINK_CLICKS_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
@@ -3230,6 +3387,9 @@ class MetaAdsService {
     // Mapear conversionLocation a destination_type de Meta API
     let destinationType = conversionLocation === 'INSTAGRAM_PROFILE' ? 'INSTAGRAM_PROFILE'
       : conversionLocation === 'WEBSITE' ? 'WEBSITE'
+      : conversionLocation === 'WHATSAPP' ? 'WHATSAPP'
+      : conversionLocation === 'MESSENGER' ? 'MESSENGER'
+      : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
     // promoted_object se construye DESPUÉS de resolver igActorId (ver abajo)
@@ -3352,6 +3512,9 @@ class MetaAdsService {
       if (destinationType === 'INSTAGRAM_PROFILE' && igConnected) {
         promotedObject = { page_id: pageId, instagram_profile_id: igActorId };
         console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId}`);
+      } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'].includes(destinationType)) {
+        promotedObject = { page_id: pageId };
+        console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
       } else if (destinationType === 'WEBSITE' && objective === 'OUTCOME_SALES') {
         // OUTCOME_SALES + WEBSITE requiere pixel en promoted_object
         try {
@@ -3478,7 +3641,8 @@ class MetaAdsService {
           description: ad.descriptions?.[1]?.trim() || '',
           linkUrl,
           callToAction: cta,
-          igActorId
+          igActorId,
+          whatsappNumber
         };
 
         let creativeResult = await this.createStandardAdCreative(adAccountId, stdCreativeParams);
@@ -3514,68 +3678,86 @@ class MetaAdsService {
         return true;
       };
 
+      // Construir array de públicos a procesar (principal + adicionales)
+      const primaryAud = { name: 'Principal', targeting };
+      const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
+        ? [primaryAud, ...multiAudiences.map(a => ({
+            name: a.name,
+            targeting: { ...(a.targeting || targeting) }
+          }))]
+        : [primaryAud];
+
+      if (audiencesToProcess.length > 1) {
+        console.log(`Multi-audience: ${audiencesToProcess.length} públicos`);
+      }
+
       if (adSetMode === 'single') {
         // ========================================================
-        // MODO SINGLE: 1 AdSet → N Ads (creatives estándar, todos en 1 Ad Set)
-        // Nota: isDynamicCreative requiere 1 ad por AdSet (Meta API limit), por eso aquí se usan standard.
+        // MODO SINGLE: M AdSets (1 por público) → cada uno con N Ads estándar
         // ========================================================
-        console.log(`Mode: 1 ADSET → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
-
-        const adSetResult = await this.createAdSet(adAccountId, {
-          name: `${campaignName} - Ad Set`,
-          campaignId: results.campaign.id,
-          billingEvent,
-          optimizationGoal,
-          targeting,
-          status: 'PAUSED',
-          endTime: endDate,
-          isDynamicCreative: false,
-          destinationType,
-          promotedObject
-        });
-
-        if (!adSetResult.success) {
-          results.errors.push(`AdSet: ${adSetResult.error}`);
-          return { success: false, ...results };
-        }
-        results.adSets.push(adSetResult.data);
-
-        for (let i = 0; i < ads.length; i++) {
-          console.log(`Creating standard creative + ad ${i + 1}/${ads.length} in shared AdSet...`);
-          await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
-        }
-
-      } else if (adSetMode === 'dynamic') {
-        // ========================================================
-        // MODO DYNAMIC: N AdSets → N Ads con 5+5+5 (mismo público)
-        // Cada ad tiene su propio AdSet con Dynamic Creative.
-        // CBO distribuye el presupuesto automáticamente.
-        // ========================================================
-        console.log(`Mode: ${ads.length} ADSETS con 5+5+5 Dynamic Creative (mismo público)`);
-
-        for (let i = 0; i < ads.length; i++) {
-          console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}...`);
+        for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
+          const currentAudience = audiencesToProcess[audIdx];
+          const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+          console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set ${i + 1}`,
+            name: `${campaignName} - Ad Set${audPrefix}`,
             campaignId: results.campaign.id,
             billingEvent,
             optimizationGoal,
-            targeting,
+            targeting: currentAudience.targeting,
             status: 'PAUSED',
             endTime: endDate,
-            isDynamicCreative: true,
+            isDynamicCreative: false,
             destinationType,
             promotedObject
           });
 
           if (!adSetResult.success) {
-            results.errors.push(`AdSet ${i + 1}: ${adSetResult.error}`);
+            results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
             continue;
           }
           results.adSets.push(adSetResult.data);
 
-          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
+          for (let i = 0; i < ads.length; i++) {
+            console.log(`Creating standard creative + ad ${i + 1}/${ads.length}${audPrefix} in shared AdSet...`);
+            await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
+          }
+        }
+
+      } else if (adSetMode === 'dynamic') {
+        // ========================================================
+        // MODO DYNAMIC: N × M AdSets con 5+5+5 (por cada ad × público)
+        // ========================================================
+        for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
+          const currentAudience = audiencesToProcess[audIdx];
+          const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+          console.log(`Mode: ${ads.length} ADSETS con 5+5+5 Dynamic Creative${audPrefix}`);
+
+          for (let i = 0; i < ads.length; i++) {
+            console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}${audPrefix}...`);
+
+            const adSetResult = await this.createAdSet(adAccountId, {
+              name: `${campaignName} - Ad Set ${i + 1}${audPrefix}`,
+              campaignId: results.campaign.id,
+              billingEvent,
+              optimizationGoal,
+              targeting: currentAudience.targeting,
+              status: 'PAUSED',
+              endTime: endDate,
+              isDynamicCreative: true,
+              destinationType,
+              promotedObject
+            });
+
+            if (!adSetResult.success) {
+              results.errors.push(`AdSet ${i + 1}${audPrefix}: ${adSetResult.error}`);
+              continue;
+            }
+            results.adSets.push(adSetResult.data);
+
+            await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
+          }
         }
 
       } else {

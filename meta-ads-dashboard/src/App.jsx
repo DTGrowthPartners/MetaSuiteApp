@@ -232,36 +232,26 @@ function App() {
           {loadingAccounts ? (
             <span className="account-count">Cargando...</span>
           ) : accountsError ? (
-            <span className="account-count" style={{ color: '#F87171' }}>Error</span>
+            <span className="account-count account-count--error">Error</span>
           ) : (
             <span className="account-count">{adAccounts.length} cuentas</span>
           )}
 
           {/* User info + Logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="nav-user">
             {userPicture && (
               <img
                 src={userPicture}
                 alt=""
-                style={{ width: '30px', height: '30px', borderRadius: '50%' }}
+                className="nav-user-avatar"
               />
             )}
-            <span style={{ fontSize: '13px', color: '#E2E8F0', fontWeight: '500' }}>
+            <span className="nav-user-name">
               {userName || 'Usuario'}
             </span>
             <button
               onClick={handleLogout}
-              style={{
-                padding: '6px 14px',
-                fontSize: '12px',
-                fontWeight: '500',
-                color: 'var(--text-muted)',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-xs)',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
+              className="nav-logout-btn"
               title="Cerrar sesión y cambiar cuenta"
             >
               Salir

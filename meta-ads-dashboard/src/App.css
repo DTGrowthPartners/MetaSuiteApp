@@ -110,6 +110,41 @@ body {
   border: 1px solid var(--border);
   font-weight: 500;
 }
+.account-count--error {
+  color: var(--error);
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.nav-user-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-logout-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nav-logout-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-light);
+}
 
 .main-content {
   padding: 0;
