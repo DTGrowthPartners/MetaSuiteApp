@@ -331,6 +331,7 @@ export const CAMPAIGN_TEMPLATES = [
       audienceConfig: {
         allowAdvantage: true,
         allowCustomAudiences: true,
+        allowLookalikes: true,
         defaultTargeting: { geo_locations: { countries: ['CO'] }, age_min: 18, age_max: 65, genders: [0] }
       },
       placementsConfig: {
@@ -346,7 +347,7 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_IMAGE',
       destinationConfig: { type: 'WHATSAPP', requiresUrl: false, requiresWhatsAppNumber: true },
-      allowedCtas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US', 'MESSAGE_PAGE'],
+      allowedCtas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US'],
       defaultCta: 'WHATSAPP_MESSAGE',
       trackingConfig: { requiresPixel: false }
     },
@@ -491,7 +492,7 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_IMAGE',
       destinationConfig: { type: 'WHATSAPP', requiresUrl: false, requiresWhatsAppNumber: true },
-      allowedCtas: ['WHATSAPP_MESSAGE', 'MESSAGE_PAGE', 'GET_QUOTE', 'CONTACT_US'],
+      allowedCtas: ['WHATSAPP_MESSAGE', 'GET_QUOTE', 'CONTACT_US'],
       defaultCta: 'WHATSAPP_MESSAGE',
       trackingConfig: { requiresPixel: false }
     },
@@ -798,7 +799,7 @@ export const CAMPAIGN_TEMPLATES = [
         allowDisplayUrl: false,
         allowUtmParams: true
       },
-      allowedCtas: ['MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'LEARN_MORE', 'CONTACT_US'],
+      allowedCtas: ['LEARN_MORE', 'CONTACT_US', 'WATCH_MORE'],
       defaultCta: 'MESSAGE_PAGE',
       trackingConfig: { requiresPixel: false, allowAppEvents: false }
     },

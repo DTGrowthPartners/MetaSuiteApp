@@ -1319,7 +1319,8 @@ class MetaAdsService {
     description,
     callToAction,
     linkUrl,
-    igActorId = null
+    igActorId = null,
+    whatsappNumber = ''
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1412,7 +1413,8 @@ class MetaAdsService {
     description,
     callToAction,
     linkUrl,
-    igActorId = null
+    igActorId = null,
+    whatsappNumber = ''
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1507,121 +1509,9 @@ class MetaAdsService {
     }
   }
 
-  // ============================================
-  // Crear Ad con Formato Flexible (creative_asset_groups_spec)
-  // Solo OUTCOME_SALES y OUTCOME_APP_PROMOTION
-  // Permite 1 AdSet → N Ads con múltiples assets (5+5+5) SIN isDynamicCreative
-  // ============================================
-  async createAdWithFlexibleCreative(adAccountId, {
-    name,
-    adsetId,
-    pageId,
-    igActorId = null,
-    // Media (al menos 1 imagen o 1 video)
-    imageHashes = [],     // Array de hashes de imágenes
-    videoEntries = [],    // Array de { video_id, image_hash? (thumbnail) }
-    // Content 5+5+5
-    primaryTexts = [],    // Array de textos primarios (max 5)
-    headlines = [],       // Array de headlines (max 5)
-    // CTA
-    callToAction = { type: 'LEARN_MORE', value: { link: 'https://example.com' } },
-    // Link obligatorio para el grupo (link_urls)
-    linkUrl = null,
-    status = 'PAUSED'
-  }) {
-    try {
-      const normalizedId = this.normalizeAccountId(adAccountId);
-
-      // Construir texts[] con text_type según docs de Meta
-      const texts = [];
-      primaryTexts.slice(0, 5).forEach(text => {
-        if (text?.trim()) texts.push({ text: text.trim(), text_type: 'primary_text' });
-      });
-      headlines.slice(0, 5).forEach(text => {
-        if (text?.trim()) texts.push({ text: text.trim(), text_type: 'headline' });
-      });
-
-      // Construir group
-      const group = { texts, call_to_action: callToAction };
-
-      // link_urls obligatorio según Meta API
-      if (linkUrl) {
-        group.link_urls = [{ website_url: linkUrl }];
-      }
-
-      // Media: imágenes
-      if (imageHashes.length > 0) {
-        group.images = imageHashes.map(hash => ({ hash }));
-      }
-
-      // Media: videos
-      if (videoEntries.length > 0) {
-        group.videos = videoEntries.map(v => {
-          const entry = { video_id: v.video_id };
-          if (v.image_hash) entry.image_hash = v.image_hash;
-          return entry;
-        });
-      }
-
-      const creativeSpec = {
-        creative_asset_groups_spec: {
-          groups: [group]
-        }
-      };
-
-      // object_story_spec con page_id, instagram_user_id y link_data
-      if (pageId) {
-        const oss = { page_id: pageId };
-        if (igActorId) {
-          oss.instagram_user_id = igActorId;
-        }
-        // Meta requiere link_data.link en object_story_spec para messaging
-        if (linkUrl) {
-          oss.link_data = {
-            link: linkUrl,
-            call_to_action: callToAction
-          };
-        }
-        creativeSpec.object_story_spec = oss;
-      }
-
-      console.log('Creating Ad with Flexible Creative (creative_asset_groups_spec):', {
-        name, adsetId, pageId, igActorId,
-        images: imageHashes.length, videos: videoEntries.length,
-        primaryTexts: primaryTexts.length, headlines: headlines.length,
-        cta: callToAction.type
-      });
-      console.log('Flexible creative_asset_groups_spec:', JSON.stringify(creativeSpec, null, 2));
-
-      const formData = new URLSearchParams();
-      formData.append('access_token', this.accessToken);
-      formData.append('name', name);
-      formData.append('adset_id', adsetId);
-      formData.append('creative', JSON.stringify(creativeSpec));
-      formData.append('status', status);
-
-      const response = await axios.post(
-        `${META_API_BASE_URL}/${normalizedId}/ads`,
-        formData,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-
-      if (response.data?.error) {
-        const err = response.data.error;
-        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
-        console.error('Flexible Ad creation FAILED (200 with error):', errorMsg);
-        return { success: false, error: errorMsg };
-      }
-
-      console.log('Flexible Ad creation SUCCESS:', JSON.stringify(response.data));
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error('Flexible Ad creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
-      const errData = error.response?.data?.error;
-      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
-      return { success: false, error: errorMsg };
-    }
-  }
+  // NOTA: creative_asset_groups_spec (Flexible Ads) fue probado en Feb 2026.
+  // Meta lo acepta sin error pero lo ignora silenciosamente via API.
+  // Solo funciona desde la UI de Ads Manager, no desde Marketing API.
 
   // Crear Ad Creative estándar (sin DCO) - Soporta imagen Y video
   async createStandardAdCreative(adAccountId, {
@@ -1779,7 +1669,8 @@ class MetaAdsService {
     callToActionTypes, // Array de CTAs (max 5)
     linkUrl,
     igActorId = null,
-    isWhatsApp = false // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
+    isWhatsApp = false, // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
+    isInstagramDM = false // IG DM + OUTCOME_SALES: forzar link_urls con ig.me/m/{igActorId}
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1795,7 +1686,10 @@ class MetaAdsService {
       assetFeedSpec.call_to_action_types = [...new Set(callToActionTypes.slice(0, 5))];
 
       // WhatsApp: NO necesita link_urls (el destino viene del ad set)
-      if (linkUrl && !isWhatsApp) {
+      // IG DM + OUTCOME_SALES: REQUIERE link_urls con ig.me/m/{igActorId} (error 1885373 sin ellas)
+      if (isInstagramDM && igActorId) {
+        assetFeedSpec.link_urls = [{ website_url: `https://ig.me/m/${igActorId}` }];
+      } else if (linkUrl && !isWhatsApp) {
         assetFeedSpec.link_urls = [{ website_url: linkUrl }];
       }
 
@@ -2407,7 +2301,9 @@ class MetaAdsService {
     billingEvent = 'IMPRESSIONS',
     status = 'PAUSED',
     promotedObject = null,
-    isDynamicCreative = false
+    isDynamicCreative = false,
+    bidStrategy = 'LOWEST_COST_WITHOUT_CAP',
+    bidAmount = null
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -2429,6 +2325,13 @@ class MetaAdsService {
         formData.append('is_dynamic_creative', 'true');
       }
 
+      if (bidAmount && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+        formData.append('bid_amount', bidAmount);
+      }
+      if (bidStrategy && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+        formData.append('bid_strategy', bidStrategy);
+      }
+
       if (promotedObject) {
         formData.append('promoted_object', JSON.stringify(promotedObject));
       }
@@ -2438,10 +2341,20 @@ class MetaAdsService {
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
+
+      if (response.data?.error) {
+        return {
+          success: false,
+          error: response.data.error.error_user_msg || response.data.error.message || 'Error desconocido'
+        };
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('AdSet for Messenger error:', error.response?.data || error.message);
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      const errData = error.response?.data?.error;
+      console.error('AdSet for Messenger FULL error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -2650,10 +2563,20 @@ class MetaAdsService {
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
+
+      if (response.data?.error) {
+        return {
+          success: false,
+          error: response.data.error.error_user_msg || response.data.error.message || 'Error desconocido'
+        };
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Creative for Messenger error:', error.response?.data || error.message);
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      const errData = error.response?.data?.error;
+      console.error('Creative for Messenger FULL error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -3146,6 +3069,10 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
+      if (!igActorId) {
+        return { success: false, error: 'Se requiere una cuenta de Instagram para Instagram Direct' };
+      }
+
       const objectStorySpec = {
         page_id: pageId,
         instagram_user_id: igActorId
@@ -3218,10 +3145,20 @@ class MetaAdsService {
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
+
+      if (response.data?.error) {
+        return {
+          success: false,
+          error: response.data.error.error_user_msg || response.data.error.message || 'Error desconocido'
+        };
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Creative for Instagram DM error:', error.response?.data || error.message);
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      const errData = error.response?.data?.error;
+      console.error('Creative for Instagram DM FULL error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -3586,7 +3523,8 @@ class MetaAdsService {
           descriptions: validBodies,
           callToActionTypes: validCTAs,
           linkUrl,
-          igActorId
+          igActorId,
+          isInstagramDM: destinationType === 'INSTAGRAM_DIRECT'
         };
 
         let creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, creativeParams);

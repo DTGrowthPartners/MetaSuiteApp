@@ -30,11 +30,28 @@ import ffmpeg from 'fluent-ffmpeg';
 import sharp from 'sharp';
 
 // Configurar ffmpeg path - usar ffmpeg-static si existe, sino el del sistema
+let ffmpegPath = null;
 try {
   const ffmpegStatic = (await import('ffmpeg-static')).default;
-  if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
+  if (ffmpegStatic) {
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+    ffmpegPath = ffmpegStatic;
+  }
 } catch {
   console.log('ffmpeg-static no disponible, usando ffmpeg del sistema');
+}
+// Si no se encontró ffmpeg-static, verificar si ffmpeg está en el PATH del sistema
+if (!ffmpegPath) {
+  try {
+    const { execSync } = await import('child_process');
+    const systemFfmpeg = execSync('which ffmpeg 2>/dev/null || where ffmpeg 2>NUL', { encoding: 'utf-8' }).trim().split('\n')[0];
+    if (systemFfmpeg) {
+      ffmpegPath = systemFfmpeg;
+      console.log('Usando ffmpeg del sistema:', ffmpegPath);
+    }
+  } catch {
+    console.warn('ffmpeg NO disponible. El análisis de video no funcionará.');
+  }
 }
 
 const app = express();
@@ -65,7 +82,8 @@ if (OPENAI_API_KEY) {
   console.warn('Configura la variable de entorno OPENAI_API_KEY para habilitar generación de contenido con IA.');
 }
 
-const META_API_BASE_URL = 'https://graph.facebook.com/v24.0';
+const META_API_VERSION = 'v24.0';
+const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 // Helper: obtener token dinámico del request (query, body, header) o fallback al hardcodeado
 function getToken(req) {
@@ -868,23 +886,33 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
           contentType: 'application/octet-stream'
         });
 
-        const transferResponse = await axios.post(
-          `${META_API_BASE_URL}/${normalizedId}/advideos`,
-          chunkForm,
-          {
-            headers: chunkForm.getHeaders(),
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            timeout: 300000 // 5 min per chunk
+        let transferResponse;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            transferResponse = await axios.post(
+              `${META_API_BASE_URL}/${normalizedId}/advideos`,
+              chunkForm,
+              {
+                headers: chunkForm.getHeaders(),
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+                timeout: 300000 // 5 min per chunk
+              }
+            );
+            break;
+          } catch (chunkErr) {
+            if (attempt >= 1) throw chunkErr;
+            console.log(`Chunk ${startOffset}-${endOffset} failed, retrying in 2s...`);
+            await new Promise(r => setTimeout(r, 2000));
           }
-        );
+        }
 
         startOffset = parseInt(transferResponse.data.start_offset);
         endOffset = parseInt(transferResponse.data.end_offset);
       }
 
       // Step 3: Finish upload
-      await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
+      const finishResponse = await axios.post(`${META_API_BASE_URL}/${normalizedId}/advideos`, null, {
         params: {
           access_token: token,
           upload_phase: 'finish',
@@ -893,6 +921,10 @@ app.post('/api/upload/video-file', upload.single('video'), async (req, res) => {
         },
         timeout: 60000
       });
+
+      if (!finishResponse.data?.success && !finishResponse.data?.id) {
+        throw new Error('Chunked upload finish failed: ' + JSON.stringify(finishResponse.data));
+      }
 
       videoId = chunkedVideoId;
       console.log(`Chunked upload complete: video_id=${videoId} (${chunkNum} chunks)`);
@@ -1166,18 +1198,32 @@ async function extractAudioFromBuffer(videoBuffer, filename) {
     // Write video buffer to temp file
     fs.writeFileSync(inputPath, videoBuffer);
 
-    // Extract audio with ffmpeg
+    // Extract audio with ffmpeg (with 60s timeout to prevent hanging)
     await new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
+      let timedOut = false;
+      const command = ffmpeg(inputPath)
         .noVideo()
         .audioCodec('libmp3lame')
         .audioBitrate('64k')
         .audioFrequency(16000)
         .audioChannels(1)
         .output(outputPath)
-        .on('end', resolve)
-        .on('error', reject)
-        .run();
+        .on('end', () => {
+          clearTimeout(timeout);
+          if (!timedOut) resolve();
+        })
+        .on('error', (err) => {
+          clearTimeout(timeout);
+          if (!timedOut) reject(err);
+        });
+
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        command.kill('SIGKILL');
+        reject(new Error('ffmpeg timeout: audio extraction exceeded 60 seconds'));
+      }, 60000);
+
+      command.run();
     });
 
     const audioBuffer = fs.readFileSync(outputPath);
@@ -1471,6 +1517,14 @@ CTAs variados de esta lista: ${ctx.ctas}`
 // POST /api/analyze-video - Transcribe video audio and generate 5+5+5
 app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
   try {
+    // Check ffmpeg availability for video processing
+    if (!ffmpegPath) {
+      return res.status(400).json({
+        success: false,
+        error: 'ffmpeg no disponible. El análisis de video requiere ffmpeg-static. Instala con: npm install ffmpeg-static'
+      });
+    }
+
     if (!openai) {
       return res.status(503).json({
         success: false,
@@ -1650,6 +1704,15 @@ app.post('/api/analyze-media-url', async (req, res) => {
 
     const adIndex = parseInt(adIndexStr) || 0;
     const mediaType = type || 'image'; // 'image' or 'video'
+
+    // Check ffmpeg availability for video processing
+    if (mediaType === 'video' && !ffmpegPath) {
+      return res.status(400).json({
+        success: false,
+        error: 'ffmpeg no disponible. El análisis de video requiere ffmpeg-static. Instala con: npm install ffmpeg-static'
+      });
+    }
+
     console.log(`Analyzing ${mediaType} from URL for ad ${adIndex}: ${url.substring(0, 100)}...`);
 
     // Download media from URL (server-side, avoids CORS)

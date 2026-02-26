@@ -580,6 +580,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [pages, setPages] = useState([]);
   const [selectedPage, setSelectedPage] = useState('');
   const [loadingPages, setLoadingPages] = useState(false);
+  const [pagesError, setPagesError] = useState('');
 
   // Cuentas de Instagram vinculadas
   const [igAccounts, setIgAccounts] = useState([]);
@@ -854,6 +855,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         }
       } catch (err) {
         console.error('Error loading pages:', err);
+        setPagesError('Error cargando páginas de Facebook. Recarga la página.');
       } finally {
         setLoadingPages(false);
       }
@@ -979,7 +981,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     let cancelled = false;
 
     const loadIgAccounts = async () => {
-      if (!selectedAccount) {
+      if (!selectedAccount || pages.length === 0) {
         setIgAccounts([]);
         setSelectedIgAccount('');
         return;
@@ -1220,6 +1222,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
     if (!dailyBudget || parseFloat(dailyBudget) < 5000) {
       setError('El presupuesto mínimo es $5,000 COP diario');
+      return;
+    }
+
+    // Validar que todos los ads tienen media (imagen o video)
+    const adsWithoutMedia = ads.filter(ad => !ad.imageHash && !ad.videoId);
+    if (adsWithoutMedia.length === ads.length) {
+      setError('Sube al menos una imagen o video para tus anuncios');
+      return;
+    }
+    if (adsWithoutMedia.length > 0) {
+      setError(`${adsWithoutMedia.length} anuncio(s) no tienen imagen ni video. Sube contenido o elimina los anuncios vacíos.`);
       return;
     }
 
@@ -1468,6 +1481,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </option>
             ))}
           </select>
+              {adAccounts.length === 0 && (
+                <p className="hint" style={{ color: 'var(--warning)' }}>No se encontraron cuentas publicitarias. Verifica los permisos de tu token.</p>
+              )}
         </div>
 
         </div>{/* fin section-card Campaña */}
@@ -1494,6 +1510,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </option>
             ))}
           </select>
+          {pagesError && <p className="hint" style={{ color: 'var(--error)' }}>{pagesError}</p>}
           <p className="hint">La página desde la cual se publicará el anuncio</p>
         </div>
 
@@ -2806,7 +2823,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       if (job.endDate) {
         addLog(`Fecha fin: ${job.endDate}`);
       }
-      const budgetLevelLabel = job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO';
+      const budgetLevelLabel = (job.budgetLevel || 'campaign') === 'adset' ? 'por Ad Set' : 'CBO';
       addLog(`Presupuesto: $${formatCOP(job.dailyBudgetCOP)} COP/día (${budgetLevelLabel})`);
       if (job.bidStrategy && job.bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
         addLog(`Puja: ${job.bidStrategy}${job.bidAmount ? ' - $' + formatCOP(job.bidAmount) + ' COP' : ''}`);
@@ -3539,7 +3556,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             })()}</p>
           </div>
           <div className="summary-item">
-            <label>Presupuesto Diario ({job.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO'})</label>
+            <label>Presupuesto Diario ({(job.budgetLevel || 'campaign') === 'adset' ? 'por Ad Set' : 'CBO'})</label>
             <p>${formatCOP(job.dailyBudgetCOP)} COP</p>
           </div>
           <div className="summary-item">
