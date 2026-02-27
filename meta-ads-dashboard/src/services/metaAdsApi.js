@@ -1670,7 +1670,7 @@ class MetaAdsService {
     linkUrl,
     igActorId = null,
     isWhatsApp = false, // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
-    isInstagramDM = false // IG DM + OUTCOME_SALES: forzar link_urls con ig.me/m/{igActorId}
+    isInstagramDM = false // IG DM: SIEMPRE requiere link_urls con ig.me/m/{igActorId} (error 1885869 sin ellas)
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1686,7 +1686,7 @@ class MetaAdsService {
       assetFeedSpec.call_to_action_types = [...new Set(callToActionTypes.slice(0, 5))];
 
       // WhatsApp: NO necesita link_urls (el destino viene del ad set)
-      // IG DM + OUTCOME_SALES: REQUIERE link_urls con ig.me/m/{igActorId} (error 1885373 sin ellas)
+      // IG DM: SIEMPRE requiere link_urls (error 1885869 sin ellas, aplica a TODOS los objetivos)
       if (isInstagramDM && igActorId) {
         assetFeedSpec.link_urls = [{ website_url: `https://ig.me/m/${igActorId}` }];
       } else if (linkUrl && !isWhatsApp) {

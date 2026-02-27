@@ -3073,11 +3073,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
               addLog(`Creando dynamic creative 5+5+5 + ad${adLabel}${audienceLabel} (${adVideoId ? 'video' : 'imagen'})...`);
 
-              const needsLinkUrl = isIgDM && objective === 'OUTCOME_SALES';
-              const igDmLink = needsLinkUrl ? `https://ig.me/m/${job.igActorId}` : null;
+              // IG DM con DC SIEMPRE requiere link_urls (error 1885869 sin ellas)
+              const igDmLink = isIgDM ? `https://ig.me/m/${job.igActorId}` : null;
               const messengerLink = (!isIgDM && objective === 'OUTCOME_SALES') ? `https://m.me/${job.pageId}` : null;
               const dcLinkUrl = igDmLink || messengerLink || null;
-              const dcIsWhatsApp = !needsLinkUrl && !messengerLink;
+              const dcIsWhatsApp = !isIgDM && !messengerLink;
 
               let creativeResult = await metaService.createAdCreativeWithAssetFeedSpec(job.adAccountId, {
                 name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audienceLabel} - Creative`,
@@ -3092,7 +3092,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 callToActionTypes: validCTAs,
                 linkUrl: dcLinkUrl,
                 igActorId: isIgDM ? job.igActorId : null,
-                isWhatsApp: dcIsWhatsApp
+                isWhatsApp: dcIsWhatsApp,
+                isInstagramDM: isIgDM
               });
 
               if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
@@ -3110,7 +3111,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                   callToActionTypes: validCTAs,
                   linkUrl: dcLinkUrl,
                   igActorId: null,
-                  isWhatsApp: dcIsWhatsApp
+                  isWhatsApp: dcIsWhatsApp,
+                  isInstagramDM: isIgDM
                 });
               }
 
