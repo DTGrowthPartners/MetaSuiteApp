@@ -1161,6 +1161,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     e.preventDefault();
     setError('');
 
+    // Bloquear submit si la IA aún está analizando media
+    const adsStillAnalyzing = ads.filter(ad => ad.analyzingMedia);
+    if (adsStillAnalyzing.length > 0) {
+      setError(`Espera a que la IA termine de analizar ${adsStillAnalyzing.length} anuncio(s). El contenido 5+5+5 aún se está generando.`);
+      return;
+    }
+
+    // Advertir si hay ads con media pero sin contenido generado (5+5+5 incompleto)
+    const adsWithMediaButNoContent = ads.filter(ad =>
+      (ad.imageHash || ad.videoId) && !ad.contentGenerated &&
+      ad.headlines.every(h => !h?.trim()) && ad.descriptions.every(d => !d?.trim())
+    );
+    if (adsWithMediaButNoContent.length > 0) {
+      setError(`${adsWithMediaButNoContent.length} anuncio(s) tienen media pero no se generó contenido 5+5+5. Espera a que la IA termine o edita el contenido manualmente.`);
+      return;
+    }
+
     if (!campaignName.trim()) {
       setError('Por favor ingresa un nombre para la campaña');
       return;
@@ -2750,8 +2767,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {error && <div className="error-message">{error}</div>}
 
-        <button type="submit" className="submit-button" disabled={uploading || loadingAudiences}>
-          {uploading ? 'Procesando...' : 'Continuar a Crear Campaña'}
+        <button type="submit" className="submit-button" disabled={uploading || loadingAudiences || ads.some(ad => ad.analyzingMedia)}>
+          {uploading ? 'Procesando...' : ads.some(ad => ad.analyzingMedia) ? `Analizando con IA (${ads.filter(ad => ad.analyzingMedia).length} pendiente${ads.filter(ad => ad.analyzingMedia).length > 1 ? 's' : ''})...` : 'Continuar a Crear Campaña'}
         </button>
       </form>
     </div>
@@ -2905,9 +2922,19 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';
-        const useDynamic = mode === 'dynamic' || mode === 'per-ad';
-        const modeLabel = mode === 'single' ? `1 Ad Set → ${totalAds} Ads (sin 5+5+5)`
-          : mode === 'dynamic' ? `${totalAds} Ad Set(s) con 5+5+5 (mismo público)`
+        // OUTCOME_ENGAGEMENT + IG DM + DC no es soportado por Meta
+        // Error: "INSTAGRAM_MESSAGE no es compatible con OUTCOME_ENGAGEMENT en conjunto de anuncios con contenido dinámico"
+        const dcBlockedObjectives = ['OUTCOME_ENGAGEMENT', 'OUTCOME_SALES'];
+        const dcBlocked = isIgDM && dcBlockedObjectives.includes(objective);
+        const effectiveMode = dcBlocked ? 'single' : mode;
+        const useDynamic = (mode === 'dynamic' || mode === 'per-ad') && !dcBlocked;
+
+        if (dcBlocked && mode !== 'single') {
+          addLog(`${destLabel} + ${objective}: DC no soportado. Usando standard creatives.`);
+        }
+
+        const modeLabel = effectiveMode === 'single' ? `1 Ad Set → ${totalAds} Ads (standard creatives)`
+          : effectiveMode === 'dynamic' ? `${totalAds} Ad Set(s) con 5+5+5 (mismo público)`
           : `${totalAds} Ad Set(s) con 5+5+5 (público diferente)`;
 
         addLog(`Creando campaña para ${destLabel} (${modeLabel})...`);
@@ -2959,8 +2986,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               addLog(`--- Público ${audIdx + 1}/${audiencesToProcess.length}: ${currentAudience.name} ---`);
             }
 
-          if (mode === 'single') {
-            // ========== MODO SINGLE: 1 AdSet por público → N standard creatives (1-1-1) ==========
+          if (effectiveMode === 'single') {
+            // ========== MODO SINGLE (o DC bloqueado): 1 AdSet por público → N standard creatives (1-1-1) ==========
             const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
             const adSetResult = await metaService[adSetMethod](job.adAccountId, {
               name: `${job.campaignName} - Ad Set${audPrefix}`,
@@ -3064,8 +3091,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const adThumbnailUrl = ad.videoThumbnailUrl || null;
               const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
               const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
-              const AWARENESS_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE', 'VISIT_INSTAGRAM_PROFILE'];
-              let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))];
+              const AWARENESS_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE'];
+              // VISIT_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — reemplazar con LEARN_MORE
+              let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))].map(c => c === 'VISIT_INSTAGRAM_PROFILE' ? 'LEARN_MORE' : c);
               if (objective === 'OUTCOME_AWARENESS') {
                 validCTAs = validCTAs.filter(c => AWARENESS_VALID_CTAS.includes(c));
                 if (validCTAs.length === 0) validCTAs = [defaultCta];

@@ -1594,14 +1594,18 @@ class MetaAdsService {
       formData.append('name', name);
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
 
-      // Optimizar texto por persona + Advantage+ creative features (web traffic)
+      // Advantage+ creative features — NO enhance_cta para messaging CTAs
+      // (enhance_cta puede inyectar link en CTA value, incompatible con WHATSAPP_MESSAGE/MESSAGE_PAGE/INSTAGRAM_MESSAGE)
+      const stdCreativeFeatures = {
+        text_optimizations: { enroll_status: 'OPT_IN' },
+        image_touchups: { enroll_status: 'OPT_IN' },
+        inline_comment: { enroll_status: 'OPT_IN' }
+      };
+      if (!isMessagingCTA) {
+        stdCreativeFeatures.enhance_cta = { enroll_status: 'OPT_IN' };
+      }
       formData.append('degrees_of_freedom_spec', JSON.stringify({
-        creative_features_spec: {
-          text_optimizations: { enroll_status: 'OPT_IN' },
-          enhance_cta: { enroll_status: 'OPT_IN' },
-          image_touchups: { enroll_status: 'OPT_IN' },
-          inline_comment: { enroll_status: 'OPT_IN' }
-        },
+        creative_features_spec: stdCreativeFeatures,
         text_transformation_types: ['TEXT_LIQUIDITY']
       }));
 
@@ -1762,14 +1766,18 @@ class MetaAdsService {
       formData.append('object_story_spec', JSON.stringify(objectStorySpec));
       formData.append('asset_feed_spec', JSON.stringify(assetFeedSpec));
 
-      // Optimizar texto por persona + Advantage+ creative features (web traffic 5+5+5)
+      // Advantage+ creative features — NO enhance_cta para WhatsApp/Messaging
+      // (enhance_cta puede inyectar link en CTA value, incompatible con WHATSAPP_MESSAGE)
+      const creativeFeatures = {
+        text_optimizations: { enroll_status: 'OPT_IN' },
+        image_touchups: { enroll_status: 'OPT_IN' },
+        inline_comment: { enroll_status: 'OPT_IN' }
+      };
+      if (!isWhatsApp && !isInstagramDM) {
+        creativeFeatures.enhance_cta = { enroll_status: 'OPT_IN' };
+      }
       formData.append('degrees_of_freedom_spec', JSON.stringify({
-        creative_features_spec: {
-          text_optimizations: { enroll_status: 'OPT_IN' },
-          enhance_cta: { enroll_status: 'OPT_IN' },
-          image_touchups: { enroll_status: 'OPT_IN' },
-          inline_comment: { enroll_status: 'OPT_IN' }
-        },
+        creative_features_spec: creativeFeatures,
         text_transformation_types: ['TEXT_LIQUIDITY']
       }));
 
@@ -2625,7 +2633,13 @@ class MetaAdsService {
     }
 
     // WhatsApp: isDynamicCreative con asset_feed_spec (5+5+5) para modos dynamic/per-ad
-    const useDynamicCreative = adSetMode !== 'single';
+    // EXCEPCIÓN: OUTCOME_SALES y OUTCOME_ENGAGEMENT + WhatsApp NO soportan DC (error 1885392)
+    // Meta acepta el AdSet+Creative pero rechaza el Ad. Forzar standard creative para estos objetivos.
+    const dcBlockedObjectives = ['OUTCOME_SALES', 'OUTCOME_ENGAGEMENT'];
+    const useDynamicCreative = adSetMode !== 'single' && !dcBlockedObjectives.includes(objective);
+    if (adSetMode !== 'single' && dcBlockedObjectives.includes(objective)) {
+      console.warn(`WhatsApp + ${objective}: DC not supported (error 1885392). Using standard creatives instead.`);
+    }
 
     try {
       // 1. Crear Campaña
@@ -2741,13 +2755,10 @@ class MetaAdsService {
           // ====== DYNAMIC CREATIVE (5+5+5) para WhatsApp ======
           const validTitles = adHeadlines.length > 0 ? adHeadlines : ['Contáctanos'];
           const validBodies = adDescriptions.length > 0 ? adDescriptions : ['Escríbenos por WhatsApp'];
-          // OUTCOME_AWARENESS + DC: filtrar CTAs no compatibles (GET_OFFER, APPLY_NOW, etc.)
-          const AWARENESS_DC_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE', 'VISIT_INSTAGRAM_PROFILE'];
-          let validCTAs = [...new Set((ad.ctas || ['WHATSAPP_MESSAGE']).filter(c => c))];
-          if (objective === 'OUTCOME_AWARENESS') {
-            validCTAs = validCTAs.filter(c => AWARENESS_DC_VALID_CTAS.includes(c));
-            if (validCTAs.length === 0) validCTAs = ['WHATSAPP_MESSAGE'];
-          }
+          // WhatsApp DC: SOLO WHATSAPP_MESSAGE como CTA
+          // Otros CTAs (SHOP_NOW, ORDER_NOW, GET_QUOTE, etc.) requieren link_urls en asset_feed_spec,
+          // pero WhatsApp DC no tiene link_urls → error "demasiados parámetros: link"
+          const validCTAs = ['WHATSAPP_MESSAGE'];
 
           console.log(`  Dynamic Creative 5+5+5: ${validTitles.length}t + ${validBodies.length}d + ${validCTAs.length}cta`);
 
@@ -2814,8 +2825,9 @@ class MetaAdsService {
             if (description.trim()) videoData.link_description = description;
             objectStorySpec.video_data = videoData;
           } else {
+            // WhatsApp image: NO incluir link en link_data (Meta interpreta link como CTA value.link
+            // y WHATSAPP_MESSAGE no soporta link — error "demasiados parámetros" en OUTCOME_SALES)
             const linkData = {
-              link: `https://api.whatsapp.com/send`,
               message: primaryText,
               name: headline,
               call_to_action: { type: whatsAppCta, value: {} }
@@ -2840,11 +2852,11 @@ class MetaAdsService {
           formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
           formData.append('object_story_spec', JSON.stringify(objectStorySpec));
 
-          // Advantage+ creative individual features + Optimizar texto por persona
+          // Advantage+ creative features — NO enhance_cta para WhatsApp
+          // (enhance_cta puede inyectar link en CTA value, incompatible con WHATSAPP_MESSAGE)
           formData.append('degrees_of_freedom_spec', JSON.stringify({
             creative_features_spec: {
               text_optimizations: { enroll_status: 'OPT_IN' },
-              enhance_cta: { enroll_status: 'OPT_IN' },
               image_touchups: { enroll_status: 'OPT_IN' },
               inline_comment: { enroll_status: 'OPT_IN' }
             },
@@ -2873,14 +2885,125 @@ class MetaAdsService {
         results.creatives.push(creativeResult.data);
 
         // Crear Ad
-        const adResult = await this.createAd(adAccountId, {
+        let adResult = await this.createAd(adAccountId, {
           name: ad.adName || `${campaignName} - Ad${adLabel}`,
           adsetId: sharedAdSetId,
           creativeId: creativeResult.data.id,
           status: 'PAUSED'
         });
 
-        if (!adResult.success) {
+        // ====== FALLBACK: Error 1885392 — DC no soportado para este objetivo ======
+        // Meta acepta el AdSet con isDynamicCreative y el Creative con asset_feed_spec,
+        // pero rechaza el Ad con "El contenido dinámico no admite el objetivo de la campaña".
+        // Solución: re-crear AdSet sin DC + Creative estándar + Ad.
+        if (!adResult.success && useDynamicCreative &&
+            (adResult.error?.includes('1885392') || adResult.error?.includes('contenido dinámico no admite') || adResult.error?.includes('dynamic creative'))) {
+          console.warn(`Ad${adLabel}: DC not supported for this objective+destination. Falling back to standard creative...`);
+
+          // 1. Crear nuevo AdSet SIN isDynamicCreative
+          const adAudienceLabel = (adSetMode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
+          const adTargeting = (adSetMode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
+          const fallbackAdSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+            name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel} (std)`,
+            campaignId: results.campaign.id,
+            targeting: adTargeting,
+            optimizationGoal,
+            promotedObject: { page_id: pageId },
+            whatsappPhoneNumber: adWhatsappNumber,
+            dailyBudget: !isCBO ? dailyBudget : null,
+            isDynamicCreative: false,
+            startTime,
+            endTime,
+            bidStrategy: !isCBO ? bidStrategy : undefined,
+            bidAmount: !isCBO ? bidAmount : undefined
+          });
+
+          if (!fallbackAdSetResult.success) {
+            console.error(`Fallback AdSet${adLabel} failed:`, fallbackAdSetResult.error);
+            results.errors.push(`Ad${adLabel}: DC no soportado y fallback AdSet falló: ${fallbackAdSetResult.error}`);
+            continue;
+          }
+          results.adSets.push(fallbackAdSetResult.data);
+
+          // 2. Crear Creative estándar (usa primer headline/description)
+          const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
+          const headline = adHeadlines[0] || 'Contáctanos';
+          const description = adDescriptions[1] || adHeadlines[1] || '';
+          const whatsAppCta = 'WHATSAPP_MESSAGE';
+
+          console.log(`  Fallback Standard Creative: "${headline}" | "${primaryText.substring(0, 60)}..." | CTA: ${whatsAppCta}`);
+
+          const objectStorySpec = { page_id: pageId };
+          if (adVideoId) {
+            const videoData = {
+              video_id: adVideoId,
+              message: primaryText,
+              title: headline,
+              call_to_action: { type: whatsAppCta, value: {} }
+            };
+            if (adThumbnailUrl && adThumbnailUrl.startsWith('http')) videoData.image_url = adThumbnailUrl;
+            if (description.trim()) videoData.link_description = description;
+            objectStorySpec.video_data = videoData;
+          } else {
+            // WhatsApp image: NO incluir link (WHATSAPP_MESSAGE no soporta link en CTA value)
+            const linkData = {
+              message: primaryText,
+              name: headline,
+              call_to_action: { type: whatsAppCta, value: {} }
+            };
+            if (adImageHash) linkData.image_hash = adImageHash;
+            else if (adImageUrl && adImageUrl.trim()) linkData.picture = adImageUrl;
+            if (description.trim()) linkData.description = description;
+            objectStorySpec.link_data = linkData;
+          }
+          if (igActorId) objectStorySpec.instagram_user_id = igActorId;
+
+          const normalizedId = this.normalizeAccountId(adAccountId);
+          const fallbackFormData = new URLSearchParams();
+          fallbackFormData.append('access_token', this.accessToken);
+          fallbackFormData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative (std)`);
+          fallbackFormData.append('object_story_spec', JSON.stringify(objectStorySpec));
+          fallbackFormData.append('degrees_of_freedom_spec', JSON.stringify({
+            creative_features_spec: {
+              text_optimizations: { enroll_status: 'OPT_IN' },
+              image_touchups: { enroll_status: 'OPT_IN' },
+              inline_comment: { enroll_status: 'OPT_IN' }
+            },
+            text_transformation_types: ['TEXT_LIQUIDITY']
+          }));
+
+          let fallbackCreativeResult;
+          try {
+            const response = await axios.post(`${META_API_BASE_URL}/${normalizedId}/adcreatives`, fallbackFormData,
+              { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+            fallbackCreativeResult = { success: true, data: response.data };
+          } catch (error) {
+            console.error('Fallback creative error:', JSON.stringify(error.response?.data, null, 2));
+            const errData = error.response?.data?.error;
+            fallbackCreativeResult = { success: false, error: errData?.error_user_msg || errData?.message || error.message };
+          }
+
+          if (!fallbackCreativeResult.success) {
+            console.error(`Fallback Creative${adLabel} failed:`, fallbackCreativeResult.error);
+            results.errors.push(`Ad${adLabel}: DC no soportado y fallback Creative falló: ${fallbackCreativeResult.error}`);
+            continue;
+          }
+          results.creatives.push(fallbackCreativeResult.data);
+
+          // 3. Crear Ad con el nuevo AdSet + Creative estándar
+          adResult = await this.createAd(adAccountId, {
+            name: ad.adName || `${campaignName} - Ad${adLabel}`,
+            adsetId: fallbackAdSetResult.data.id,
+            creativeId: fallbackCreativeResult.data.id,
+            status: 'PAUSED'
+          });
+
+          if (!adResult.success) {
+            results.errors.push(`Ad${adLabel} (fallback): ${adResult.error}`);
+            continue;
+          }
+          console.log(`  Fallback successful! Ad${adLabel} created with standard creative.`);
+        } else if (!adResult.success) {
           results.errors.push(`Ad${adLabel}: ${adResult.error}`);
           continue;
         }
@@ -3292,25 +3415,40 @@ class MetaAdsService {
     ];
 
     // Determinar CTA default según destino
-    const defaultCTAForDestination = conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+    // NOTA: VISIT_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — usar LEARN_MORE para IG Profile en DC
+    const defaultCTAForDestination = conversionLocation === 'INSTAGRAM_PROFILE' ? 'LEARN_MORE'
       : conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
       : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
       : conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'
       : 'LEARN_MORE';
 
+    // CTA para standard creatives (INSTAGRAM_PROFILE usa VISIT_INSTAGRAM_PROFILE ahí sí)
+    const defaultCTAForStandard = conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+      : defaultCTAForDestination;
+
     // OUTCOME_AWARENESS + DC: solo permite estos CTAs (GET_OFFER, APPLY_NOW, etc. dan error 1885396)
     const AWARENESS_DC_VALID_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE',
-      'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE', 'VISIT_INSTAGRAM_PROFILE'
+      'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE'
     ];
 
-    const sanitizeCTAs = (ctas) => {
+    // CTAs que NO funcionan en asset_feed_spec (DC) pero sí en standard creatives
+    const DC_CTA_REPLACEMENTS = {
+      'VISIT_INSTAGRAM_PROFILE': 'LEARN_MORE'
+    };
+
+    const sanitizeCTAs = (ctas, forDC = true) => {
       let filtered = (ctas || []).filter(c => VALID_LINK_CLICKS_CTAS.includes(c));
+      if (forDC) {
+        // Reemplazar CTAs no válidos en asset_feed_spec
+        filtered = filtered.map(c => DC_CTA_REPLACEMENTS[c] || c);
+      }
       // Filtrar CTAs no compatibles con OUTCOME_AWARENESS + Dynamic Creative
-      if (objective === 'OUTCOME_AWARENESS') {
+      if (objective === 'OUTCOME_AWARENESS' && forDC) {
         filtered = filtered.filter(c => AWARENESS_DC_VALID_CTAS.includes(c));
       }
-      return filtered.length > 0 ? filtered : [defaultCTAForDestination];
+      const defaultCta = forDC ? defaultCTAForDestination : defaultCTAForStandard;
+      return filtered.length > 0 ? [...new Set(filtered)] : [defaultCta];
     };
 
     const results = {
@@ -3503,7 +3641,8 @@ class MetaAdsService {
       };
 
       // Helper: crear Dynamic Creative (asset_feed_spec 5+5+5) + ad
-      const createDynamicCreativeAndAd = async (ad, adIndex, adSetId) => {
+      // fallbackContext: { targeting, campaignId } — datos para crear AdSet sin DC si falla con 1885392
+      const createDynamicCreativeAndAd = async (ad, adIndex, adSetId, fallbackContext = null) => {
         const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
         const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
         const validCTAs = sanitizeCTAs(ad.ctas);
@@ -3552,6 +3691,41 @@ class MetaAdsService {
           status: 'PAUSED'
         });
 
+        // ====== FALLBACK: Error 1885392 — DC no soportado para este objetivo ======
+        if (!adResult.success && fallbackContext &&
+            (adResult.error?.includes('1885392') || adResult.error?.includes('contenido dinámico no admite') || adResult.error?.includes('dynamic creative'))) {
+          console.warn(`Ad ${adIndex + 1}: DC not supported for this objective+destination. Falling back to standard creative...`);
+
+          // Crear nuevo AdSet SIN isDynamicCreative
+          const fallbackAdSetResult = await this.createAdSet(adAccountId, {
+            name: `${campaignName} - Ad Set ${adIndex + 1} (std)`,
+            campaignId: fallbackContext.campaignId,
+            billingEvent,
+            optimizationGoal,
+            targeting: fallbackContext.targeting,
+            status: 'PAUSED',
+            endTime: endDate,
+            isDynamicCreative: false,
+            destinationType,
+            promotedObject
+          });
+
+          if (!fallbackAdSetResult.success) {
+            // Remove the stale DC error and add fallback error
+            results.errors.pop(); // remove the pending error we haven't pushed yet
+            results.errors.push(`Ad ${adIndex + 1}: DC no soportado y fallback AdSet falló: ${fallbackAdSetResult.error}`);
+            return false;
+          }
+          results.adSets.push(fallbackAdSetResult.data);
+
+          // Usar el helper de Standard Creative
+          const stdSuccess = await createStandardCreativeAndAd(ad, adIndex, fallbackAdSetResult.data.id);
+          if (stdSuccess) {
+            console.log(`  Fallback successful! Ad ${adIndex + 1} created with standard creative.`);
+          }
+          return stdSuccess;
+        }
+
         if (!adResult.success) {
           results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
           return false;
@@ -3564,7 +3738,7 @@ class MetaAdsService {
       const createStandardCreativeAndAd = async (ad, adIndex, adSetId) => {
         const headline = (ad.headlines?.find(h => h?.trim()) || 'Conoce más');
         const primaryText = (ad.descriptions?.find(d => d?.trim()) || 'Descubre más');
-        const cta = sanitizeCTAs(ad.ctas)[0] || 'LEARN_MORE';
+        const cta = sanitizeCTAs(ad.ctas, false)[0] || 'LEARN_MORE';
         const { resolvedThumbUrl } = await resolveThumbnail(ad, adIndex);
 
         const stdCreativeParams = {
@@ -3694,7 +3868,10 @@ class MetaAdsService {
             }
             results.adSets.push(adSetResult.data);
 
-            await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
+            await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id, {
+              targeting: currentAudience.targeting,
+              campaignId: results.campaign.id
+            });
           }
         }
 
@@ -3730,7 +3907,10 @@ class MetaAdsService {
           }
           results.adSets.push(adSetResult.data);
 
-          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id);
+          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id, {
+            targeting: adTargeting,
+            campaignId: results.campaign.id
+          });
         }
       }
 
