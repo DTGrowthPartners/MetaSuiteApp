@@ -2385,6 +2385,9 @@ class MetaAdsService {
 
       let objectStorySpec;
 
+      // CTA value: si hay número de WhatsApp, usar wa_id; si no, value vacío (asignar manualmente en Ads Manager)
+      const ctaValue = whatsappNumber ? { wa_id: whatsappNumber } : {};
+
       if (videoId) {
         // Creativo con VIDEO para WhatsApp - usa video_data
         const videoData = {
@@ -2393,9 +2396,7 @@ class MetaAdsService {
           title: headline,
           call_to_action: {
             type: callToAction,
-            value: {
-              wa_id: whatsappNumber
-            }
+            value: ctaValue
           }
         };
 
@@ -2422,9 +2423,7 @@ class MetaAdsService {
           description: description,
           call_to_action: {
             type: callToAction,
-            value: {
-              wa_id: whatsappNumber
-            }
+            value: ctaValue
           }
         };
 
@@ -2682,7 +2681,7 @@ class MetaAdsService {
       if (adSetMode === 'single') {
         console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (standard creatives en 1 Ad Set)`);
 
-        const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+        let adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
           name: `${campaignName} - Ad Set${audPrefix}`,
           campaignId: results.campaign.id,
           targeting: currentAudience.targeting,
@@ -2696,6 +2695,28 @@ class MetaAdsService {
           bidStrategy: !isCBO ? bidStrategy : undefined,
           bidAmount: !isCBO ? bidAmount : undefined
         });
+
+        // Fallback: si falla con número de WhatsApp, reintentar sin él
+        if (!adSetResult.success && whatsappNumber) {
+          console.warn(`AdSet${audPrefix}: falló con WhatsApp number, reintentando sin número...`);
+          adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+            name: `${campaignName} - Ad Set${audPrefix}`,
+            campaignId: results.campaign.id,
+            targeting: currentAudience.targeting,
+            optimizationGoal,
+            promotedObject: { page_id: pageId },
+            whatsappPhoneNumber: null,
+            dailyBudget: !isCBO ? dailyBudget : null,
+            isDynamicCreative: false,
+            startTime,
+            endTime,
+            bidStrategy: !isCBO ? bidStrategy : undefined,
+            bidAmount: !isCBO ? bidAmount : undefined
+          });
+          if (adSetResult.success) {
+            console.warn(`AdSet${audPrefix}: creado SIN número de WhatsApp. Asignar manualmente en Ads Manager.`);
+          }
+        }
 
         if (!adSetResult.success) {
           results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
@@ -2717,7 +2738,7 @@ class MetaAdsService {
           console.log(`  WhatsApp: ${adWhatsappNumber}${ad.whatsappNumber ? ' (per-ad)' : ' (global)'}`);
 
           const adTargeting = (adSetMode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
-          const adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+          let adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
             name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel}`,
             campaignId: results.campaign.id,
             targeting: adTargeting,
@@ -2731,6 +2752,28 @@ class MetaAdsService {
             bidStrategy: !isCBO ? bidStrategy : undefined,
             bidAmount: !isCBO ? bidAmount : undefined
           });
+
+          // Fallback: si falla con número de WhatsApp, reintentar sin él
+          if (!adSetResult.success && adWhatsappNumber) {
+            console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number, reintentando sin número...`);
+            adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
+              name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel}`,
+              campaignId: results.campaign.id,
+              targeting: adTargeting,
+              optimizationGoal,
+              promotedObject: { page_id: pageId },
+              whatsappPhoneNumber: null,
+              dailyBudget: !isCBO ? dailyBudget : null,
+              isDynamicCreative: useDynamicCreative,
+              startTime,
+              endTime,
+              bidStrategy: !isCBO ? bidStrategy : undefined,
+              bidAmount: !isCBO ? bidAmount : undefined
+            });
+            if (adSetResult.success) {
+              console.warn(`AdSet${adLabel}${adAudienceLabel}: creado SIN número de WhatsApp. Asignar manualmente en Ads Manager.`);
+            }
+          }
 
           if (!adSetResult.success) {
             results.errors.push(`AdSet${adLabel}${adAudienceLabel}: ${adSetResult.error}`);
