@@ -1118,7 +1118,7 @@ class MetaAdsService {
     billingEvent = 'IMPRESSIONS',
     optimizationGoal = 'LINK_CLICKS',
     targeting,
-    status = 'PAUSED',
+    status = 'ACTIVE',
     endTime = null, // Fecha de fin en formato ISO o timestamp UNIX
     isDynamicCreative = false, // Para Asset Feed Spec (5+5+5 en 1 anuncio)
     destinationType = null, // 'WEBSITE', 'INSTAGRAM_PROFILE', etc. (null = Meta decide)
@@ -1465,7 +1465,7 @@ class MetaAdsService {
   }
 
   // Crear un Ad
-  async createAd(adAccountId, { name, adsetId, creativeId, status = 'PAUSED' }) {
+  async createAd(adAccountId, { name, adsetId, creativeId, status = 'ACTIVE' }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
@@ -1853,7 +1853,7 @@ class MetaAdsService {
         billingEvent,
         optimizationGoal,
         targeting,
-        status: 'PAUSED',
+        status: 'ACTIVE',
         endTime: endDate // Pasar fecha de fin si existe
       });
 
@@ -1934,7 +1934,7 @@ class MetaAdsService {
         billingEvent,
         optimizationGoal,
         targeting,
-        status: 'PAUSED',
+        status: 'ACTIVE',
         endTime: endDate,
         isDynamicCreative: true // Permite Asset Feed Spec (5+5+5)
       });
@@ -2004,7 +2004,7 @@ class MetaAdsService {
         name: adName,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
-        status: 'PAUSED'
+        status: 'ACTIVE'
       });
 
       if (!adResult.success) {
@@ -2079,7 +2079,7 @@ class MetaAdsService {
         billingEvent,
         optimizationGoal,
         targeting,
-        status: 'PAUSED'
+        status: 'ACTIVE'
       });
 
       if (!adSetResult.success) {
@@ -2151,7 +2151,7 @@ class MetaAdsService {
         name: `${campaignName} - Ad`,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
-        status: 'PAUSED'
+        status: 'ACTIVE'
       });
 
       if (!adResult.success) {
@@ -2197,7 +2197,7 @@ class MetaAdsService {
     targeting,
     optimizationGoal = 'CONVERSATIONS',
     billingEvent = 'IMPRESSIONS',
-    status = 'PAUSED',
+    status = 'ACTIVE',
     promotedObject = null,
     whatsappPhoneNumber = null, // Número de teléfono real (ej: "573007189383")
     dailyBudget = null, // Presupuesto a nivel de ad set (cuando no es CBO)
@@ -2307,7 +2307,7 @@ class MetaAdsService {
     targeting,
     optimizationGoal = 'CONVERSATIONS',
     billingEvent = 'IMPRESSIONS',
-    status = 'PAUSED',
+    status = 'ACTIVE',
     promotedObject = null,
     isDynamicCreative = false,
     bidStrategy = 'LOWEST_COST_WITHOUT_CAP',
@@ -2932,7 +2932,7 @@ class MetaAdsService {
           name: ad.adName || `${campaignName} - Ad${adLabel}`,
           adsetId: sharedAdSetId,
           creativeId: creativeResult.data.id,
-          status: 'PAUSED'
+          status: 'ACTIVE'
         });
 
         // ====== FALLBACK: Error 1885392 — DC no soportado para este objetivo ======
@@ -3038,7 +3038,7 @@ class MetaAdsService {
             name: ad.adName || `${campaignName} - Ad${adLabel}`,
             adsetId: fallbackAdSetResult.data.id,
             creativeId: fallbackCreativeResult.data.id,
-            status: 'PAUSED'
+            status: 'ACTIVE'
           });
 
           if (!adResult.success) {
@@ -3146,7 +3146,7 @@ class MetaAdsService {
         name: adName || `${campaignName} - Ad`,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
-        status: 'PAUSED'
+        status: 'ACTIVE'
       });
 
       if (!adResult.success) {
@@ -3170,7 +3170,7 @@ class MetaAdsService {
     targeting,
     optimizationGoal = 'CONVERSATIONS',
     billingEvent = 'IMPRESSIONS',
-    status = 'PAUSED',
+    status = 'ACTIVE',
     promotedObject = null,
     isDynamicCreative = false
   }) {
@@ -3410,7 +3410,7 @@ class MetaAdsService {
         name: adName || `${campaignName} - Ad`,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
-        status: 'PAUSED'
+        status: 'ACTIVE'
       });
 
       if (!adResult.success) {
@@ -3731,7 +3731,7 @@ class MetaAdsService {
           name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
-          status: 'PAUSED'
+          status: 'ACTIVE'
         });
 
         // ====== FALLBACK: Error 1885392 — DC no soportado para este objetivo ======
@@ -3746,7 +3746,7 @@ class MetaAdsService {
             billingEvent,
             optimizationGoal,
             targeting: fallbackContext.targeting,
-            status: 'PAUSED',
+            status: 'ACTIVE',
             endTime: endDate,
             isDynamicCreative: false,
             destinationType,
@@ -3822,7 +3822,7 @@ class MetaAdsService {
           name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
-          status: 'PAUSED'
+          status: 'ACTIVE'
         });
 
         if (!adResult.success) {
@@ -3861,7 +3861,7 @@ class MetaAdsService {
             billingEvent,
             optimizationGoal,
             targeting: currentAudience.targeting,
-            status: 'PAUSED',
+            status: 'ACTIVE',
             endTime: endDate,
             isDynamicCreative: false,
             destinationType,
@@ -3898,7 +3898,7 @@ class MetaAdsService {
               billingEvent,
               optimizationGoal,
               targeting: currentAudience.targeting,
-              status: 'PAUSED',
+              status: 'ACTIVE',
               endTime: endDate,
               isDynamicCreative: true,
               destinationType,
@@ -3937,7 +3937,7 @@ class MetaAdsService {
             billingEvent,
             optimizationGoal,
             targeting: adTargeting,
-            status: 'PAUSED',
+            status: 'ACTIVE',
             endTime: endDate,
             isDynamicCreative: true,
             destinationType,

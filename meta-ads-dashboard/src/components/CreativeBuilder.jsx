@@ -3043,7 +3043,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                   name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audPrefix}`,
                   adsetId: adSetResult.data.id,
                   creativeId: creativeResult.data.id,
-                  status: 'PAUSED'
+                  status: 'ACTIVE'
                 });
 
                 if (!adResult.success) {
@@ -3154,7 +3154,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audienceLabel}`,
                 adsetId: adSetResult.data.id,
                 creativeId: creativeResult.data.id,
-                status: 'PAUSED'
+                status: 'ACTIVE'
               });
 
               if (!adResult.success) {
@@ -3283,7 +3283,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           descriptions: job.descriptions || [],
           ctas: job.ctas || [],
           jobAds: job.ads || [],
-          status: 'PAUSED',
+          status: 'ACTIVE',
           noImage: job.noImage || !job.imageUrl,
           needsCreative: !hasAds,
           // Nuevos campos
