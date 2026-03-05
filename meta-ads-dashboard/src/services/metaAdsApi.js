@@ -136,7 +136,7 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/me/adaccounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,account_status,business{id,name}',
+          fields: 'id,name,account_status,disable_reason,currency,amount_spent,business{id,name}',
           limit: 100
         }
       });
@@ -218,7 +218,7 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/${businessId}/owned_ad_accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,account_status',
+          fields: 'id,name,account_status,disable_reason,currency,amount_spent',
           limit: 100
         }
       });
@@ -234,7 +234,7 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/${businessId}/client_ad_accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,account_status',
+          fields: 'id,name,account_status,disable_reason,currency,amount_spent',
           limit: 100
         }
       });

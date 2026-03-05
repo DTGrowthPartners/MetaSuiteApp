@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import CreativeBuilder from './components/CreativeBuilder';
+import AccountDashboard from './components/AccountDashboard';
 import MetaAdsService from './services/metaAdsApi';
 import './App.css';
 
@@ -165,6 +166,14 @@ function App() {
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [accountsError, setAccountsError] = useState(null);
 
+  // Hash-based routing: #dashboard → AccountDashboard
+  const [page, setPage] = useState(() => window.location.hash === '#dashboard' ? 'dashboard' : 'main');
+  useEffect(() => {
+    const onHash = () => setPage(window.location.hash === '#dashboard' ? 'dashboard' : 'main');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   const handleLogin = useCallback((token, userInfo = {}) => {
     localStorage.setItem('meta_access_token', token);
     localStorage.setItem('meta_user_name', userInfo.name || 'Usuario');
@@ -262,7 +271,14 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} />
+        {page === 'dashboard' ? (
+          <AccountDashboard
+            adAccounts={adAccounts}
+            onBack={() => { window.location.hash = ''; setPage('main'); }}
+          />
+        ) : (
+          <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} />
+        )}
       </main>
     </div>
   );
