@@ -13,7 +13,7 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
     // Esperar a que el SDK de Facebook se cargue
     window.fbAsyncInit = function() {
       window.FB.init({
-        appId: '2784679235288284',
+        appId: '779707284522963',
         cookie: true,
         xfbml: true,
         version: 'v18.0'
