@@ -2947,7 +2947,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         }
 
         const modeLabel = effectiveMode === 'single' ? `1 Ad Set → ${totalAds} Ads (standard creatives)`
-          : effectiveMode === 'flexible' ? `1 Ad Set → ${totalAds} Flexible Ads (creative_asset_groups_spec)`
+          : effectiveMode === 'flexible' ? `1 Ad Set → 1 Flexible Ad (${totalAds} contenidos combinados)`
           : effectiveMode === 'dynamic' ? `${totalAds} Ad Set(s) con 5+5+5 (mismo público)`
           : `${totalAds} Ad Set(s) con 5+5+5 (público diferente)`;
 
@@ -3070,7 +3070,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               }
             }
           } else if (effectiveMode === 'flexible') {
-            // ========== MODO FLEXIBLE: 1 AdSet por público → N Flexible Ads (creative_asset_groups_spec) ==========
+            // ========== MODO FLEXIBLE: 1 AdSet por público → 1 Flexible Ad con TODO el contenido ==========
             const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
             const adSetResult = await metaService[adSetMethod](job.adAccountId, {
               name: `${job.campaignName} - Ad Set${audPrefix}`,
@@ -3087,24 +3087,19 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               addLog(`Ad Set creado${audPrefix}: ${adSetResult.data.id}`);
               createdAdSets.push(adSetResult.data);
 
+              // Agrupar TODO el contenido en un solo flexible ad
+              addLog(`Creando 1 flexible ad con todo el contenido (${totalAds} piezas)${audPrefix}...`);
+
+              const allImages = [];
+              const allVideos = [];
+              const allHeadlines = new Set();
+              const allPrimaryTexts = new Set();
+              const allDescriptions = new Set();
+              let firstCta = null;
+
               for (let i = 0; i < totalAds; i++) {
                 const ad = adsArray[i];
-                const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
-                const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
-                const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
-                const adCta = ad.ctas?.[0] || defaultCta;
-
-                addLog(`Creando flexible ad${adLabel}${audPrefix}...`);
-
-                // Construir textos
-                const texts = [];
-                adHeadlines.slice(0, 5).forEach(h => texts.push({ text: h.trim(), text_type: 'headline' }));
-                adDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'primary_text' }));
-                adDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'description' }));
-
-                // Construir imágenes y videos
-                const images = [];
-                const videos = [];
+                // Acumular contenido
                 if (ad.videoId) {
                   const vid = { video_id: ad.videoId };
                   if (ad.videoThumbnailHash) {
@@ -3112,37 +3107,54 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                   } else if (ad.videoThumbnailUrl || ad.imageUrl) {
                     vid.image_url = ad.videoThumbnailUrl || ad.imageUrl;
                   }
-                  videos.push(vid);
+                  allVideos.push(vid);
                 } else if (ad.imageHash) {
-                  images.push({ hash: ad.imageHash });
+                  allImages.push({ hash: ad.imageHash });
                 }
-
-                // Flexible ads SIEMPRE requieren link en call_to_action.value
-                // Para messaging: usar deep link apropiado
-                const flexLink = isIgDM
-                  ? `https://ig.me/m/${job.igActorId}`
-                  : `https://m.me/${job.pageId}`;
-
-                const flexResult = await metaService.createFlexibleAd(job.adAccountId, {
-                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audPrefix}`,
-                  adsetId: adSetResult.data.id,
-                  pageId: job.pageId,
-                  igActorId: isIgDM ? job.igActorId : null,
-                  images,
-                  videos,
-                  texts,
-                  callToAction: { type: adCta, value: { link: flexLink } },
-                  linkUrl: flexLink,
-                  status: 'ACTIVE'
+                // Acumular textos (deduplicados)
+                (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
+                (ad.descriptions || []).filter(d => d?.trim()).forEach(d => {
+                  allPrimaryTexts.add(d.trim());
+                  allDescriptions.add(d.trim());
                 });
+                if (!firstCta && ad.ctas?.[0]) firstCta = ad.ctas[0];
+              }
 
-                if (!flexResult.success) {
-                  errors.push(`Flexible Ad${adLabel}${audPrefix}: ${flexResult.error}`);
-                  addLog(`Error flexible ad${adLabel}${audPrefix}: ${flexResult.error}`);
-                } else {
-                  createdAds.push(flexResult.data);
-                  addLog(`Flexible Ad${adLabel}${audPrefix} creado: ${flexResult.data.id}`);
-                }
+              // Construir textos (máximo 5 por tipo)
+              const texts = [];
+              const headlines = [...allHeadlines].slice(0, 5);
+              const primaryTexts = [...allPrimaryTexts].slice(0, 5);
+              const descriptions = [...allDescriptions].slice(0, 5);
+              if (headlines.length === 0) headlines.push('Conoce más');
+              if (primaryTexts.length === 0) primaryTexts.push('Descubre más');
+              headlines.forEach(h => texts.push({ text: h, text_type: 'headline' }));
+              primaryTexts.forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
+              descriptions.forEach(d => texts.push({ text: d, text_type: 'description' }));
+
+              const flexLink = isIgDM
+                ? `https://ig.me/m/${job.igActorId}`
+                : `https://m.me/${job.pageId}`;
+              const adCta = firstCta || defaultCta;
+
+              const flexResult = await metaService.createFlexibleAd(job.adAccountId, {
+                name: `${job.campaignName} - Flexible Ad${audPrefix}`,
+                adsetId: adSetResult.data.id,
+                pageId: job.pageId,
+                igActorId: isIgDM ? job.igActorId : null,
+                images: allImages,
+                videos: allVideos,
+                texts,
+                callToAction: { type: adCta, value: { link: flexLink } },
+                linkUrl: flexLink,
+                status: 'ACTIVE'
+              });
+
+              if (!flexResult.success) {
+                errors.push(`Flexible Ad${audPrefix}: ${flexResult.error}`);
+                addLog(`Error flexible ad${audPrefix}: ${flexResult.error}`);
+              } else {
+                createdAds.push(flexResult.data);
+                addLog(`Flexible Ad${audPrefix} creado: ${flexResult.data.id}`);
               }
             }
           } else {
@@ -3279,7 +3291,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
         const mode = job.adSetMode || 'dynamic';
         const modeLabel = mode === 'single' ? `1 Ad Set → ${totalAds} Ads (sin 5+5+5)`
-          : mode === 'flexible' ? `1 Ad Set → ${totalAds} Flexible Ads (formato flexible Meta)`
+          : mode === 'flexible' ? `1 Ad Set → 1 Flexible Ad (${totalAds} contenidos combinados)`
           : mode === 'dynamic' ? `${totalAds} Ad Sets con 5+5+5 (mismo público, CBO)`
           : `${totalAds} Ad Sets con 5+5+5 (público diferente)`;
         addLog(`Modo: ${modeLabel}`);
