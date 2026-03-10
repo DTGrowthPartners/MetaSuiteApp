@@ -2158,12 +2158,24 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               <strong>Público por Ad</strong>
               <small>Diferente audiencia</small>
             </button>
+            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
+              <button
+                type="button"
+                className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
+                onClick={() => setAdSetMode('flexible')}
+              >
+                <strong>Flexible</strong>
+                <small>Nuevo formato</small>
+              </button>
+            )}
           </div>
           <p className="hint">
             {adSetMode === 'single'
               ? 'Todos los ads en 1 Ad Set. Cada ad usa 1 título + 1 descripción + 1 CTA (el mejor generado por IA).'
               : adSetMode === 'dynamic'
               ? 'Cada ad tiene su propio Ad Set con Dynamic Creative 5+5+5 (Meta prueba 125 combinaciones por ad). Mismo público para todos. CBO distribuye el presupuesto.'
+              : adSetMode === 'flexible'
+              ? 'Formato de anuncio flexible de Meta. Agrupa múltiples activos (imágenes, videos, textos) en un solo anuncio y Meta optimiza las combinaciones automáticamente. Solo para campañas de Ventas.'
               : 'Cada ad tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
           </p>
         </div>
@@ -2926,14 +2938,16 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         // Error: "INSTAGRAM_MESSAGE no es compatible con OUTCOME_ENGAGEMENT en conjunto de anuncios con contenido dinámico"
         const dcBlockedObjectives = ['OUTCOME_ENGAGEMENT', 'OUTCOME_SALES'];
         const dcBlocked = isIgDM && dcBlockedObjectives.includes(objective);
-        const effectiveMode = dcBlocked ? 'single' : mode;
+        // Flexible mode bypasses DC restrictions (no isDynamicCreative needed)
+        const effectiveMode = mode === 'flexible' ? 'flexible' : (dcBlocked ? 'single' : mode);
         const useDynamic = (mode === 'dynamic' || mode === 'per-ad') && !dcBlocked;
 
-        if (dcBlocked && mode !== 'single') {
+        if (dcBlocked && mode !== 'single' && mode !== 'flexible') {
           addLog(`${destLabel} + ${objective}: DC no soportado. Usando standard creatives.`);
         }
 
         const modeLabel = effectiveMode === 'single' ? `1 Ad Set → ${totalAds} Ads (standard creatives)`
+          : effectiveMode === 'flexible' ? `1 Ad Set → ${totalAds} Flexible Ads (creative_asset_groups_spec)`
           : effectiveMode === 'dynamic' ? `${totalAds} Ad Set(s) con 5+5+5 (mismo público)`
           : `${totalAds} Ad Set(s) con 5+5+5 (público diferente)`;
 
@@ -3052,6 +3066,82 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 } else {
                   createdAds.push(adResult.data);
                   addLog(`Ad${adLabel}${audPrefix} creado: ${adResult.data.id}`);
+                }
+              }
+            }
+          } else if (effectiveMode === 'flexible') {
+            // ========== MODO FLEXIBLE: 1 AdSet por público → N Flexible Ads (creative_asset_groups_spec) ==========
+            const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
+            const adSetResult = await metaService[adSetMethod](job.adAccountId, {
+              name: `${job.campaignName} - Ad Set${audPrefix}`,
+              campaignId: campaignResult.data.id,
+              targeting: currentAudience.targeting,
+              optimizationGoal,
+              promotedObject: { page_id: job.pageId },
+              isDynamicCreative: false
+            });
+
+            if (!adSetResult.success) {
+              errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
+            } else {
+              addLog(`Ad Set creado${audPrefix}: ${adSetResult.data.id}`);
+              createdAdSets.push(adSetResult.data);
+
+              for (let i = 0; i < totalAds; i++) {
+                const ad = adsArray[i];
+                const adLabel = totalAds > 1 ? ` ${i + 1}` : '';
+                const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
+                const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
+                const adCta = ad.ctas?.[0] || defaultCta;
+
+                addLog(`Creando flexible ad${adLabel}${audPrefix}...`);
+
+                // Construir textos
+                const texts = [];
+                adHeadlines.slice(0, 5).forEach(h => texts.push({ text: h.trim(), text_type: 'headline' }));
+                adDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'primary_text' }));
+                adDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'description' }));
+
+                // Construir imágenes y videos
+                const images = [];
+                const videos = [];
+                if (ad.videoId) {
+                  const vid = { video_id: ad.videoId };
+                  if (ad.videoThumbnailHash) {
+                    vid.image_hash = ad.videoThumbnailHash;
+                  } else if (ad.videoThumbnailUrl || ad.imageUrl) {
+                    vid.image_url = ad.videoThumbnailUrl || ad.imageUrl;
+                  }
+                  videos.push(vid);
+                } else if (ad.imageHash) {
+                  images.push({ hash: ad.imageHash });
+                }
+
+                // Flexible ads SIEMPRE requieren link en call_to_action.value
+                // Para messaging: usar deep link apropiado
+                const flexLink = isIgDM
+                  ? `https://ig.me/m/${job.igActorId}`
+                  : `https://m.me/${job.pageId}`;
+
+                const flexResult = await metaService.createFlexibleAd(job.adAccountId, {
+                  name: `${ad.adName || job.campaignName + ' - Ad' + adLabel}${audPrefix}`,
+                  adsetId: adSetResult.data.id,
+                  pageId: job.pageId,
+                  igActorId: isIgDM ? job.igActorId : null,
+                  images,
+                  videos,
+                  texts,
+                  callToAction: { type: adCta, value: { link: flexLink } },
+                  linkUrl: flexLink,
+                  status: 'ACTIVE'
+                });
+
+                if (!flexResult.success) {
+                  errors.push(`Flexible Ad${adLabel}${audPrefix}: ${flexResult.error}`);
+                  addLog(`Error flexible ad${adLabel}${audPrefix}: ${flexResult.error}`);
+                } else {
+                  createdAds.push(flexResult.data);
+                  addLog(`Flexible Ad${adLabel}${audPrefix} creado: ${flexResult.data.id}`);
                 }
               }
             }
@@ -3189,6 +3279,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         addLog(`URL destino: ${job.linkUrl || 'N/A'}`);
         const mode = job.adSetMode || 'dynamic';
         const modeLabel = mode === 'single' ? `1 Ad Set → ${totalAds} Ads (sin 5+5+5)`
+          : mode === 'flexible' ? `1 Ad Set → ${totalAds} Flexible Ads (formato flexible Meta)`
           : mode === 'dynamic' ? `${totalAds} Ad Sets con 5+5+5 (mismo público, CBO)`
           : `${totalAds} Ad Sets con 5+5+5 (público diferente)`;
         addLog(`Modo: ${modeLabel}`);

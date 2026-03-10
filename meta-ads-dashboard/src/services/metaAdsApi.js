@@ -1509,9 +1509,162 @@ class MetaAdsService {
     }
   }
 
-  // NOTA: creative_asset_groups_spec (Flexible Ads) fue probado en Feb 2026.
-  // Meta lo acepta sin error pero lo ignora silenciosamente via API.
-  // Solo funciona desde la UI de Ads Manager, no desde Marketing API.
+  // NOTA (actualizado Mar 2026): creative_asset_groups_spec (Flexible Ads) SÍ funciona via API
+  // pero SOLO para OUTCOME_SALES y OUTCOME_APP_PROMOTION.
+  // Se envía como parámetro separado en /ads (no dentro del creative).
+  // El creative lleva un object_story_spec básico (page_id) y el contenido va en creative_asset_groups_spec.
+
+  // Crear Ad con Formato Flexible (creative_asset_groups_spec)
+  // Solo soportado para OUTCOME_SALES y OUTCOME_APP_PROMOTION
+  async createFlexibleAd(adAccountId, {
+    name,
+    adsetId,
+    pageId,
+    igActorId = null,
+    images = [],        // [{ hash: 'abc123' }, ...]
+    videos = [],        // [{ video_id: '123' }, ...]
+    texts = [],         // [{ text: '...', text_type: 'primary_text' }, { text: '...', text_type: 'headline' }]
+    callToAction,       // { type: 'SHOP_NOW', value: { link: 'https://...' } }
+    linkUrl = null,
+    status = 'ACTIVE'
+  }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+
+      // object_story_spec necesita link_data con link obligatorio
+      // creative_asset_groups_spec maneja los múltiples activos, pero el creative base requiere un link
+      const objectStorySpec = { page_id: pageId };
+      if (igActorId) {
+        objectStorySpec.instagram_user_id = igActorId;
+      }
+
+      // Determinar el link a usar
+      const resolvedLink = linkUrl || callToAction?.value?.link || '';
+      const firstPrimaryText = texts.find(t => t.text_type === 'primary_text')?.text || '';
+      const firstHeadline = texts.find(t => t.text_type === 'headline')?.text || '';
+
+      // Obtener primera descripción si existe
+      const firstDescription = texts.find(t => t.text_type === 'description')?.text || '';
+
+      if (videos.length > 0) {
+        // Video: usar video_data
+        objectStorySpec.video_data = {
+          video_id: videos[0].video_id,
+          message: firstPrimaryText,
+          title: firstHeadline,
+          call_to_action: {
+            type: callToAction?.type || 'LEARN_MORE',
+            value: { link: resolvedLink }
+          }
+        };
+        // Thumbnail: image_hash tiene prioridad, luego image_url
+        if (videos[0].image_hash) {
+          objectStorySpec.video_data.image_hash = videos[0].image_hash;
+        } else if (videos[0].image_url) {
+          objectStorySpec.video_data.image_url = videos[0].image_url;
+        }
+        if (firstDescription) {
+          objectStorySpec.video_data.link_description = firstDescription;
+        }
+      } else {
+        // Imagen: usar link_data
+        objectStorySpec.link_data = {
+          link: resolvedLink,
+          message: firstPrimaryText,
+          name: firstHeadline,
+          call_to_action: {
+            type: callToAction?.type || 'LEARN_MORE',
+            value: { link: resolvedLink }
+          }
+        };
+        if (firstDescription) {
+          objectStorySpec.link_data.description = firstDescription;
+        }
+        if (images.length > 0 && images[0].hash) {
+          objectStorySpec.link_data.image_hash = images[0].hash;
+        }
+      }
+
+      // Creative inline
+      const creative = {
+        name: name + ' - Creative',
+        object_story_spec: objectStorySpec
+      };
+
+      // Construir creative_asset_groups_spec
+      const group = {};
+
+      if (images.length > 0) {
+        group.images = images.map(img => ({ hash: img.hash }));
+      }
+      if (videos.length > 0) {
+        group.videos = videos.map(vid => {
+          const v = { video_id: vid.video_id };
+          if (vid.image_hash) {
+            v.image_hash = vid.image_hash;
+          } else if (vid.image_url) {
+            v.image_url = vid.image_url;
+          }
+          return v;
+        });
+      }
+
+      // Textos: primary_text, headline y description (máximo 5 por text_type = 15 total)
+      group.texts = texts.filter(t => t.text?.trim()).slice(0, 15); // max 5+5+5
+
+      // CTA — todos deben tener el mismo type
+      // Flexible ads SIEMPRE requieren link en call_to_action.value (incluso messaging)
+      if (callToAction) {
+        // Asegurar que siempre haya un link en el value
+        if (!callToAction.value?.link && linkUrl) {
+          callToAction.value = { ...callToAction.value, link: linkUrl };
+        }
+        group.call_to_action = callToAction;
+      }
+
+      const creativeAssetGroupsSpec = { groups: [group] };
+
+      console.log('Creating flexible ad:', {
+        name, adsetId, pageId,
+        images: images.length, videos: videos.length,
+        texts: texts.length, cta: callToAction?.type,
+        igActorId: igActorId || 'none'
+      });
+      console.log('creative_asset_groups_spec:', JSON.stringify(creativeAssetGroupsSpec, null, 2));
+
+      const formData = new URLSearchParams();
+      formData.append('access_token', this.accessToken);
+      formData.append('name', name);
+      formData.append('adset_id', adsetId);
+      formData.append('creative', JSON.stringify(creative));
+      formData.append('creative_asset_groups_spec', JSON.stringify(creativeAssetGroupsSpec));
+      formData.append('status', status);
+
+      const response = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/ads`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      if (response.data?.error) {
+        const err = response.data.error;
+        const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
+        console.error('Flexible ad creation FAILED (200 with error):', errorMsg);
+        return { success: false, error: errorMsg, errorSubcode: err.error_subcode };
+      }
+      console.log('Flexible ad creation SUCCESS:', JSON.stringify(response.data));
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Flexible ad creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
+      const errData = error.response?.data?.error;
+      const errorMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errorMsg, errorSubcode: errData?.error_subcode };
+    }
+  }
 
   // Crear Ad Creative estándar (sin DCO) - Soporta imagen Y video
   async createStandardAdCreative(adAccountId, {
@@ -2634,16 +2787,19 @@ class MetaAdsService {
     // WhatsApp: isDynamicCreative con asset_feed_spec (5+5+5) para modos dynamic/per-ad
     // EXCEPCIÓN: OUTCOME_SALES y OUTCOME_ENGAGEMENT + WhatsApp NO soportan DC (error 1885392)
     // Meta acepta el AdSet+Creative pero rechaza el Ad. Forzar standard creative para estos objetivos.
+    // FLEXIBLE mode: no usa isDynamicCreative, usa creative_asset_groups_spec en /ads
+    const useFlexible = adSetMode === 'flexible';
     const dcBlockedObjectives = ['OUTCOME_SALES', 'OUTCOME_ENGAGEMENT'];
-    const useDynamicCreative = adSetMode !== 'single' && !dcBlockedObjectives.includes(objective);
-    if (adSetMode !== 'single' && dcBlockedObjectives.includes(objective)) {
+    const useDynamicCreative = !useFlexible && adSetMode !== 'single' && !dcBlockedObjectives.includes(objective);
+    if (!useFlexible && adSetMode !== 'single' && dcBlockedObjectives.includes(objective)) {
       console.warn(`WhatsApp + ${objective}: DC not supported (error 1885392). Using standard creatives instead.`);
     }
 
     try {
       // 1. Crear Campaña
       const isCBO = budgetLevel === 'campaign';
-      console.log(`Step 1: Creating WhatsApp campaign (budget: ${budgetLevel}, ${ads.length} ads, mode: ${adSetMode}, ${useDynamicCreative ? 'DYNAMIC 5+5+5' : 'standard'} creatives)...`);
+      const modeStr = useFlexible ? 'FLEXIBLE' : (useDynamicCreative ? 'DYNAMIC 5+5+5' : 'standard');
+      console.log(`Step 1: Creating WhatsApp campaign (budget: ${budgetLevel}, ${ads.length} ads, mode: ${adSetMode}, ${modeStr} creatives)...`);
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
@@ -2678,8 +2834,8 @@ class MetaAdsService {
         const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
         let sharedAdSetId = null;
 
-      if (adSetMode === 'single') {
-        console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (standard creatives en 1 Ad Set)`);
+      if (adSetMode === 'single' || adSetMode === 'flexible') {
+        console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (${useFlexible ? 'flexible' : 'standard'} creatives en 1 Ad Set)`);
 
         let adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
           name: `${campaignName} - Ad Set${audPrefix}`,
@@ -2731,7 +2887,7 @@ class MetaAdsService {
         const adLabel = ads.length > 1 ? ` ${i + 1}` : '';
         const adWhatsappNumber = ad.whatsappNumber || whatsappNumber;
 
-        if (adSetMode !== 'single') {
+        if (adSetMode !== 'single' && adSetMode !== 'flexible') {
           // MODO DYNAMIC/PER-AD: crear 1 AdSet por cada ad
           const adAudienceLabel = (adSetMode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
           console.log(`Creating Ad Set${adLabel}${adAudienceLabel} + ${useDynamicCreative ? 'Dynamic Creative 5+5+5' : 'Standard Creative'} + Ad (${i + 1}/${ads.length})...`);
@@ -2792,6 +2948,52 @@ class MetaAdsService {
         const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
         const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
 
+        // ====== FLEXIBLE AD: creative_asset_groups_spec ======
+        if (useFlexible) {
+          console.log(`  Creating Flexible Ad ${i + 1}/${ads.length} in shared AdSet${audPrefix}...`);
+
+          const validHeadlines = adHeadlines.length > 0 ? adHeadlines : ['Contáctanos'];
+          const validDescriptions = adDescriptions.length > 0 ? adDescriptions : ['Escríbenos por WhatsApp'];
+          const texts = [];
+          validHeadlines.slice(0, 5).forEach(h => texts.push({ text: h.trim(), text_type: 'headline' }));
+          validDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'primary_text' }));
+          // Agregar descriptions (segunda línea de descripción) como text_type 'description'
+          validDescriptions.slice(0, 5).forEach(d => texts.push({ text: d.trim(), text_type: 'description' }));
+
+          const images = [];
+          const videos = [];
+          if (adVideoId) {
+            const vid = { video_id: adVideoId };
+            if (adThumbnailUrl) vid.image_url = adThumbnailUrl;
+            videos.push(vid);
+          } else if (adImageHash) {
+            images.push({ hash: adImageHash });
+          }
+
+          // WhatsApp flexible: link obligatorio → deep link de WhatsApp
+          const waLink = `https://api.whatsapp.com/send?phone=${adWhatsappNumber.replace(/\D/g, '')}`;
+
+          const flexResult = await this.createFlexibleAd(adAccountId, {
+            name: ad.adName || `${campaignName} - Ad${adLabel}`,
+            adsetId: sharedAdSetId,
+            pageId,
+            igActorId,
+            images,
+            videos,
+            texts,
+            callToAction: { type: 'WHATSAPP_MESSAGE', value: { link: waLink } },
+            linkUrl: waLink,
+            status: 'ACTIVE'
+          });
+
+          if (!flexResult.success) {
+            results.errors.push(`Flexible Ad${adLabel}: ${flexResult.error}`);
+          } else {
+            results.ads.push(flexResult.data);
+          }
+          continue; // Skip normal creative+ad flow
+        }
+
         let creativeResult;
 
         if (useDynamicCreative) {
@@ -2842,7 +3044,7 @@ class MetaAdsService {
           }
         } else {
           // ====== STANDARD CREATIVE para WhatsApp ======
-          // Nota: creative_asset_groups_spec (flexible) fue probado pero Meta lo ignora silenciosamente vía API
+          // Nota: flexible ads ahora van por rama separada (useFlexible) arriba
           const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
           const headline = adHeadlines[0] || 'Contáctanos';
           const description = adDescriptions[1] || adHeadlines[1] || '';
@@ -3915,6 +4117,100 @@ class MetaAdsService {
               targeting: currentAudience.targeting,
               campaignId: results.campaign.id
             });
+          }
+        }
+
+      } else if (adSetMode === 'flexible') {
+        // ========================================================
+        // MODO FLEXIBLE: M AdSets (1 por público) → N Ads con creative_asset_groups_spec
+        // Solo soportado para OUTCOME_SALES y OUTCOME_APP_PROMOTION
+        // ========================================================
+        for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
+          const currentAudience = audiencesToProcess[audIdx];
+          const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+          console.log(`Mode: FLEXIBLE - 1 ADSET${audPrefix} → ${ads.length} Flexible Ads (creative_asset_groups_spec)`);
+
+          const adSetResult = await this.createAdSet(adAccountId, {
+            name: `${campaignName} - Ad Set${audPrefix}`,
+            campaignId: results.campaign.id,
+            billingEvent,
+            optimizationGoal,
+            targeting: currentAudience.targeting,
+            status: 'ACTIVE',
+            endTime: endDate,
+            isDynamicCreative: false, // Flexible ads NO usan isDynamicCreative
+            destinationType,
+            promotedObject
+          });
+
+          if (!adSetResult.success) {
+            results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
+            continue;
+          }
+          results.adSets.push(adSetResult.data);
+
+          for (let i = 0; i < ads.length; i++) {
+            const ad = ads[i];
+            console.log(`Creating flexible ad ${i + 1}/${ads.length}${audPrefix}...`);
+
+            const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
+            const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
+            const validCTAs = sanitizeCTAs(ad.ctas, false); // false = no DC sanitization
+            const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, i);
+
+            // Construir textos para creative_asset_groups_spec
+            const texts = [];
+            validTitles.slice(0, 5).forEach(t => texts.push({ text: t.trim(), text_type: 'headline' }));
+            validBodies.slice(0, 5).forEach(b => texts.push({ text: b.trim(), text_type: 'primary_text' }));
+            // Agregar descriptions (subtítulo/descripción del enlace)
+            validBodies.slice(0, 5).forEach(b => texts.push({ text: b.trim(), text_type: 'description' }));
+
+            // Construir imágenes y videos
+            const images = [];
+            const videos = [];
+            if (ad.videoId) {
+              const vid = { video_id: ad.videoId };
+              if (resolvedThumbHash) {
+                vid.image_hash = resolvedThumbHash;
+              } else if (resolvedThumbUrl) {
+                vid.image_url = resolvedThumbUrl;
+              }
+              videos.push(vid);
+            } else if (ad.imageHash) {
+              images.push({ hash: ad.imageHash });
+            }
+
+            // CTA — Flexible ads SIEMPRE requieren link en call_to_action.value
+            const ctaType = validCTAs[0] || defaultCTAForStandard;
+            // Para messaging: generar deep link apropiado
+            let flexLinkUrl = linkUrl;
+            if (ctaType === 'WHATSAPP_MESSAGE' && whatsappNumber) {
+              flexLinkUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber.replace(/\D/g, '')}`;
+            } else if (ctaType === 'INSTAGRAM_MESSAGE' && igActorId) {
+              flexLinkUrl = `https://ig.me/m/${igActorId}`;
+            } else if (ctaType === 'MESSAGE_PAGE' && pageId) {
+              flexLinkUrl = `https://m.me/${pageId}`;
+            }
+
+            const flexResult = await this.createFlexibleAd(adAccountId, {
+              name: ad.adName || `${campaignName} - Ad ${i + 1}`,
+              adsetId: adSetResult.data.id,
+              pageId,
+              igActorId,
+              images,
+              videos,
+              texts,
+              callToAction: { type: ctaType, value: { link: flexLinkUrl || '' } },
+              linkUrl: flexLinkUrl,
+              status: 'ACTIVE'
+            });
+
+            if (!flexResult.success) {
+              results.errors.push(`Flexible Ad ${i + 1}${audPrefix}: ${flexResult.error}`);
+            } else {
+              results.ads.push(flexResult.data);
+              // No separate creative for flexible ads (inline)
+            }
           }
         }
 
