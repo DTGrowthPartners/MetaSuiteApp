@@ -5,11 +5,9 @@ import MetaAdsService from './services/metaAdsApi';
 import './App.css';
 
 // ============================================
-// LOGIN SCREEN - Facebook Login + Token Manual
+// LOGIN SCREEN - Facebook Login
 // ============================================
 function LoginScreen({ onLogin }) {
-  const [manualToken, setManualToken] = useState('');
-  const [showManual, setShowManual] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fbReady, setFbReady] = useState(false);
@@ -64,19 +62,6 @@ function LoginScreen({ onLogin }) {
     });
   };
 
-  const handleManualLogin = () => {
-    const token = manualToken.trim();
-    if (!token) {
-      setError('Pega un Access Token válido');
-      return;
-    }
-    if (token.length < 50) {
-      setError('El token parece muy corto. Asegúrate de copiar el token completo.');
-      return;
-    }
-    onLogin(token, { name: 'Token Manual', picture: null, userId: null });
-  };
-
   return (
     <div className="login-screen">
       {/* Animated background orbs */}
@@ -95,7 +80,7 @@ function LoginScreen({ onLogin }) {
           </div>
           <h1 className="login-title">Meta Suite</h1>
         </div>
-        <p className="login-subtitle">Administra y optimiza tus campañas publicitarias</p>
+        <p className="login-subtitle">Inicia sesión para administrar tus campañas publicitarias</p>
 
         {/* Facebook Login Button */}
         <button
@@ -108,38 +93,6 @@ function LoginScreen({ onLogin }) {
           </svg>
           {loading ? 'Conectando...' : 'Continuar con Facebook'}
         </button>
-
-        {/* Divider */}
-        <div className="login-divider">
-          <span>o</span>
-        </div>
-
-        {/* Manual Token Toggle */}
-        {!showManual ? (
-          <button onClick={() => setShowManual(true)} className="login-manual-btn">
-            Usar Access Token manualmente
-          </button>
-        ) : (
-          <div className="login-token-form">
-            <label>Access Token de Meta</label>
-            <textarea
-              value={manualToken}
-              onChange={(e) => { setManualToken(e.target.value); setError(''); }}
-              placeholder="Pega tu Access Token aquí..."
-              rows={3}
-            />
-            <button onClick={handleManualLogin} className="login-token-submit">
-              Conectar con Token
-            </button>
-            <p className="login-token-hint">
-              Genera un token en{' '}
-              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer">
-                Graph API Explorer
-              </a>
-              {' '}con permisos: ads_management, pages_show_list, business_management
-            </p>
-          </div>
-        )}
 
         {/* Error */}
         {error && <div className="login-error">{error}</div>}
