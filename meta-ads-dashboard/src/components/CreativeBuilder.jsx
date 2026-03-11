@@ -848,9 +848,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         console.log('Pages loaded:', result);
         if (result.success && result.data) {
           setPages(result.data);
-          if (result.data.length > 0) {
-            setSelectedPage(result.data[0].id);
-          }
         }
       } catch (err) {
         console.error('Error loading pages:', err);
@@ -861,6 +858,19 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     };
     loadPages();
   }, []);
+
+  // Auto-seleccionar página de Facebook según la cuenta publicitaria seleccionada
+  useEffect(() => {
+    if (!pages.length) return;
+    const accountData = adAccounts.find(a => a.id === selectedAccount);
+    const businessId = accountData?.business_id || accountData?.business?.id || null;
+    // Buscar página del mismo negocio
+    const matchingPage = businessId
+      ? pages.find(p => p.business?.id === businessId)
+      : null;
+    // Si hay match usar esa; si no, usar la primera
+    setSelectedPage(matchingPage ? matchingPage.id : pages[0].id);
+  }, [selectedAccount, pages]);
 
   // Cargar números de WhatsApp Business del business de la cuenta publicitaria seleccionada
   useEffect(() => {

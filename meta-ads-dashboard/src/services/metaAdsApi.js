@@ -984,7 +984,7 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/me/accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,access_token,website,instagram_business_account{id,username}'
+          fields: 'id,name,access_token,website,instagram_business_account{id,username},business{id}'
         }
       });
       console.log('Pages response:', response.data);
