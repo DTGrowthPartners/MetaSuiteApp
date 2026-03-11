@@ -298,8 +298,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   useEffect(() => {
     const sectionIds = [
       'section-campana', 'section-identidad', 'section-destino',
-      'section-publico', 'section-presupuesto', 'section-segmentacion',
-      'section-ubicaciones', 'section-anuncios'
+      'section-publico', 'section-presupuesto', 'section-anuncios'
     ];
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1411,8 +1410,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             { id: 'section-destino', label: 'Destino' },
             { id: 'section-publico', label: 'Público' },
             { id: 'section-presupuesto', label: 'Presupuesto' },
-            { id: 'section-segmentacion', label: 'Segmentación' },
-            { id: 'section-ubicaciones', label: 'Ubicaciones' },
             { id: 'section-anuncios', label: 'Anuncios' },
           ].map(nav => (
             <button
@@ -1446,41 +1443,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             />
           </div>
           <p className="hint">Se agregará "{CAMPAIGN_PREFIX}" al inicio para identificar tus campañas</p>
-        </div>
-
-        {/* Categorías de Anuncios Especiales */}
-        <div className="form-group">
-          <label>Categorías de Anuncios Especiales</label>
-          <select
-            value=""
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val && !specialAdCategories.includes(val)) {
-                setSpecialAdCategories(prev => [...prev, val]);
-              }
-            }}
-          >
-            <option value="">Declara la categoría si corresponde</option>
-            {SPECIAL_AD_CATEGORIES.filter(c => !specialAdCategories.includes(c.value)).map(cat => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
-            ))}
-          </select>
-          {specialAdCategories.length > 0 && (
-            <div className="toggle-group" style={{ marginTop: '8px' }}>
-              {specialAdCategories.map(cat => {
-                const catInfo = SPECIAL_AD_CATEGORIES.find(c => c.value === cat);
-                return (
-                  <span key={cat} className="chip"
-                    onClick={() => setSpecialAdCategories(prev => prev.filter(c => c !== cat))}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {catInfo?.label || cat} <span className="chip-remove">×</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-          <p className="hint">Declara si tus anuncios están relacionados con servicios financieros, empleos, viviendas o temas sociales</p>
         </div>
 
         {/* Ad Account Selection */}
@@ -1779,7 +1741,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onClick={() => setShowMultiAudienceSelector(!showMultiAudienceSelector)}
                 style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px' }}
               >
-                {showMultiAudienceSelector ? 'Ocultar lista' : `+ Agregar más públicos (${multiAudiences.length} adicional${multiAudiences.length !== 1 ? 'es' : ''})`}
+                {showMultiAudienceSelector ? 'Ocultar lista' : `+ Agregar otro AdSet con diferente público`}
               </button>
 
               {showMultiAudienceSelector && (
@@ -1881,250 +1843,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
-        {/* Estrategia de Puja */}
-        <div className="form-group">
-          <label>Estrategia de Puja de la Campaña</label>
-          <div className="toggle-group">
-            {BID_STRATEGIES.map(bs => (
-              <button
-                key={bs.value}
-                type="button"
-                className={`toggle-btn ${bidStrategy === bs.value ? 'active' : ''}`}
-                onClick={() => {
-                  setBidStrategy(bs.value);
-                  if (bs.value === 'LOWEST_COST_WITHOUT_CAP') setBidAmount('');
-                }}
-              >
-                {bs.label}
-              </button>
-            ))}
-          </div>
-          <p className="hint">
-            {BID_STRATEGIES.find(bs => bs.value === bidStrategy)?.description || ''}
-          </p>
-          {bidStrategy !== 'LOWEST_COST_WITHOUT_CAP' && (
-            <div className="mt-sm">
-              <label>{bidStrategy === 'COST_CAP' ? 'Costo por Resultado Objetivo (COP)' : 'Límite de Puja (COP)'}</label>
-              <input
-                type="number"
-                placeholder={bidStrategy === 'COST_CAP' ? 'Ej: 5000' : 'Ej: 3000'}
-                min="100"
-                step="100"
-                value={bidAmount}
-                onChange={(e) => setBidAmount(e.target.value)}
-              />
-              <p className="hint">
-                {bidStrategy === 'COST_CAP'
-                  ? 'Meta intentará mantener un costo promedio por resultado cerca de este monto'
-                  : 'Meta no pujará más de este monto en cada subasta'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Schedule: Start Date + End Date */}
-          <div className="targeting-row">
-            <div className="targeting-field">
-              <label>Fecha de Inicio</label>
-              <input
-                type="datetime-local"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 16)}
-              />
-              <p className="hint">
-                Deja vacío para iniciar inmediatamente
-              </p>
-            </div>
-            <div className="targeting-field">
-              <label>Fecha de Finalización</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-              />
-              <p className="hint">
-                Deja vacío para correr indefinidamente
-              </p>
-            </div>
-          </div>
-
         </div>{/* fin section-card Presupuesto */}
-
-        {/* ===================== SECCIÓN: SEGMENTACIÓN ===================== */}
-        <div className="section-card" id="section-segmentacion">
-          <h4><span className="section-icon">🎯</span> Segmentación</h4>
-
-          {/* Advantage+ Audience Toggle */}
-          {templateAdSetConfig.audienceConfig?.allowAdvantage !== false && (
-            <div className="targeting-row">
-              <div className="targeting-field" style={{ flex: 1 }}>
-                <div className="toggle-inline">
-                  <label>Advantage+ Público</label>
-                  <button
-                    type="button"
-                    className={`toggle-btn ${advantageAudience ? 'active' : ''}`}
-                    onClick={() => setAdvantageAudience(!advantageAudience)}
-                  >
-                    {advantageAudience ? 'Activado' : 'Desactivado'}
-                  </button>
-                </div>
-                <p className="hint">
-                  {advantageAudience
-                    ? 'Meta ampliará automáticamente tu público para mejorar el rendimiento'
-                    : 'Solo se mostrará a tu público definido, sin expansión automática'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Age Range */}
-          <div className="targeting-row">
-            <div className="targeting-field">
-              <label>Edad Mínima</label>
-              <select value={ageMin} onChange={(e) => setAgeMin(parseInt(e.target.value))}>
-                {[...Array(48)].map((_, i) => (
-                  <option key={i + 18} value={i + 18}>{i + 18} años</option>
-                ))}
-              </select>
-            </div>
-            <div className="targeting-field">
-              <label>Edad Máxima</label>
-              <select value={ageMax} onChange={(e) => setAgeMax(parseInt(e.target.value))}>
-                {[...Array(48)].map((_, i) => (
-                  <option key={i + 18} value={i + 18} disabled={i + 18 < ageMin}>{i + 18} años</option>
-                ))}
-                <option value={65}>65+ años</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Gender */}
-          <div className="targeting-row">
-            <div className="targeting-field" style={{ flex: 1 }}>
-              <label>Sexo</label>
-              <div className="toggle-options">
-                <div
-                  className={`toggle-option ${gender === 'all' ? 'selected' : ''}`}
-                  onClick={() => setGender('all')}
-                >
-                  <span className="icon">Todos</span>
-                </div>
-                <div
-                  className={`toggle-option ${gender === 'male' ? 'selected' : ''}`}
-                  onClick={() => setGender('male')}
-                >
-                  <span className="icon">Hombres</span>
-                </div>
-                <div
-                  className={`toggle-option ${gender === 'female' ? 'selected' : ''}`}
-                  onClick={() => setGender('female')}
-                >
-                  <span className="icon">Mujeres</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>{/* fin section-card Segmentación */}
-
-        {/* ===================== SECCIÓN: UBICACIONES ===================== */}
-        <div className="section-card" id="section-ubicaciones">
-          <h4><span className="section-icon">📍</span> Ubicaciones</h4>
-          <div className="targeting-row">
-            <div className="targeting-field" style={{ flex: 1 }}>
-              <div className="toggle-inline">
-                <label>Advantage+ Ubicaciones</label>
-                <button
-                  type="button"
-                  className={`toggle-btn ${useAdvantagePlacements ? 'active' : ''}`}
-                  onClick={() => {
-                    setUseAdvantagePlacements(!useAdvantagePlacements);
-                    if (!useAdvantagePlacements) setExcludedPlacements([]);
-                  }}
-                >
-                  {useAdvantagePlacements ? 'Activado' : 'Desactivado'}
-                </button>
-              </div>
-              <p className="hint">
-                {useAdvantagePlacements
-                  ? 'Meta mostrará los anuncios en los lugares donde generen respuesta'
-                  : 'Elige manualmente dónde mostrar tus anuncios'}
-              </p>
-            </div>
-          </div>
-
-          {/* Exclusiones de ubicaciones (siempre visible para excluir específicas) */}
-          {!useAdvantagePlacements && (
-            <div className="targeting-row mt-sm">
-              <div className="targeting-field" style={{ flex: 1 }}>
-                <label>Ubicaciones excluidas</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {Object.entries(PLACEMENT_OPTIONS).map(([platform, placements]) => (
-                    <div key={platform}>
-                      <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'bold', textTransform: 'capitalize' }}>{platform}</span>
-                      <div className="toggle-group" style={{ marginTop: '4px' }}>
-                        {placements.map(p => {
-                          const key = `${platform}_${p.id}`;
-                          const isExcluded = excludedPlacements.includes(key);
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              className={`toggle-btn ${!isExcluded ? 'active' : ''}`}
-                              onClick={() => {
-                                setExcludedPlacements(prev =>
-                                  isExcluded ? prev.filter(e => e !== key) : [...prev, key]
-                                );
-                              }}
-                            >
-                              {p.label} {isExcluded ? '(excluido)' : ''}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {useAdvantagePlacements && (
-            <div className="targeting-row mt-sm">
-              <div className="targeting-field" style={{ flex: 1 }}>
-                <label>Ubicaciones excluidas (opcional)</label>
-                <div className="toggle-group">
-                  {[
-                    { key: 'facebook_marketplace', label: 'Facebook Marketplace' },
-                    { key: 'facebook_right_column', label: 'Columna derecha de Facebook' }
-                  ].map(p => {
-                    const isExcluded = excludedPlacements.includes(p.key);
-                    return (
-                      <button
-                        key={p.key}
-                        type="button"
-                        className={`toggle-btn ${isExcluded ? 'active' : ''}`}
-                        onClick={() => {
-                          setExcludedPlacements(prev =>
-                            isExcluded ? prev.filter(e => e !== p.key) : [...prev, p.key]
-                          );
-                        }}
-                      >
-                        {isExcluded ? '×' : ''} {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="hint">
-                  Haz clic para excluir ubicaciones específicas
-                </p>
-              </div>
-            </div>
-          )}
-
-        </div>{/* fin section-card Ubicaciones */}
 
         {/* ===================== SECCIÓN: ANUNCIOS ===================== */}
         <div className="section-card" id="section-anuncios">
