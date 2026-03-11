@@ -2259,14 +2259,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             >
               Subir Multiples Archivos
             </button>
-            <button
-              type="button"
-              onClick={addAd}
-              className="add-ad-btn"
-              style={{ padding: '10px 18px', borderRadius: '10px' }}
-            >
-              + Agregar Ad Vacio
-            </button>
             {multiUploadProgress && (
               <span className="text-accent" style={{ fontSize: '12px' }}>
                 {multiUploadProgress}
