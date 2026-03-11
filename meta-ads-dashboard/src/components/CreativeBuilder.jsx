@@ -2571,7 +2571,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px' }}>IA</span>
                     )}
                     <span className={ad.contentGenerated ? 'text-success' : 'text-muted'} style={{ fontSize: '13px', fontWeight: '500' }}>
-                      {ad.headlines.filter(h => h.trim()).length} Títulos + {ad.descriptions.filter(d => d.trim()).length} Descripciones + {[...new Set(ad.ctas)].length} CTAs
+                      {ad.contentGenerated 
+                        ? '5 Títulos + 5 Descripciones (CTAs de la plantilla)'
+                        : `${ad.headlines.filter(h => h.trim()).length} Títulos + ${ad.descriptions.filter(d => d.trim()).length} Descripciones`}
                     </span>
                   </div>
                   <span className="content-editor-arrow" style={{ transform: ad.showEditContent ? 'rotate(180deg)' : 'none' }}>
