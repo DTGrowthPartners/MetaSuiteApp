@@ -63,7 +63,7 @@ function TemplateSelector({ onSelectTemplate }) {
       <div className="templates-grid">
         {filteredTemplates.map(template => {
           const requirements = getRequirementBadges(template);
-          const suggestedBudget = template.adSetConfig?.suggestedBudget || template.suggestedBudget || 50000;
+          const suggestedBudget = template.adSetConfig?.suggestedBudget || template.suggestedBudget || 20000;
           const ctaList = template.creativeContent?.ctas || template.ctas || [];
 
           return (
@@ -214,7 +214,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [campaignName, setCampaignName] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
   const [dailyBudget, setDailyBudget] = useState(
-    (templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000).toString()
+    (templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 20000).toString()
   );
   const [budgetLevel, setBudgetLevel] = useState('campaign'); // 'campaign' (CBO) o 'adset'
   const [uploading, setUploading] = useState(false);
@@ -1829,7 +1829,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <label>Presupuesto Diario (COP) *</label>
           <input
             type="number"
-            placeholder="50000"
+            placeholder="20000"
             min="5000"
             step="1000"
             value={dailyBudget}
@@ -1837,7 +1837,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             required
           />
           <p className="hint">
-            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día ({budgetLevel === 'campaign' ? 'CBO' : 'por Ad Set'}) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 50000)}
+            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día ({budgetLevel === 'campaign' ? 'CBO' : 'por Ad Set'}) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 20000)}
           </p>
         </div>
 
