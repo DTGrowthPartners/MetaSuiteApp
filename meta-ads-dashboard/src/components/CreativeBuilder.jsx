@@ -1102,7 +1102,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       console.log('Total Instagram accounts found:', allIg.length, allIg);
       if (allIg.length > 0) {
         setIgAccounts(allIg);
-        setSelectedIgAccount(prev => prev || allIg[0].id);
+        setSelectedIgAccount(allIg[0].id);
       } else {
         setIgAccounts([]);
         setSelectedIgAccount('');
