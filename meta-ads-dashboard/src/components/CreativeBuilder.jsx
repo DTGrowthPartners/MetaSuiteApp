@@ -592,7 +592,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [audienceError, setAudienceError] = useState('');
   // Múltiples públicos (replicar ads en varios AdSets con diferente público)
   const [multiAudiences, setMultiAudiences] = useState([]); // Array de { id, name, targeting, audienceType }
-  const [showMultiAudienceSelector, setShowMultiAudienceSelector] = useState(false);
 
   // (headlines, descriptions, ctas are now per-ad in the ads array)
 
@@ -1723,75 +1722,46 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
           {selectedAudience && !audienceError && (
             <p className="hint success">
-              Público seleccionado: {allAudiences.find(a => a.id === selectedAudience)?.name}
+              Conjunto 1: {allAudiences.find(a => a.id === selectedAudience)?.name}
             </p>
           )}
 
           {/* Multi-Audience Selector (oculto en per-ad mode) */}
           {adSetMode !== 'per-ad' && selectedAudience && allAudiences.length > 1 && (
             <div className="mt-sm">
-              {/* Chips de públicos adicionales seleccionados */}
-              {multiAudiences.length > 0 && (
-                <div className="toggle-group mb-sm">
-                  {multiAudiences.map((aud) => (
-                    <span key={aud.id} className="chip">
-                      {aud.audienceType === 'custom' ? '[C] ' : ''}{aud.name}
-                      <span
-                        onClick={() => setMultiAudiences(prev => prev.filter(a => a.id !== aud.id))}
-                        className="chip-remove"
-                      >×</span>
-                    </span>
-                  ))}
+              {/* Chips de públicos adicionales */}
+              {multiAudiences.map((aud, index) => (
+                <div key={aud.id} className="hint success" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>Conjunto {index + 2}: {aud.audienceType === 'custom' ? '[Custom] ' : ''}{aud.name}</span>
+                  <span
+                    onClick={() => setMultiAudiences(prev => prev.filter(a => a.id !== aud.id))}
+                    style={{ cursor: 'pointer', marginLeft: '8px', fontWeight: 'bold', color: 'var(--text-muted)' }}
+                  >×</span>
                 </div>
-              )}
+              ))}
 
-              <button
-                type="button"
-                className="add-ad-btn"
-                onClick={() => setShowMultiAudienceSelector(!showMultiAudienceSelector)}
-                style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '6px' }}
+              {/* Dropdown para agregar otro público */}
+              <select
+                value=""
+                onChange={(e) => {
+                  const aud = allAudiences.find(a => a.id === e.target.value);
+                  if (aud) setMultiAudiences(prev => [...prev, { id: aud.id, name: aud.name, targeting: aud.targeting, audienceType: aud.audienceType }]);
+                }}
+                style={{ marginTop: '6px' }}
               >
-                {showMultiAudienceSelector ? 'Ocultar lista' : `+ Agregar otro AdSet con diferente público`}
-              </button>
-
-              {showMultiAudienceSelector && (
-                <div className="library-grid" style={{ display: 'block', gridTemplateColumns: 'none', maxHeight: '180px' }}>
-                  {allAudiences
-                    .filter(a => a.id !== selectedAudience)
-                    .map((audience) => {
-                      const isSelected = multiAudiences.some(ma => ma.id === audience.id);
-                      return (
-                        <label key={audience.id} style={{
-                          display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 4px',
-                          cursor: 'pointer', fontSize: '12px', color: isSelected ? 'var(--accent)' : 'var(--text-muted)',
-                          borderBottom: '1px solid var(--border)'
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {
-                              if (isSelected) {
-                                setMultiAudiences(prev => prev.filter(a => a.id !== audience.id));
-                              } else {
-                                setMultiAudiences(prev => [...prev, {
-                                  id: audience.id,
-                                  name: audience.name,
-                                  targeting: audience.targeting,
-                                  audienceType: audience.audienceType
-                                }]);
-                              }
-                            }}
-                          />
-                          {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
-                        </label>
-                      );
-                    })}
-                </div>
-              )}
+                <option value="">+ Selecciona otro público para crear otro conjunto</option>
+                {allAudiences
+                  .filter(a => a.id !== selectedAudience && !multiAudiences.some(ma => ma.id === a.id))
+                  .map((audience) => (
+                    <option key={audience.id} value={audience.id}>
+                      {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                    </option>
+                  ))}
+              </select>
 
               {multiAudiences.length > 0 && (
                 <p className="hint mt-sm text-accent">
-                  {multiAudiences.length + 1} públicos total = {
+                  {multiAudiences.length + 1} conjuntos = {
                     adSetMode === 'single'
                       ? `${multiAudiences.length + 1} Ad Sets (cada uno con ${ads.length} ad${ads.length > 1 ? 's' : ''})`
                       : `${(multiAudiences.length + 1) * ads.length} Ad Sets con 5+5+5`
