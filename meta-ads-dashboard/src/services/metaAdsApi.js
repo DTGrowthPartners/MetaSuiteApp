@@ -2923,10 +2923,8 @@ class MetaAdsService {
           }
           // Acumular textos (deduplicados)
           (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
-          (ad.descriptions || []).filter(d => d?.trim()).forEach(d => {
-            allPrimaryTexts.add(d.trim());
-            allDescriptions.add(d.trim());
-          });
+          (ad.descriptions || []).filter(d => d?.trim()).forEach(d => allPrimaryTexts.add(d.trim()));
+          (ad.linkDescriptions || []).filter(d => d?.trim()).forEach(d => allDescriptions.add(d.trim()));
         }
 
         // Construir textos (máximo 5 por tipo)
@@ -3036,6 +3034,7 @@ class MetaAdsService {
           // ====== DYNAMIC CREATIVE (5+5+5) para WhatsApp ======
           const validTitles = adHeadlines.length > 0 ? adHeadlines : ['Contáctanos'];
           const validBodies = adDescriptions.length > 0 ? adDescriptions : ['Escríbenos por WhatsApp'];
+          const validLinkDescs = (ad.linkDescriptions || []).filter(d => d?.trim());
           // WhatsApp DC: SOLO WHATSAPP_MESSAGE como CTA
           // Otros CTAs (SHOP_NOW, ORDER_NOW, GET_QUOTE, etc.) requieren link_urls en asset_feed_spec,
           // pero WhatsApp DC no tiene link_urls → error "demasiados parámetros: link"
@@ -3052,7 +3051,7 @@ class MetaAdsService {
             thumbnailUrl: adThumbnailUrl,
             titles: validTitles,
             bodies: validBodies,
-            descriptions: validBodies,
+            descriptions: validLinkDescs.length > 0 ? validLinkDescs : validBodies,
             callToActionTypes: validCTAs,
             linkUrl: null,
             igActorId,
@@ -3071,7 +3070,7 @@ class MetaAdsService {
               thumbnailUrl: adThumbnailUrl,
               titles: validTitles,
               bodies: validBodies,
-              descriptions: validBodies,
+              descriptions: validLinkDescs.length > 0 ? validLinkDescs : validBodies,
               callToActionTypes: validCTAs,
               linkUrl: null,
               igActorId: null,
@@ -4217,10 +4216,8 @@ class MetaAdsService {
 
             // Acumular textos (deduplicados)
             (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
-            (ad.descriptions || []).filter(d => d?.trim()).forEach(d => {
-              allPrimaryTexts.add(d.trim());
-              allDescriptions.add(d.trim());
-            });
+            (ad.descriptions || []).filter(d => d?.trim()).forEach(d => allPrimaryTexts.add(d.trim()));
+            (ad.linkDescriptions || []).filter(d => d?.trim()).forEach(d => allDescriptions.add(d.trim()));
 
             // CTA: usar el primero encontrado
             if (!firstCTAType) {

@@ -659,6 +659,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions || ['', '', '', '', ''],
           // Messaging destinations: forzar CTA de mensajería, no usar los generados por IA
           ...((isWhatsApp || isMessaging || isIgProfile)
             ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
