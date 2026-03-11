@@ -1682,6 +1682,7 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
       data: {
         headlines: content.headlines?.slice(0, 5) || [],
         descriptions: content.descriptions?.slice(0, 5) || [],
+        linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
         ctas: content.ctas?.slice(0, 5) || [],
         method: 'vision'
       }
@@ -1766,6 +1767,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
             data: {
               headlines: content.headlines?.slice(0, 5) || [],
               descriptions: content.descriptions?.slice(0, 5) || [],
+              linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
               ctas: content.ctas?.slice(0, 5) || [],
               method: 'vision-url'
             }
@@ -1781,6 +1783,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
         data: {
           headlines: content.headlines?.slice(0, 5) || [],
           descriptions: content.descriptions?.slice(0, 5) || [],
+          linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
           ctas: content.ctas?.slice(0, 5) || [],
           transcription,
           method: 'whisper-url'
@@ -1796,6 +1799,7 @@ app.post('/api/analyze-media-url', async (req, res) => {
         data: {
           headlines: content.headlines?.slice(0, 5) || [],
           descriptions: content.descriptions?.slice(0, 5) || [],
+          linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
           ctas: content.ctas?.slice(0, 5) || [],
           method: 'vision-url'
         }

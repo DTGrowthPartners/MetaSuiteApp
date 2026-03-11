@@ -1557,11 +1557,30 @@ class MetaAdsService {
             value: { link: resolvedLink }
           }
         };
-        // Thumbnail: image_hash tiene prioridad, luego image_url
+        // Thumbnail: image_hash tiene prioridad, luego image_url, luego auto-fetch
         if (videos[0].image_hash) {
           objectStorySpec.video_data.image_hash = videos[0].image_hash;
         } else if (videos[0].image_url) {
           objectStorySpec.video_data.image_url = videos[0].image_url;
+        } else {
+          // Fallback: obtener thumbnail automáticamente del video via servidor proxy
+          console.log('Flexible Ad: no thumbnail, fetching from server for video:', videos[0].video_id);
+          try {
+            const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videos[0].video_id}`, {
+              params: { adAccountId: normalizedId }
+            });
+            const autoThumbUrl = thumbResponse.data?.data?.thumbnailUrl || '';
+            const autoThumbHash = thumbResponse.data?.data?.thumbnailHash || '';
+            if (autoThumbHash) {
+              objectStorySpec.video_data.image_hash = autoThumbHash;
+            } else if (autoThumbUrl) {
+              objectStorySpec.video_data.image_url = autoThumbUrl;
+            } else {
+              console.warn('Flexible Ad: server could not obtain thumbnail for video:', videos[0].video_id);
+            }
+          } catch (thumbErr) {
+            console.warn('Flexible Ad: failed to fetch video thumbnail:', thumbErr.message);
+          }
         }
         if (firstDescription) {
           objectStorySpec.video_data.link_description = firstDescription;
