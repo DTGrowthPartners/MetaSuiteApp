@@ -3683,6 +3683,7 @@ class MetaAdsService {
     igActorId = null,
     linkUrl = null,
     conversionLocation = null, // 'WEBSITE', 'INSTAGRAM_PROFILE', etc.
+    pixelId = null, // ID del pixel de Meta (para OUTCOME_SALES + WEBSITE)
     whatsappNumber = null, // Número de WhatsApp (ej: "573005410171")
     adSetMode = 'single', // 'single' | 'per-ad'
     ads = [],
@@ -3874,17 +3875,22 @@ class MetaAdsService {
         console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
       } else if (destinationType === 'WEBSITE' && objective === 'OUTCOME_SALES') {
         // OUTCOME_SALES + WEBSITE requiere pixel en promoted_object
-        try {
-          const pixelResult = await this.getPixels(adAccountId);
-          if (pixelResult.success && pixelResult.data.length > 0) {
-            const pixel = pixelResult.data[0];
-            promotedObject = { pixel_id: pixel.id, custom_event_type: 'PURCHASE' };
-            console.log(`promoted_object: WEBSITE SALES with pixel: ${pixel.name} (${pixel.id})`);
-          } else {
-            console.warn('⚠️ No pixel found for OUTCOME_SALES + WEBSITE. AdSet may fail.');
+        if (pixelId) {
+          promotedObject = { pixel_id: pixelId, custom_event_type: 'PURCHASE' };
+          console.log(`promoted_object: WEBSITE SALES with selected pixel: ${pixelId}`);
+        } else {
+          try {
+            const pixelResult = await this.getPixels(adAccountId);
+            if (pixelResult.success && pixelResult.data.length > 0) {
+              const pixel = pixelResult.data[0];
+              promotedObject = { pixel_id: pixel.id, custom_event_type: 'PURCHASE' };
+              console.log(`promoted_object: WEBSITE SALES with auto pixel: ${pixel.name} (${pixel.id})`);
+            } else {
+              console.warn('⚠️ No pixel found for OUTCOME_SALES + WEBSITE. AdSet may fail.');
+            }
+          } catch (pixErr) {
+            console.warn('Error fetching pixels:', pixErr.message);
           }
-        } catch (pixErr) {
-          console.warn('Error fetching pixels:', pixErr.message);
         }
       }
 

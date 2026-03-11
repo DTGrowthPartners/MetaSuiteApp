@@ -592,6 +592,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [igAccounts, setIgAccounts] = useState([]);
   const [selectedIgAccount, setSelectedIgAccount] = useState('');
 
+  // Pixels de Meta (solo para OUTCOME_SALES + WEBSITE)
+  const [pixels, setPixels] = useState([]);
+  const [selectedPixel, setSelectedPixel] = useState('');
+  const [loadingPixels, setLoadingPixels] = useState(false);
+
   // Audiences (Saved + Custom)
   const [allAudiences, setAllAudiences] = useState([]);
   const [selectedAudience, setSelectedAudience] = useState('');
@@ -1126,6 +1131,37 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     return () => { cancelled = true; };
   }, [selectedAccount, selectedPage, pages]);
 
+  // Cargar pixels cuando la cuenta cambia y es campaña OUTCOME_SALES + WEBSITE
+  const isWebsiteSales = selectedTemplate?.objective === 'OUTCOME_SALES' &&
+    (destinationOptions ? selectedDestination === 'WEBSITE' : templateAdSetConfig?.conversionLocation === 'WEBSITE');
+
+  useEffect(() => {
+    if (!selectedAccount || !isWebsiteSales) {
+      setPixels([]);
+      setSelectedPixel('');
+      return;
+    }
+    let cancelled = false;
+    const loadPixels = async () => {
+      setLoadingPixels(true);
+      try {
+        const metaService = new MetaAdsService(accessToken);
+        const result = await metaService.getPixels(selectedAccount);
+        if (cancelled) return;
+        if (result.success && result.data.length > 0) {
+          setPixels(result.data);
+          setSelectedPixel(result.data[0].id);
+        }
+      } catch (err) {
+        console.error('Error loading pixels:', err);
+      } finally {
+        if (!cancelled) setLoadingPixels(false);
+      }
+    };
+    loadPixels();
+    return () => { cancelled = true; };
+  }, [selectedAccount, isWebsiteSales]);
+
   // Cargar todos los públicos cuando se selecciona una cuenta
   useEffect(() => {
     const loadAllAudiences = async () => {
@@ -1306,6 +1342,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         videoThumbnailUrl: ad.videoThumbnailUrl || null,
         headlines: ad.headlines.filter(h => h.trim() !== ''),
         descriptions: ad.descriptions.filter(d => d.trim() !== ''),
+        linkDescriptions: (ad.linkDescriptions || []).filter(d => d.trim() !== ''),
         ctas: ad.ctas,
         // Per-ad audience (for per-ad mode)
         audienceId: ad.audienceId || null,
@@ -1331,6 +1368,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         // Cuenta de Instagram para el anuncio
         igActorId: selectedIgAccount || null,
         igUsername: (() => { const ig = igAccounts.find(ig => ig.id === selectedIgAccount); console.log('IG account being sent:', { id: selectedIgAccount, username: ig?.username, allAccounts: igAccounts.map(a => ({ id: a.id, username: a.username })) }); return ig?.username || null; })(),
+        // Pixel (para OUTCOME_SALES + WEBSITE)
+        pixelId: selectedPixel || null,
         // Multi-ad
         adSetMode: adSetMode,
         ads: builtAds,
@@ -1538,6 +1577,24 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               : 'El anuncio aparecerá también en Instagram con esta cuenta'}
           </p>
         </div>
+
+        {/* Pixel selector - solo para OUTCOME_SALES + WEBSITE */}
+        {isWebsiteSales && (
+          <div className="form-group">
+            <label>Pixel de Meta *</label>
+            <select
+              value={selectedPixel}
+              onChange={(e) => setSelectedPixel(e.target.value)}
+              disabled={loadingPixels}
+            >
+              <option value="">{loadingPixels ? 'Cargando pixels...' : 'Selecciona un pixel'}</option>
+              {pixels.map((px) => (
+                <option key={px.id} value={px.id}>{px.name} ({px.id})</option>
+              ))}
+            </select>
+            <p className="hint">Pixel usado para rastrear conversiones en el sitio web</p>
+          </div>
+        )}
 
         </div>{/* fin section-card Identidad */}
 
@@ -3077,6 +3134,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           igActorId: job.igActorId || null,
           linkUrl: job.linkUrl,
           conversionLocation,
+          pixelId: job.pixelId || null,
           whatsappNumber: job.whatsappNumber || null,
           adSetMode: job.adSetMode || 'single',
           multiAudiences: job.multiAudiences || [],
