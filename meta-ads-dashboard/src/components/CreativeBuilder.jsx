@@ -2217,6 +2217,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Multi-file Upload Section */}
         <div className="upload-area">
+          <h4 style={{ marginBottom: '4px', color: 'var(--text-primary)' }}>Subir Imágenes y Videos</h4>
+          <p className="hint mb-md" style={{ marginTop: '0' }}>
+            Sube las imágenes o videos para tus anuncios. La IA analizará cada archivo y generará automáticamente los textos (títulos, descripciones).
+          </p>
           <input
             ref={multiFileInputRef}
             type="file"
