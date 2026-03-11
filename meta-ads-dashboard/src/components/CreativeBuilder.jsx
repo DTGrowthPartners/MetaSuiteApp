@@ -2139,24 +2139,24 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               className={`ad-mode-btn ${adSetMode === 'single' ? 'active' : ''}`}
               onClick={() => setAdSetMode('single')}
             >
-              <strong>1 Ad Set</strong>
-              <small>Sin 5+5+5</small>
+              <strong>Creativos Estándar</strong>
+              <small>1 solo组合</small>
             </button>
             <button
               type="button"
               className={`ad-mode-btn ${adSetMode === 'dynamic' ? 'active' : ''}`}
               onClick={() => setAdSetMode('dynamic')}
             >
-              <strong>5+5+5 por Ad</strong>
-              <small>Recomendado</small>
+              <strong>Creativos Dinámicos</strong>
+              <small>125 combinaciones</small>
             </button>
             <button
               type="button"
               className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
               onClick={() => setAdSetMode('per-ad')}
             >
-              <strong>Público por Ad</strong>
-              <small>Diferente audiencia</small>
+              <strong>Público diferente x Ad</strong>
+              <small>Multi-audiencia</small>
             </button>
             {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
               <button
@@ -2165,18 +2165,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onClick={() => setAdSetMode('flexible')}
               >
                 <strong>Flexible</strong>
-                <small>Nuevo formato</small>
+                <small>Formato nuevo</small>
               </button>
             )}
           </div>
           <p className="hint">
             {adSetMode === 'single'
-              ? 'Todos los ads en 1 Ad Set. Cada ad usa 1 título + 1 descripción + 1 CTA (el mejor generado por IA).'
+              ? 'Todos los anuncios en 1 solo Ad Set. Ideal para campañas simples con 1-2 anuncios.'
               : adSetMode === 'dynamic'
-              ? 'Cada ad tiene su propio Ad Set con Dynamic Creative 5+5+5 (Meta prueba 125 combinaciones por ad). Mismo público para todos. CBO distribuye el presupuesto.'
+              ? 'Crea docenas de combinaciones automáticamente (5 títulos + 5 descripciones + 5 CTAs). Meta optimiza las mejores. Recomendado para la mayoría de campañas.'
               : adSetMode === 'flexible'
-              ? 'Formato de anuncio flexible de Meta. Agrupa múltiples activos (imágenes, videos, textos) en un solo anuncio y Meta optimiza las combinaciones automáticamente. Solo para campañas de Ventas.'
-              : 'Cada ad tiene su propio Ad Set con público diferente y Dynamic Creative 5+5+5.'}
+              ? 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio. Meta optimiza automáticamente. Solo para campañas de Ventas o Apps.'
+              : 'Crea un Ad Set separado para cada anuncio con público diferente. Ideal para probar audiencias distintas en simultáneo.'}
           </p>
         </div>
 
