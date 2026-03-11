@@ -332,6 +332,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   // Library multi-select (always active)
   const [selectedLibraryMedia, setSelectedLibraryMedia] = useState([]); // [{type: 'image'|'video', data: {...}}]
   const [libraryMode, setLibraryMode] = useState('per-ad'); // 'per-ad' = 1 ad por contenido, 'single' = todo para este ad
+  const [libraryTab, setLibraryTab] = useState('images'); // 'images' | 'videos'
 
   const toggleLibraryMediaSelection = (type, data) => {
     setSelectedLibraryMedia(prev => {
@@ -2152,90 +2153,97 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           <p className="text-muted" style={{ textAlign: 'center', fontSize: '13px' }}>No hay medios en esta cuenta</p>
                         ) : (
                           <>
-                            {mediaLibrary.images.length > 0 && (
-                              <div>
-                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px', color: 'var(--text-primary)' }}>
-                                  Imágenes ({mediaLibrary.images.length})
-                                </p>
-                                <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}>
-                                  {mediaLibrary.images.map((img, i) => {
-                                    const isSel = isLibraryMediaSelected('image', img);
-                                    return (
-                                      <div
-                                        key={img.hash || i}
-                                        onClick={() => {
-                                          if (libraryMode === 'single') {
-                                            // Directo: asignar a este ad
-                                            handleAdSelectLibraryImage(adIndex, img);
-                                          } else {
-                                            // Multi: toggle seleccion
-                                            toggleLibraryMediaSelection('image', img);
-                                          }
-                                        }}
-                                        className={`library-item ${(isSel || ad.imageHash === img.hash) ? 'selected' : ''}`}
-                                      >
-                                        <img
-                                          src={img.url}
-                                          alt={img.name || 'Ad image'}
-                                          onError={(e) => { e.target.style.display = 'none'; }}
-                                        />
-                                        {isSel && (
-                                          <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'image' && m.data.hash === img.hash) + 1}</div>
-                                        )}
-                                        {!isSel && ad.imageHash === img.hash && (
-                                          <div className="library-item-badge">{'\u2713'}</div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                            {/* Tabs */}
+                            <div className="toggle-group mb-sm">
+                              <button
+                                type="button"
+                                className={`toggle-btn ${libraryTab === 'images' ? 'active' : ''}`}
+                                onClick={() => setLibraryTab('images')}
+                              >
+                                Imágenes ({mediaLibrary.images.length})
+                              </button>
+                              <button
+                                type="button"
+                                className={`toggle-btn ${libraryTab === 'videos' ? 'active' : ''}`}
+                                onClick={() => setLibraryTab('videos')}
+                              >
+                                Videos ({mediaLibrary.videos.length})
+                              </button>
+                            </div>
+
+                            {/* Tab: Imágenes */}
+                            {libraryTab === 'images' && (
+                              <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}>
+                                {mediaLibrary.images.map((img, i) => {
+                                  const isSel = isLibraryMediaSelected('image', img);
+                                  return (
+                                    <div
+                                      key={img.hash || i}
+                                      onClick={() => {
+                                        if (libraryMode === 'single') {
+                                          handleAdSelectLibraryImage(adIndex, img);
+                                        } else {
+                                          toggleLibraryMediaSelection('image', img);
+                                        }
+                                      }}
+                                      className={`library-item ${(isSel || ad.imageHash === img.hash) ? 'selected' : ''}`}
+                                    >
+                                      <img
+                                        src={img.url}
+                                        alt={img.name || 'Ad image'}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                      />
+                                      {isSel && (
+                                        <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'image' && m.data.hash === img.hash) + 1}</div>
+                                      )}
+                                      {!isSel && ad.imageHash === img.hash && (
+                                        <div className="library-item-badge">✓</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
-                            {mediaLibrary.videos.length > 0 && (
-                              <div className="mt-sm">
-                                <p style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px', color: 'var(--text-primary)' }}>
-                                  Videos ({mediaLibrary.videos.length})
-                                </p>
-                                <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
-                                  {mediaLibrary.videos.map((vid, i) => {
-                                    const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
-                                    const isSel = isLibraryMediaSelected('video', vid);
-                                    return (
-                                      <div
-                                        key={vid.id || i}
-                                        onClick={() => {
-                                          if (libraryMode === 'single') {
-                                            handleAdSelectLibraryVideo(adIndex, vid);
-                                          } else {
-                                            toggleLibraryMediaSelection('video', vid);
-                                          }
-                                        }}
-                                        className={`library-item ${(isSel || ad.videoId === vid.id) ? 'selected' : ''}`}
-                                        style={{ aspectRatio: 'auto' }}
-                                      >
-                                        {thumbnail ? (
-                                          <img src={thumbnail} alt={vid.title} style={{ height: '70px', objectFit: 'cover' }} />
-                                        ) : (
-                                          <div className="text-muted" style={{ width: '100%', height: '70px', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                                            V
-                                          </div>
-                                        )}
-                                        <div style={{ padding: '4px 6px', fontSize: '10px' }}>
-                                          <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
-                                            {vid.title || 'Sin título'}
-                                          </p>
-                                          {vid.length && <p className="text-muted" style={{ margin: 0 }}>{Math.round(vid.length)}s</p>}
-                                        </div>
-                                        {isSel && (
-                                          <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'video' && m.data.id === vid.id) + 1}</div>
-                                        )}
-                                        {!isSel && ad.videoId === vid.id && (
-                                          <div className="library-item-badge">{'✓'}</div>
-                                        )}
+
+                            {/* Tab: Videos */}
+                            {libraryTab === 'videos' && (
+                              <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
+                                {mediaLibrary.videos.map((vid, i) => {
+                                  const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
+                                  const isSel = isLibraryMediaSelected('video', vid);
+                                  return (
+                                    <div
+                                      key={vid.id || i}
+                                      onClick={() => {
+                                        if (libraryMode === 'single') {
+                                          handleAdSelectLibraryVideo(adIndex, vid);
+                                        } else {
+                                          toggleLibraryMediaSelection('video', vid);
+                                        }
+                                      }}
+                                      className={`library-item ${(isSel || ad.videoId === vid.id) ? 'selected' : ''}`}
+                                      style={{ aspectRatio: 'auto' }}
+                                    >
+                                      {thumbnail ? (
+                                        <img src={thumbnail} alt={vid.title} style={{ height: '70px', objectFit: 'cover' }} />
+                                      ) : (
+                                        <div className="text-muted" style={{ width: '100%', height: '70px', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>V</div>
+                                      )}
+                                      <div style={{ padding: '4px 6px', fontSize: '10px' }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+                                          {vid.title || 'Sin título'}
+                                        </p>
+                                        {vid.length && <p className="text-muted" style={{ margin: 0 }}>{Math.round(vid.length)}s</p>}
                                       </div>
-                                    );
-                                  })}
-                                </div>
+                                      {isSel && (
+                                        <div className="library-item-badge" style={{ background: 'var(--warning)' }}>{selectedLibraryMedia.findIndex(m => m.type === 'video' && m.data.id === vid.id) + 1}</div>
+                                      )}
+                                      {!isSel && ad.videoId === vid.id && (
+                                        <div className="library-item-badge">✓</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </>
