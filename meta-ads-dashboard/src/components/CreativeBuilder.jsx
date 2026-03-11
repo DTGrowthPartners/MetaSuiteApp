@@ -15,8 +15,8 @@ import {
 } from '../config/campaignTemplates';
 import './CreativeBuilder.css';
 
-// Prefijo para identificar campañas creadas por CARLOS
-const CAMPAIGN_PREFIX = 'CARLOS - ';
+// Prefijo para identificar campañas creadas por esta herramienta
+const CAMPAIGN_PREFIX = 'DTGP - ';
 
 // Las plantillas ahora se importan desde campaignTemplates.js
 
@@ -258,6 +258,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     uploadProgress: '',
     headlines: templateContent.headlines || selectedTemplate?.headlines || ['', '', '', '', ''],
     descriptions: templateContent.descriptions || selectedTemplate?.descriptions || ['', '', '', '', ''],
+    linkDescriptions: ['', '', '', '', ''],
     ctas: templateContent.ctas || (() => {
       const dc = templateAdConfig?.defaultCta
         || (templateAdSetConfig?.conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
@@ -817,6 +818,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         updateAd(adIndex, {
           headlines: result.data.headlines || ['', '', '', '', ''],
           descriptions: result.data.descriptions || ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions || ['', '', '', '', ''],
           // Messaging destinations: forzar CTA de mensajería
           ...((isWhatsApp || isMessaging || isIgProfile)
             ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
@@ -1936,7 +1938,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Multi-file Upload Section */}
         <div className="upload-area">
-          <h4 style={{ marginBottom: '4px', color: 'var(--text-primary)' }}>Subir Imágenes y Videos</h4>
+          <h4 style={{ marginBottom: '4px', color: 'var(--text-primary)' }}>Subir Múltiples Imágenes o Videos para Anuncios</h4>
           <p className="hint mb-md" style={{ marginTop: '0' }}>
             Sube las imágenes o videos para tus anuncios. La IA analizará cada archivo y generará automáticamente los textos (títulos, descripciones).
           </p>
@@ -2117,14 +2119,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                         className={`toggle-btn ${libraryMode === 'single' ? 'active' : ''}`}
                         onClick={() => { setLibraryMode('single'); setSelectedLibraryMedia([]); }}
                       >
-                        Para este Ad
+                        1 Anuncio x conjunto
                       </button>
                       <button
                         type="button"
                         className={`toggle-btn ${libraryMode === 'per-ad' ? 'active' : ''}`}
                         onClick={() => { setLibraryMode('per-ad'); setSelectedLibraryMedia([]); }}
                       >
-                        1 Ad por contenido
+                        Múltiples Anuncios por conjunto
                       </button>
                       {selectedLibraryMedia.length > 1 && (
                         <button
@@ -2307,33 +2309,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 {/* Inline Content Editor */}
                 {ad.showEditContent && (
                   <div className="content-editor">
-                    {/* Headlines */}
-                    <div className="content-editor-section">
-                      <div className="content-editor-section-header">
-                        <span className="content-badge content-badge--h">H</span>
-                        <label>
-                          Títulos ({ad.headlines.filter(h => h.trim()).length}/5)
-                        </label>
-                      </div>
-                      {ad.headlines.map((headline, hi) => (
-                        <div key={`ad${adIndex}-h${hi}`} className="content-input-wrapper">
-                          <input
-                            type="text"
-                            placeholder={`Título ${hi + 1}`}
-                            value={headline}
-                            onChange={(e) => {
-                              const newHeadlines = [...ad.headlines];
-                              newHeadlines[hi] = e.target.value;
-                              updateAd(adIndex, { headlines: newHeadlines });
-                            }}
-                            maxLength={55}
-                            className={`content-input ${headline.trim() ? 'filled' : ''}`}
-                          />
-                          <span className={`char-count ${headline.length > 50 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{headline.length}/55</span>
-                        </div>
-                      ))}
-                    </div>
-
                     {/* Descriptions */}
                     <div className="content-editor-section">
                       <div className="content-editor-section-header">
@@ -2362,12 +2337,66 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       ))}
                     </div>
 
+                    {/* Headlines */}
+                    <div className="content-editor-section">
+                      <div className="content-editor-section-header">
+                        <span className="content-badge content-badge--h">H</span>
+                        <label>
+                          Títulos ({ad.headlines.filter(h => h.trim()).length}/5)
+                        </label>
+                      </div>
+                      {ad.headlines.map((headline, hi) => (
+                        <div key={`ad${adIndex}-h${hi}`} className="content-input-wrapper">
+                          <input
+                            type="text"
+                            placeholder={`Título ${hi + 1}`}
+                            value={headline}
+                            onChange={(e) => {
+                              const newHeadlines = [...ad.headlines];
+                              newHeadlines[hi] = e.target.value;
+                              updateAd(adIndex, { headlines: newHeadlines });
+                            }}
+                            maxLength={55}
+                            className={`content-input ${headline.trim() ? 'filled' : ''}`}
+                          />
+                          <span className={`char-count ${headline.length > 50 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{headline.length}/55</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Link Descriptions */}
+                    <div className="content-editor-section">
+                      <div className="content-editor-section-header">
+                        <span className="content-badge content-badge--d" style={{ opacity: 0.7 }}>LD</span>
+                        <label>
+                          Descripciones ({ad.linkDescriptions?.filter(d => d.trim()).length || 0}/5) <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>· texto corto bajo el título</span>
+                        </label>
+                      </div>
+                      {(ad.linkDescriptions || ['', '', '', '', '']).map((desc, di) => (
+                        <div key={`ad${adIndex}-ld${di}`} className="content-input-wrapper">
+                          <input
+                            type="text"
+                            placeholder={`Descripción ${di + 1} (máx 30 chars)`}
+                            value={desc}
+                            onChange={(e) => {
+                              const newLD = [...(ad.linkDescriptions || ['', '', '', '', ''])];
+                              newLD[di] = e.target.value;
+                              updateAd(adIndex, { linkDescriptions: newLD });
+                            }}
+                            maxLength={30}
+                            className={`content-input ${desc.trim() ? 'filled' : ''}`}
+                          />
+                          <span className={`char-count ${desc.length > 27 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{desc.length}/30</span>
+                        </div>
+                      ))}
+                    </div>
+
                     {/* CTAs */}
                     <div>
                       <div className="content-editor-section-header">
                         <span className="content-badge content-badge--cta">CTA</span>
                         <label>
-                          Call to Actions ({[...new Set(ad.ctas)].length} únicos)
+                          Llamados a la Acción ({[...new Set(ad.ctas)].length} únicos)
                         </label>
                       </div>
                       <div className="cta-grid">

@@ -3064,7 +3064,8 @@ class MetaAdsService {
           // Nota: flexible ads ahora van por rama separada (useFlexible) arriba
           const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
           const headline = adHeadlines[0] || 'Contáctanos';
-          const description = adDescriptions[1] || adHeadlines[1] || '';
+          const adLinkDescs0 = (ad.linkDescriptions || []).filter(d => d?.trim());
+          const description = adLinkDescs0[0] || adDescriptions[1] || adHeadlines[1] || '';
           // Usar CTA del ad (si viene), forzar WHATSAPP_MESSAGE como fallback
           const adCta = (ad.ctas || [])[0] || callToAction || 'WHATSAPP_MESSAGE';
           // Para WhatsApp standard, el CTA siempre debe ser WHATSAPP_MESSAGE
@@ -3190,7 +3191,8 @@ class MetaAdsService {
           // 2. Crear Creative estándar (usa primer headline/description)
           const primaryText = adDescriptions[0] || 'Escríbenos por WhatsApp';
           const headline = adHeadlines[0] || 'Contáctanos';
-          const description = adDescriptions[1] || adHeadlines[1] || '';
+          const adLinkDescs = (ad.linkDescriptions || []).filter(d => d?.trim());
+          const description = adLinkDescs[0] || adDescriptions[1] || adHeadlines[1] || '';
           const whatsAppCta = 'WHATSAPP_MESSAGE';
 
           console.log(`  Fallback Standard Creative: "${headline}" | "${primaryText.substring(0, 60)}..." | CTA: ${whatsAppCta}`);
@@ -3907,6 +3909,7 @@ class MetaAdsService {
       const createDynamicCreativeAndAd = async (ad, adIndex, adSetId, fallbackContext = null) => {
         const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
         const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
+        const validLinkDescs = ad.linkDescriptions?.filter(d => d?.trim()) || [];
         const validCTAs = sanitizeCTAs(ad.ctas);
         const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, adIndex);
 
@@ -3921,7 +3924,7 @@ class MetaAdsService {
           thumbnailUrl: resolvedThumbUrl || null,
           titles: validTitles,
           bodies: validBodies,
-          descriptions: validBodies,
+          descriptions: validLinkDescs.length > 0 ? validLinkDescs : validBodies,
           callToActionTypes: validCTAs,
           linkUrl,
           igActorId,
@@ -4012,7 +4015,7 @@ class MetaAdsService {
           thumbnailUrl: resolvedThumbUrl || null,
           primaryText,
           headline,
-          description: ad.descriptions?.[1]?.trim() || '',
+          description: ad.linkDescriptions?.find(d => d?.trim()) || ad.descriptions?.[1]?.trim() || '',
           linkUrl,
           callToAction: cta,
           igActorId,

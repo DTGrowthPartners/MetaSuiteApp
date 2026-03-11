@@ -1116,12 +1116,14 @@ ${category ? `Categoría de campaña: ${category}` : ''}
 Genera exactamente:
 - 5 títulos cortos y llamativos (máx 40 caracteres cada uno)
 - 5 descripciones persuasivas (máx 125 caracteres cada una)
+- 5 descripciones de enlace cortas (máx 30 caracteres cada una, detalles adicionales que complementan el título, ej: "Envío gratis", "Ver colección", "Disponible ahora")
 - 5 CTAs recomendados de esta lista: LEARN_MORE, SHOP_NOW, SIGN_UP, CONTACT_US, GET_QUOTE, SUBSCRIBE, BOOK_NOW, DOWNLOAD, GET_OFFER, SEND_MESSAGE, WHATSAPP_MESSAGE, CALL_NOW
 
 Responde en este formato JSON exacto:
 {
   "headlines": ["título1", "título2", "título3", "título4", "título5"],
   "descriptions": ["desc1", "desc2", "desc3", "desc4", "desc5"],
+  "linkDescriptions": ["detalle corto1", "detalle corto2", "detalle corto3", "detalle corto4", "detalle corto5"],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"],
   "suggestedBudget": 50000,
   "targetAudience": "descripción breve del público objetivo sugerido"
@@ -1169,6 +1171,7 @@ Responde en este formato JSON exacto:
       data: {
         headlines: generatedContent.headlines.slice(0, 5),
         descriptions: generatedContent.descriptions.slice(0, 5),
+        linkDescriptions: (generatedContent.linkDescriptions || []).slice(0, 5),
         ctas: generatedContent.ctas.slice(0, 5),
         suggestedBudget: generatedContent.suggestedBudget || 50000,
         targetAudience: generatedContent.targetAudience || ''
@@ -1396,12 +1399,14 @@ Instrucción de ángulo: ${angle}
 Genera exactamente:
 - 5 TÍTULOS llamativos (máx ${len.headlineMax} chars) con máximo 1 emoji cada uno - que enganchen y generen curiosidad
 - 5 DESCRIPCIONES persuasivas (${len.descMin}-${len.descMax} chars cada una) - con beneficios claros, detalles específicos del producto/servicio, y un cierre con llamado a la acción. Máximo 1 emoji por oración, no abuses
+- 5 DESCRIPCIONES DE ENLACE cortas (máx 30 chars cada una) - detalles adicionales breves que complementan el título, ej: "Envío gratis hoy", "Ver colección", "Disponible ahora"
 - 5 CTAs variados de esta lista: ${ctx.ctas}
 
 JSON exacto:
 {
   "headlines": ["título", "título", "título", "título", "título"],
   "descriptions": ["descripción con beneficios claros...", "otra descripción persuasiva...", "...", "...", "..."],
+  "linkDescriptions": ["detalle corto", "detalle corto", "detalle corto", "detalle corto", "detalle corto"],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }`;
 
@@ -1479,10 +1484,12 @@ Genera exactamente en JSON:
 {
   "headlines": ["título (máx ${len.headlineMax} chars)", "título", "título", "título", "título"],
   "descriptions": ["descripción persuasiva (${len.descMin}-${len.descMax} chars)...", "otra descripción...", "...", "...", "..."],
+  "linkDescriptions": ["detalle corto (máx 30 chars)", "detalle corto", "detalle corto", "detalle corto", "detalle corto"],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
 Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
+linkDescriptions: detalles adicionales breves que complementan el título (ej: "Envío gratis", "Ver colección", "Disponible ahora").
 CTAs variados de esta lista: ${ctx.ctas}`
           },
           {
@@ -1602,6 +1609,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
           data: {
             headlines: content.headlines?.slice(0, 5) || [],
             descriptions: content.descriptions?.slice(0, 5) || [],
+            linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
             ctas: content.ctas?.slice(0, 5) || [],
             transcription: transcription || '(sin habla detectada)',
             method: 'vision'
@@ -1625,6 +1633,7 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
       data: {
         headlines: content.headlines?.slice(0, 5) || [],
         descriptions: content.descriptions?.slice(0, 5) || [],
+        linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
         ctas: content.ctas?.slice(0, 5) || [],
         transcription,
         method: 'whisper'
