@@ -1721,22 +1721,40 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             </p>
           )}
           {selectedAudience && !audienceError && (
-            <p className="hint success">
-              Conjunto 1: {allAudiences.find(a => a.id === selectedAudience)?.name}
-            </p>
+            <p className="hint" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Conjunto 1</p>
           )}
 
           {/* Multi-Audience Selector (oculto en per-ad mode) */}
           {adSetMode !== 'per-ad' && selectedAudience && allAudiences.length > 1 && (
             <div className="mt-sm">
-              {/* Chips de públicos adicionales */}
+              {/* Dropdowns de públicos adicionales */}
               {multiAudiences.map((aud, index) => (
-                <div key={aud.id} className="hint success" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Conjunto {index + 2}: {aud.audienceType === 'custom' ? '[Custom] ' : ''}{aud.name}</span>
-                  <span
-                    onClick={() => setMultiAudiences(prev => prev.filter(a => a.id !== aud.id))}
-                    style={{ cursor: 'pointer', marginLeft: '8px', fontWeight: 'bold', color: 'var(--text-muted)' }}
-                  >×</span>
+                <div key={aud.id} className="form-group" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto {index + 2}</label>
+                      <select
+                        value={aud.id}
+                        onChange={(e) => {
+                          const newAud = allAudiences.find(a => a.id === e.target.value);
+                          if (newAud) setMultiAudiences(prev => prev.map((a, i) => i === index ? { id: newAud.id, name: newAud.name, targeting: newAud.targeting, audienceType: newAud.audienceType } : a));
+                        }}
+                      >
+                        {allAudiences
+                          .filter(a => a.id !== selectedAudience && !multiAudiences.some((ma, mi) => ma.id === a.id && mi !== index))
+                          .map((audience) => (
+                            <option key={audience.id} value={audience.id}>
+                              {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMultiAudiences(prev => prev.filter((_, i) => i !== index))}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', padding: '0 4px', marginTop: '14px' }}
+                    >×</button>
+                  </div>
                 </div>
               ))}
 
@@ -1747,7 +1765,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   const aud = allAudiences.find(a => a.id === e.target.value);
                   if (aud) setMultiAudiences(prev => [...prev, { id: aud.id, name: aud.name, targeting: aud.targeting, audienceType: aud.audienceType }]);
                 }}
-                style={{ marginTop: '6px' }}
+                style={{ marginTop: '4px' }}
               >
                 <option value="">+ Selecciona otro público para crear otro conjunto</option>
                 {allAudiences
