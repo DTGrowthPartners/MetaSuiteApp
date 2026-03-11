@@ -2140,7 +2140,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               onClick={() => setAdSetMode('single')}
             >
               <strong>Creativos Estándar</strong>
-              <small>1 solo组合</small>
+              <small>1 solo anuncio</small>
             </button>
             <button
               type="button"
