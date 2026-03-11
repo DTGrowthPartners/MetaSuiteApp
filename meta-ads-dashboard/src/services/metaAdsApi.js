@@ -3008,6 +3008,10 @@ class MetaAdsService {
         let creativeResult;
         const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
         const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
+        const adVideoId = ad.videoId || null;
+        const adImageHash = ad.imageHash || null;
+        const adImageUrl = ad.imageUrl || null;
+        const adThumbnailUrl = ad.videoThumbnailUrl || null;
 
         if (useDynamicCreative) {
           // ====== DYNAMIC CREATIVE (5+5+5) para WhatsApp ======
