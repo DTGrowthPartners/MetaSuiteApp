@@ -2693,6 +2693,14 @@ class MetaAdsService {
         };
         if (videoThumbnailUrl && videoThumbnailUrl.startsWith('http')) {
           videoData.image_url = videoThumbnailUrl;
+        } else {
+          try {
+            const thumbResp = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videoId}`, { params: { adAccountId: normalizedId } });
+            const tHash = thumbResp.data?.data?.thumbnailHash || '';
+            const tUrl = thumbResp.data?.data?.thumbnailUrl || '';
+            if (tHash) videoData.image_hash = tHash;
+            else if (tUrl) videoData.image_url = tUrl;
+          } catch (te) { console.warn('Messenger: thumbnail fetch failed:', te.message); }
         }
         if (description?.trim()) videoData.link_description = description;
         objectStorySpec.video_data = videoData;
@@ -3102,6 +3110,14 @@ class MetaAdsService {
             };
             if (adThumbnailUrl && adThumbnailUrl.startsWith('http')) {
               videoData.image_url = adThumbnailUrl;
+            } else {
+              try {
+                const thumbResp = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${adVideoId}`, { params: { adAccountId: this.normalizeAccountId(adAccountId) } });
+                const tHash = thumbResp.data?.data?.thumbnailHash || '';
+                const tUrl = thumbResp.data?.data?.thumbnailUrl || '';
+                if (tHash) videoData.image_hash = tHash;
+                else if (tUrl) videoData.image_url = tUrl;
+              } catch (te) { console.warn('WA standard: thumbnail fetch failed:', te.message); }
             }
             if (description.trim()) videoData.link_description = description;
             objectStorySpec.video_data = videoData;
@@ -3501,6 +3517,14 @@ class MetaAdsService {
         };
         if (videoThumbnailUrl && videoThumbnailUrl.startsWith('http')) {
           videoData.image_url = videoThumbnailUrl;
+        } else {
+          try {
+            const thumbResp = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videoId}`, { params: { adAccountId: normalizedId } });
+            const tHash = thumbResp.data?.data?.thumbnailHash || '';
+            const tUrl = thumbResp.data?.data?.thumbnailUrl || '';
+            if (tHash) videoData.image_hash = tHash;
+            else if (tUrl) videoData.image_url = tUrl;
+          } catch (te) { console.warn('IG DM: thumbnail fetch failed:', te.message); }
         }
         if (description?.trim()) videoData.link_description = description;
         objectStorySpec.video_data = videoData;
