@@ -211,6 +211,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const templateAdConfig = selectedTemplate?.adConfig || {};
   const templateRequirements = getTemplateRequirements(selectedTemplate);
 
+  // DC (Dynamic Creative / 5+5+5) no está soportado en estas combinaciones por Meta
+  const isDCBlocked =
+    selectedTemplate?.objective === 'OUTCOME_ENGAGEMENT' ||
+    (selectedTemplate?.objective === 'OUTCOME_SALES' && templateAdSetConfig?.conversionLocation === 'WHATSAPP');
+
   const [campaignName, setCampaignName] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
   const [dailyBudget, setDailyBudget] = useState(
@@ -836,6 +841,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       });
     }
   };
+
+  // Si DC está bloqueado para esta plantilla y el modo actual es dynamic, cambiar a single
+  useEffect(() => {
+    if (isDCBlocked && adSetMode === 'dynamic') setAdSetMode('single');
+  }, [isDCBlocked]);
 
   // Cargar páginas de Facebook al montar
   useEffect(() => {
@@ -1856,33 +1866,27 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               className={`ad-mode-btn ${adSetMode === 'single' ? 'active' : ''}`}
               onClick={() => setAdSetMode('single')}
             >
-              <strong>Creativos Estándar</strong>
-              <small>1 solo anuncio</small>
+              <strong>Anuncio Estándar</strong>
+              <small>1-1-1 Copys x Ad</small>
             </button>
-            <button
-              type="button"
-              className={`ad-mode-btn ${adSetMode === 'dynamic' ? 'active' : ''}`}
-              onClick={() => setAdSetMode('dynamic')}
-            >
-              <strong>Creativos Dinámicos</strong>
-              <small>125 combinaciones</small>
-            </button>
-            <button
-              type="button"
-              className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
-              onClick={() => setAdSetMode('per-ad')}
-            >
-              <strong>Público diferente x Ad</strong>
-              <small>Multi-audiencia</small>
-            </button>
+            {!isDCBlocked && (
+              <button
+                type="button"
+                className={`ad-mode-btn ${adSetMode === 'dynamic' ? 'active' : ''}`}
+                onClick={() => setAdSetMode('dynamic')}
+              >
+                <strong>Anuncio Dinámico</strong>
+                <small>1 creativo x Ad · 5-5-5 Copys</small>
+              </button>
+            )}
             {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
               <button
                 type="button"
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
                 onClick={() => setAdSetMode('flexible')}
               >
-                <strong>Flexible</strong>
-                <small>Formato nuevo</small>
+                <strong>Anuncio Flexible</strong>
+                <small>1 Ad · 10 img/vid · 5-5-5 Copys</small>
               </button>
             )}
           </div>
@@ -1891,9 +1895,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               ? 'Todos los anuncios en 1 solo Ad Set. Ideal para campañas simples con 1-2 anuncios.'
               : adSetMode === 'dynamic'
               ? 'Crea docenas de combinaciones automáticamente (5 títulos + 5 descripciones + 5 CTAs). Meta optimiza las mejores. Recomendado para la mayoría de campañas.'
-              : adSetMode === 'flexible'
-              ? 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio. Meta optimiza automáticamente. Solo para campañas de Ventas o Apps.'
-              : 'Crea un Ad Set separado para cada anuncio con público diferente. Ideal para probar audiencias distintas en simultáneo.'}
+              : 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio. Meta optimiza automáticamente. Solo para campañas de Ventas o Apps.'}
           </p>
         </div>
 
