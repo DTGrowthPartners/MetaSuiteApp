@@ -1822,62 +1822,58 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
           <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
-          <select
-            value={selectedAudience}
-            onChange={(e) => setSelectedAudience(e.target.value)}
-            disabled={!selectedAccount || loadingAudiences}
-          >
-            <option value="">
-              {loadingAudiences
-                ? 'Cargando públicos...'
-                : !selectedAccount
-                  ? 'Primero selecciona una cuenta'
-                  : allAudiences.length === 0
-                    ? 'No hay públicos disponibles'
-                    : 'Selecciona un público'}
-            </option>
-            {allAudiences.map((audience) => (
-              <option key={audience.id} value={audience.id}>
-                {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
-              </option>
-            ))}
-          </select>
-          {audienceError && (
-            <p className="hint text-warning">
-              {audienceError}
-            </p>
-          )}
-          {selectedAudience && !audienceError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-              <p className="hint" style={{ color: 'var(--text-muted)', fontSize: '12px', margin: 0 }}>Conjunto 1</p>
-              {budgetLevel === 'adset' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Presupuesto por conjunto</label>
-                  <input
-                    type="number"
-                    min="5000"
-                    step="1000"
-                    placeholder="20000"
-                    value={dailyBudget}
-                    onChange={(e) => setDailyBudget(e.target.value)}
-                    style={{ width: '110px', fontSize: '12px' }}
-                  />
-                  {dailyBudget && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>${formatCOP(dailyBudget)} COP/día</span>}
-                </div>
-              )}
+          {/* Cabecera de columnas cuando hay presupuesto por conjunto */}
+          {budgetLevel === 'adset' && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', paddingRight: '0px' }}>
+              <div style={{ flex: 1 }} />
+              <div style={{ width: '110px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Presupuesto por conjunto</div>
             </div>
+          )}
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto 1</label>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <select
+              style={{ flex: 1 }}
+              value={selectedAudience}
+              onChange={(e) => setSelectedAudience(e.target.value)}
+              disabled={!selectedAccount || loadingAudiences}
+            >
+              <option value="">
+                {loadingAudiences
+                  ? 'Cargando públicos...'
+                  : !selectedAccount
+                    ? 'Primero selecciona una cuenta'
+                    : allAudiences.length === 0
+                      ? 'No hay públicos disponibles'
+                      : 'Selecciona un público'}
+              </option>
+              {allAudiences.map((audience) => (
+                <option key={audience.id} value={audience.id}>
+                  {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                </option>
+              ))}
+            </select>
+            {budgetLevel === 'adset' && (
+              <input
+                type="number"
+                min="5000"
+                step="1000"
+                placeholder="20000"
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(e.target.value)}
+                style={{ width: '110px', fontSize: '12px' }}
+              />
+            )}
+          </div>
+          {audienceError && (
+            <p className="hint text-warning">{audienceError}</p>
+          )}
+          {budgetLevel === 'adset' && selectedAudience && dailyBudget && (
+            <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '2px 0 0' }}>${formatCOP(dailyBudget)} COP/día</p>
           )}
 
           {/* Multi-Audience Selector (oculto en per-ad mode) */}
           {adSetMode !== 'per-ad' && selectedAudience && allAudiences.length > 1 && (
             <div className="mt-sm">
-              {/* Cabecera de columnas cuando hay presupuesto por conjunto */}
-              {budgetLevel === 'adset' && multiAudiences.length > 0 && (
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', paddingRight: '26px' }}>
-                  <div style={{ flex: 1, fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Público</div>
-                  <div style={{ width: '110px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Presupuesto por conjunto</div>
-                </div>
-              )}
               {/* Dropdowns de públicos adicionales */}
               {multiAudiences.map((aud, index) => (
                 <div key={aud.id} className="form-group" style={{ marginBottom: '8px' }}>
