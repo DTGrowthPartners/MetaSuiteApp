@@ -1359,7 +1359,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         adAccountId: selectedAccount,
         adAccountName: selectedAccountData?.name || selectedAccount,
         dailyBudgetCOP: parseFloat(dailyBudget),
-        budgetLevel: templateAdSetConfig.allowBudgetLevel ? budgetLevel : 'campaign', // 'campaign' (CBO) o 'adset'
+        budgetLevel: budgetLevel, // 'campaign' (CBO) o 'adset'
         // Página de Facebook para el anuncio
         pageId: selectedPage,
         pageName: selectedPageData?.name || selectedPage,
@@ -1764,9 +1764,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <div className="section-card" id="section-presupuesto">
           <h4><span className="section-icon">💰</span> Presupuesto y Calendario</h4>
 
-        {/* Budget Level Selector (only for templates that allow it) */}
-        {templateAdSetConfig.allowBudgetLevel && (
-          <div className="form-group">
+        {/* Budget Level Selector - siempre visible */}
+        <div className="form-group">
             <label>Nivel de Presupuesto</label>
             <div className="toggle-group">
               <button
@@ -1790,7 +1789,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 : 'Tú controlas cuánto gasta cada conjunto de anuncios'}
             </p>
           </div>
-        )}
 
         {/* Daily Budget in COP */}
         <div className="form-group">
@@ -1873,16 +1871,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             ))}
                         </select>
                         {budgetLevel === 'adset' && (
-                          <input
-                            type="number"
-                            min="5000"
-                            step="1000"
-                            placeholder={dailyBudget || '20000'}
-                            value={aud.dailyBudget || ''}
-                            onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, dailyBudget: e.target.value } : a))}
-                            style={{ width: '110px', fontSize: '12px' }}
-                            title="Presupuesto diario para este conjunto (COP)"
-                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <label style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Presupuesto por conjunto</label>
+                            <input
+                              type="number"
+                              min="5000"
+                              step="1000"
+                              placeholder={dailyBudget || '20000'}
+                              value={aud.dailyBudget || ''}
+                              onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, dailyBudget: e.target.value } : a))}
+                              style={{ width: '110px', fontSize: '12px' }}
+                            />
+                          </div>
                         )}
                       </div>
                       {budgetLevel === 'adset' && (
