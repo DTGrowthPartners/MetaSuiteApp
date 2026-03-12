@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import multer from 'multer';
 import FormData from 'form-data';
 import fs from 'fs';
@@ -66,20 +66,19 @@ const PORT = process.env.PORT || 3002;
 // Token de acceso con permisos: pages_show_list, ads_management, ads_read, business_management, pages_read_engagement
 const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI';
 
-// OpenAI Configuration - Configurar variable de entorno OPENAI_API_KEY
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
-let openai = null;
+// Anthropic (Claude) Configuration
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || null;
+let anthropic = null;
 
-if (OPENAI_API_KEY) {
+if (ANTHROPIC_API_KEY) {
   try {
-    openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-    console.log('OpenAI API configurada correctamente');
+    anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    console.log('Anthropic (Claude) API configurada correctamente');
   } catch (err) {
-    console.error('ERROR al inicializar OpenAI:', err.message);
+    console.error('ERROR al inicializar Anthropic:', err.message);
   }
 } else {
-  console.warn('ADVERTENCIA: OPENAI_API_KEY no está configurada. Las funciones de IA (5+5+5 automático) no funcionarán.');
-  console.warn('Configura la variable de entorno OPENAI_API_KEY para habilitar generación de contenido con IA.');
+  console.warn('ADVERTENCIA: ANTHROPIC_API_KEY no está configurada. Las funciones de IA (5+5+5 automático) no funcionarán.');
 }
 
 const META_API_VERSION = 'v24.0';
@@ -301,7 +300,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'Meta Ads Dashboard API',
-    openaiConfigured: !!openai
+    anthropicConfigured: !!anthropic
   });
 });
 
@@ -1074,13 +1073,13 @@ app.get('/api/pixels/:accountId', async (req, res) => {
 // AI CONTENT GENERATION ENDPOINT
 // ============================================
 
-// Generar contenido 5+5+5 con OpenAI
+// Generar contenido 5+5+5 con Claude (Anthropic)
 app.post('/api/generate-content', async (req, res) => {
   try {
-    if (!openai) {
+    if (!anthropic) {
       return res.status(503).json({
         success: false,
-        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor.'
+        error: 'Anthropic no está configurado. Configura ANTHROPIC_API_KEY en las variables de entorno del servidor.'
       });
     }
 
@@ -1093,7 +1092,7 @@ app.post('/api/generate-content', async (req, res) => {
       });
     }
 
-    console.log('Generating content with OpenAI for:', prompt.substring(0, 100) + '...');
+    console.log('Generating content with Claude for:', prompt.substring(0, 100) + '...');
 
     const systemPrompt = `Eres un experto en marketing digital y copywriting para anuncios de Facebook/Instagram Ads.
 Tu tarea es generar contenido creativo y persuasivo para campañas publicitarias.
@@ -1129,18 +1128,16 @@ Responde en este formato JSON exacto:
   "targetAudience": "descripción breve del público objetivo sugerido"
 }`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
+    const completion = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
       temperature: 0.7,
       max_tokens: 2000
     });
 
-    const responseText = completion.choices[0].message.content;
-    console.log('OpenAI response:', responseText);
+    const responseText = completion.content[0].text;
+    console.log('Claude response:', responseText);
 
     // Parsear el JSON de la respuesta
     let generatedContent;
@@ -1149,7 +1146,7 @@ Responde en este formato JSON exacto:
       const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       generatedContent = JSON.parse(cleanJson);
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
+      console.error('Error parsing Claude response:', parseError);
       return res.status(500).json({
         success: false,
         error: 'Error procesando la respuesta de IA',
@@ -1179,7 +1176,7 @@ Responde en este formato JSON exacto:
     });
 
   } catch (error) {
-    console.error('OpenAI error:', error.response?.data || error.message);
+    console.error('Claude error:', error.response?.data || error.message);
     res.status(500).json({
       success: false,
       error: error.message || 'Error generando contenido con IA'
@@ -1410,17 +1407,15 @@ JSON exacto:
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: 0.7 + (adIndex * 0.05), // Slight variation per ad
+  const completion = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+    temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
     max_tokens: 2000
   });
 
-  const responseText = completion.choices[0].message.content;
+  const responseText = completion.content[0].text;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
   // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
@@ -1456,12 +1451,9 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
   const ctx = getCampaignContext(objective, destType);
   const len = getTextLengthRules(textLength);
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
+  const completion = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    system: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
 
 ${ctx.focus}
 
@@ -1471,11 +1463,15 @@ REGLAS ESTRICTAS:
 - Todo en español
 - MÁXIMO 1 emoji por elemento (título o frase dentro de descripción). Menos es más. Si no aporta, no pongas emoji.
 - NO uses frases genéricas vacías. Sé MUY ESPECÍFICO sobre el producto/servicio de la imagen
-- Responde SOLO en JSON válido, sin markdown`
-      },
+- Responde SOLO en JSON válido, sin markdown`,
+    messages: [
       {
         role: 'user',
         content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/jpeg', data: base64Image }
+          },
           {
             type: 'text',
             text: `Analiza esta imagen publicitaria y genera contenido para un anuncio de Facebook Ads.
@@ -1496,22 +1492,15 @@ Genera exactamente en JSON:
 Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
 linkDescriptions: detalles adicionales breves que complementan el título (ej: "Envío gratis", "Ver colección", "Disponible ahora").
 CTAs variados de esta lista: ${ctx.ctas}`
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`,
-              detail: 'low'
-            }
           }
         ]
       }
     ],
-    temperature: 0.7 + (adIndex * 0.05),
+    temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
     max_tokens: 2000
   });
 
-  const responseText = completion.choices[0].message.content;
+  const responseText = completion.content[0].text;
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
   // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
@@ -1542,10 +1531,10 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
       });
     }
 
-    if (!openai) {
+    if (!anthropic) {
       return res.status(503).json({
         success: false,
-        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor para habilitar análisis de video.'
+        error: 'Anthropic no está configurado. Configura ANTHROPIC_API_KEY en las variables de entorno del servidor para habilitar análisis de video.'
       });
     }
 
@@ -1568,87 +1557,31 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
     let transcription = '';
 
     // Whisper only supports: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
-    const ext = fileName.toLowerCase().split('.').pop();
-    const whisperSupported = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
-    const needsAudioExtraction = !whisperSupported.includes(ext) || fileSize > 25 * 1024 * 1024;
-
+    // Claude no soporta transcripción de audio — usar análisis visual del frame
+    console.log('Analyzing video via frame extraction (Claude vision)...');
     try {
-      let audioBuffer;
+      const frameBuffer = await extractFrameFromBuffer(req.file.buffer, fileName);
+      const base64Frame = frameBuffer.toString('base64');
+      const content = await generateContentFromImage(base64Frame, adIndex, category, objective, templateName, destType, textLength, campaignContext);
 
-      if (needsAudioExtraction) {
-        // Extract audio with ffmpeg (MOV, AVI, MKV, or files > 25MB)
-        console.log(`Extracting audio with ffmpeg (format: ${ext}, size: ${(fileSize / 1024 / 1024).toFixed(1)}MB)...`);
-        audioBuffer = await extractAudioFromBuffer(req.file.buffer, fileName);
-        console.log(`Audio extracted: ${(audioBuffer.length / 1024 / 1024).toFixed(1)}MB`);
-      } else {
-        // File is small enough and in a supported format - send directly
-        audioBuffer = req.file.buffer;
-        console.log('Video in supported format and <= 25MB, sending directly to Whisper...');
-      }
-
-      // Create a File-like object for the OpenAI API
-      const audioFile = new File(
-        [audioBuffer],
-        needsAudioExtraction ? 'audio.mp3' : fileName,
-        { type: needsAudioExtraction ? 'audio/mpeg' : (getContentTypeFromExt(fileName) || 'video/mp4') }
-      );
-
-      const whisperResponse = await openai.audio.transcriptions.create({
-        model: 'whisper-1',
-        file: audioFile,
-        language: 'es'
+      return res.json({
+        success: true,
+        data: {
+          headlines: content.headlines?.slice(0, 5) || [],
+          descriptions: content.descriptions?.slice(0, 5) || [],
+          linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
+          ctas: content.ctas?.slice(0, 5) || [],
+          method: 'vision'
+        }
       });
-
-      transcription = whisperResponse.text || '';
-      console.log(`Transcription (${transcription.length} chars): ${transcription.substring(0, 200)}...`);
-    } catch (whisperError) {
-      console.warn('Whisper transcription failed:', whisperError.message);
+    } catch (visionError) {
+      console.error('Video frame analysis failed:', visionError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'No se pudo analizar el video',
+        details: visionError.message
+      });
     }
-
-    // If transcription is too short, fall back to vision analysis of a frame
-    if (transcription.length < 20) {
-      console.log('No meaningful speech detected, falling back to vision analysis...');
-
-      try {
-        const frameBuffer = await extractFrameFromBuffer(req.file.buffer, fileName);
-        const base64Frame = frameBuffer.toString('base64');
-        const content = await generateContentFromImage(base64Frame, adIndex, category, objective, templateName, destType, textLength, campaignContext);
-
-        return res.json({
-          success: true,
-          data: {
-            headlines: content.headlines?.slice(0, 5) || [],
-            descriptions: content.descriptions?.slice(0, 5) || [],
-            linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
-            ctas: content.ctas?.slice(0, 5) || [],
-            transcription: transcription || '(sin habla detectada)',
-            method: 'vision'
-          }
-        });
-      } catch (visionError) {
-        console.error('Vision fallback also failed:', visionError.message);
-        return res.status(500).json({
-          success: false,
-          error: 'No se pudo analizar el video (sin audio ni imagen)',
-          details: visionError.message
-        });
-      }
-    }
-
-    // Generate content from transcription
-    const content = await generateContentFromText(transcription, adIndex, category, objective, templateName, destType, textLength, campaignContext);
-
-    res.json({
-      success: true,
-      data: {
-        headlines: content.headlines?.slice(0, 5) || [],
-        descriptions: content.descriptions?.slice(0, 5) || [],
-        linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
-        ctas: content.ctas?.slice(0, 5) || [],
-        transcription,
-        method: 'whisper'
-      }
-    });
 
   } catch (error) {
     console.error('Video analysis error:', error.message);
@@ -1662,10 +1595,10 @@ app.post('/api/analyze-video', upload.single('video'), async (req, res) => {
 // POST /api/analyze-image - Analyze image with vision and generate 5+5+5
 app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
   try {
-    if (!openai) {
+    if (!anthropic) {
       return res.status(503).json({
         success: false,
-        error: 'OpenAI no está configurado. Configura OPENAI_API_KEY en las variables de entorno del servidor para habilitar análisis de imagen.'
+        error: 'Anthropic no está configurado. Configura ANTHROPIC_API_KEY en las variables de entorno del servidor para habilitar análisis de imagen.'
       });
     }
 
@@ -1711,8 +1644,8 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
 // Used for Meta library media where browser fetch fails due to CORS
 app.post('/api/analyze-media-url', async (req, res) => {
   try {
-    if (!openai) {
-      return res.status(503).json({ success: false, error: 'OpenAI no está configurado.' });
+    if (!anthropic) {
+      return res.status(503).json({ success: false, error: 'Anthropic no está configurado.' });
     }
 
     const { url, type, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
@@ -1745,60 +1678,25 @@ app.post('/api/analyze-media-url', async (req, res) => {
     console.log(`Downloaded ${mediaType}: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`);
 
     if (mediaType === 'video') {
-      // Video: transcribe audio with Whisper, then generate content
-      let transcription = '';
-
+      // Claude no soporta audio — usar análisis visual del frame
+      console.log('Analyzing library video via frame extraction (Claude vision)...');
       try {
-        // Extract audio with ffmpeg (the buffer is a video file)
-        const audioBuffer = await extractAudioFromBuffer(buffer, 'video.mp4');
-        console.log(`Audio extracted: ${(audioBuffer.length / 1024 / 1024).toFixed(1)}MB`);
-
-        const audioFile = new File([audioBuffer], 'audio.mp3', { type: 'audio/mpeg' });
-        const whisperResponse = await openai.audio.transcriptions.create({
-          model: 'whisper-1',
-          file: audioFile,
-          language: 'es'
+        const frameBuffer = await extractFrameFromBuffer(buffer, 'video.mp4');
+        const base64Frame = frameBuffer.toString('base64');
+        const content = await generateContentFromImage(base64Frame, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
+        return res.json({
+          success: true,
+          data: {
+            headlines: content.headlines?.slice(0, 5) || [],
+            descriptions: content.descriptions?.slice(0, 5) || [],
+            linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
+            ctas: content.ctas?.slice(0, 5) || [],
+            method: 'vision-url'
+          }
         });
-        transcription = whisperResponse.text || '';
-        console.log(`Transcription (${transcription.length} chars): ${transcription.substring(0, 200)}...`);
-      } catch (whisperError) {
-        console.warn('Whisper transcription failed for library video:', whisperError.message);
+      } catch (visionErr) {
+        return res.status(500).json({ success: false, error: 'No se pudo analizar el video' });
       }
-
-      // If no meaningful speech, fall back to frame analysis
-      if (transcription.length < 20) {
-        console.log('No speech detected, falling back to frame analysis...');
-        try {
-          const frameBuffer = await extractFrameFromBuffer(buffer, 'video.mp4');
-          const base64Frame = frameBuffer.toString('base64');
-          const content = await generateContentFromImage(base64Frame, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
-          return res.json({
-            success: true,
-            data: {
-              headlines: content.headlines?.slice(0, 5) || [],
-              descriptions: content.descriptions?.slice(0, 5) || [],
-              linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
-              ctas: content.ctas?.slice(0, 5) || [],
-              method: 'vision-url'
-            }
-          });
-        } catch (visionErr) {
-          return res.status(500).json({ success: false, error: 'No se pudo analizar el video (sin audio ni frame)' });
-        }
-      }
-
-      const content = await generateContentFromText(transcription, adIndex, category || '', objective || '', templateName || '', destType || '', textLength, campaignContext);
-      return res.json({
-        success: true,
-        data: {
-          headlines: content.headlines?.slice(0, 5) || [],
-          descriptions: content.descriptions?.slice(0, 5) || [],
-          linkDescriptions: content.linkDescriptions?.slice(0, 5) || [],
-          ctas: content.ctas?.slice(0, 5) || [],
-          transcription,
-          method: 'whisper-url'
-        }
-      });
 
     } else {
       // Image: analyze with vision
