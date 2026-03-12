@@ -1723,6 +1723,117 @@ app.post('/api/analyze-media-url', async (req, res) => {
   }
 });
 
+// POST /api/analyze-media-url-batch - Analyze multiple media URLs at once (for flexible ad groups)
+// Downloads all images, passes all to Claude in one request for better context
+app.post('/api/analyze-media-url-batch', async (req, res) => {
+  try {
+    if (!anthropic) {
+      return res.status(503).json({ success: false, error: 'Anthropic no está configurado.' });
+    }
+    const { urls, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ success: false, error: 'Se requiere array de URLs' });
+    }
+    const adIndex = parseInt(adIndexStr) || 0;
+    const textLength = tl || 'medium';
+    const campaignContext = cc || '';
+
+    console.log(`Batch analyzing ${urls.length} media items for group ${adIndex}...`);
+
+    // Download all images (cap at 10 to avoid overload)
+    const urlsToProcess = urls.slice(0, 10);
+    const base64Images = [];
+    for (const url of urlsToProcess) {
+      try {
+        const response = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 30000,
+          maxContentLength: 20 * 1024 * 1024
+        });
+        base64Images.push(Buffer.from(response.data).toString('base64'));
+      } catch (dlErr) {
+        console.warn(`Batch: failed to download ${url.substring(0, 60)}: ${dlErr.message}`);
+      }
+    }
+
+    if (base64Images.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se pudieron descargar los medios' });
+    }
+
+    const angleVariations = [
+      'Enfócate en el beneficio principal y la propuesta de valor.',
+      'Enfócate en la urgencia y escasez. Usa un tono más directo.',
+      'Enfócate en la prueba social y credibilidad.',
+      'Enfócate en resolver un problema o dolor del cliente.',
+      'Enfócate en la emoción y aspiración.',
+      'Enfócate en la curiosidad. Haz preguntas que enganchen.',
+      'Enfócate en la exclusividad y diferenciación.'
+    ];
+    const angle = angleVariations[adIndex % angleVariations.length];
+    const ctx = getCampaignContext(objective, destType);
+    const len = getTextLengthRules(textLength);
+
+    // Build message content: all images + text prompt
+    const msgContent = base64Images.map(b64 => ({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+    }));
+    msgContent.push({
+      type: 'text',
+      text: `Analiza ${base64Images.length > 1 ? `estas ${base64Images.length} imágenes publicitarias (son parte del mismo anuncio flexible)` : 'esta imagen publicitaria'} y genera contenido para un anuncio de Facebook Ads.
+
+${category ? `Categoría del negocio: ${category}` : ''}
+${templateName ? `Tipo de campaña: ${templateName}` : ''}
+${campaignContext ? `\nCONTEXTO DE LA CAMPAÑA (proporcionado por el anunciante, PRIORIZA esta información):\n"${campaignContext}"\n` : ''}
+Instrucción de ángulo: ${angle}
+
+Genera exactamente en JSON:
+{
+  "headlines": ["título (máx ${len.headlineMax} chars)", "título", "título", "título", "título"],
+  "descriptions": ["descripción persuasiva (${len.descMin}-${len.descMax} chars)...", "otra descripción...", "...", "...", "..."],
+  "linkDescriptions": ["detalle corto (máx 30 chars)", "detalle corto", "detalle corto", "detalle corto", "detalle corto"],
+  "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
+}
+
+Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
+linkDescriptions: detalles adicionales breves (ej: "Envío gratis", "Ver colección", "Disponible ahora").
+CTAs variados de esta lista: ${ctx.ctas}`
+    });
+
+    const completion = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      system: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.\n\n${ctx.focus}\n\nREGLAS ESTRICTAS:\n- TÍTULOS (headlines): ${len.headlineRule}\n- DESCRIPCIONES: ${len.descRule}\n- Todo en español\n- MÁXIMO 1 emoji por elemento. Menos es más.\n- NO uses frases genéricas. Sé MUY ESPECÍFICO sobre el producto/servicio mostrado.\n- Responde SOLO en JSON válido, sin markdown`,
+      messages: [{ role: 'user', content: msgContent }],
+      temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
+      max_tokens: 2000
+    });
+
+    const responseText = completion.content[0].text;
+    const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    const fallbackCtas = [...ctx.preferredCtas, 'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP'];
+    if (!parsed.ctas || parsed.ctas.length < 5) {
+      parsed.ctas = parsed.ctas || [];
+      while (parsed.ctas.length < 5) {
+        const next = fallbackCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
+        parsed.ctas.push(next);
+      }
+    }
+    if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
+      parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+      while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
+    }
+
+    console.log(`Batch analysis done: ${base64Images.length} images analyzed`);
+    return res.json({ success: true, data: { ...parsed, method: 'vision-batch', mediaCount: base64Images.length } });
+
+  } catch (error) {
+    console.error('analyze-media-url-batch error:', error.message);
+    res.status(500).json({ success: false, error: error.message || 'Error analizando medios' });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`

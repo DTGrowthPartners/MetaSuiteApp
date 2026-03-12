@@ -124,6 +124,27 @@ class MetaAdsService {
     }
   }
 
+  // Analyze multiple media URLs at once (for flexible ad groups — all images sent to Claude together)
+  async analyzeMediaUrlBatch(urls, adIndex = 0, category = '', objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
+    try {
+      const validUrls = urls.filter(u => u && u.trim());
+      if (validUrls.length === 0) return { success: false, error: 'No hay URLs válidas' };
+      console.log(`Batch analyzing ${validUrls.length} media items for group ${adIndex}...`);
+      const timeout = Math.max(60000, validUrls.length * 15000); // 15s per image, min 60s
+      const response = await axios.post(`${BACKEND_API_URL}/analyze-media-url-batch`, {
+        urls: validUrls, adIndex, category, objective, templateName, destType, textLength, campaignContext
+      }, { timeout });
+      if (response.data.success) {
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.error };
+      }
+    } catch (error) {
+      console.error('analyzeMediaUrlBatch error:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  }
+
   // Normaliza el ID de cuenta para asegurar que tenga el prefijo 'act_'
   normalizeAccountId(accountId) {
     if (!accountId) return null;

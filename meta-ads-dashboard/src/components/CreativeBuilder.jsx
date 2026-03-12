@@ -321,11 +321,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const analyzeFlexGroupWithMedia = async (groupIndex) => {
     const group = flexibleAdGroups[groupIndex];
     if (!group || group.mediaItems.length === 0) return;
-    // Use the first media item as the primary reference for AI generation
-    const firstItem = group.mediaItems[0];
-    // For videos we only have the thumbnail URL (not the raw video file), so analyze it as an image
-    const mediaUrl = firstItem.thumbnailUrl || firstItem.url || '';
-    const mediaType = 'image';
+    // Collect thumbnail/image URLs for all media items (videos use their thumbnail)
+    const mediaUrls = group.mediaItems
+      .map(item => item.thumbnailUrl || item.url || '')
+      .filter(u => u.trim());
+    if (mediaUrls.length === 0) return;
     updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA...` });
     try {
       const metaService = new MetaAdsService(accessToken);
@@ -333,8 +333,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const objective = selectedTemplate?.objective || '';
       const templateName = selectedTemplate?.name || '';
       const destType = templateAdConfig.destinationConfig?.type || '';
-      const result = await metaService.analyzeMediaUrl(
-        mediaUrl, mediaType, groupIndex, category, objective, templateName, destType, textLength, campaignContext
+      const result = await metaService.analyzeMediaUrlBatch(
+        mediaUrls, groupIndex, category, objective, templateName, destType, textLength, campaignContext
       );
       if (result.success && result.data) {
         const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
@@ -3372,74 +3372,58 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               addLog(`Ad Set creado${audPrefix}: ${adSetResult.data.id}`);
               createdAdSets.push(adSetResult.data);
 
-              // Agrupar TODO el contenido en un solo flexible ad
-              addLog(`Creando 1 flexible ad con todo el contenido (${totalAds} piezas)${audPrefix}...`);
+              // N flexible ads per AdSet (one per flexibleAdGroups entry)
+              const flexGroups = job.flexibleAdGroups?.length > 0 ? job.flexibleAdGroups : null;
+              const groupsToCreate = flexGroups || [{
+                mediaItems: adsArray.map(ad => ad.videoId
+                  ? { type: 'video', hash: ad.imageHash || '', url: ad.videoThumbnailUrl || '', videoId: ad.videoId, thumbnailUrl: ad.videoThumbnailUrl || '' }
+                  : { type: 'image', hash: ad.imageHash || '', url: ad.imageUrl || '' }),
+                headlines: [...new Set(adsArray.flatMap(a => (a.headlines || [])).filter(Boolean))].slice(0, 5),
+                descriptions: [...new Set(adsArray.flatMap(a => (a.descriptions || [])).filter(Boolean))].slice(0, 5),
+                linkDescriptions: [],
+                ctas: adsArray[0]?.ctas || [defaultCta]
+              }];
+              const flexLink = isIgDM ? `https://ig.me/m/${job.igActorId}` : `https://m.me/${job.pageId}`;
+              addLog(`Creando ${groupsToCreate.length} flexible ad(s)${audPrefix}...`);
 
-              const allImages = [];
-              const allVideos = [];
-              const allHeadlines = new Set();
-              const allPrimaryTexts = new Set();
-              const allDescriptions = new Set();
-              let firstCta = null;
-
-              for (let i = 0; i < totalAds; i++) {
-                const ad = adsArray[i];
-                // Acumular contenido
-                if (ad.videoId) {
-                  const vid = { video_id: ad.videoId };
-                  if (ad.videoThumbnailHash) {
-                    vid.image_hash = ad.videoThumbnailHash;
-                  } else if (ad.videoThumbnailUrl || ad.imageUrl) {
-                    vid.image_url = ad.videoThumbnailUrl || ad.imageUrl;
-                  }
-                  allVideos.push(vid);
-                } else if (ad.imageHash) {
-                  allImages.push({ hash: ad.imageHash });
-                }
-                // Acumular textos (deduplicados)
-                (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
-                (ad.descriptions || []).filter(d => d?.trim()).forEach(d => {
-                  allPrimaryTexts.add(d.trim());
-                  allDescriptions.add(d.trim());
+              for (let gi = 0; gi < groupsToCreate.length; gi++) {
+                const flexGroup = groupsToCreate[gi];
+                const groupLabel = groupsToCreate.length > 1 ? ` (Ad ${gi + 1})` : '';
+                const images = flexGroup.mediaItems.filter(m => m.type === 'image' && m.hash).map(m => ({ hash: m.hash }));
+                const videos = flexGroup.mediaItems.filter(m => m.type === 'video' && m.videoId).map(m => {
+                  const v = { video_id: m.videoId };
+                  if (m.hash) v.image_hash = m.hash;
+                  else if (m.thumbnailUrl) v.image_url = m.thumbnailUrl;
+                  return v;
                 });
-                if (!firstCta && ad.ctas?.[0]) firstCta = ad.ctas[0];
-              }
+                const texts = [];
+                (flexGroup.headlines || []).filter(Boolean).slice(0, 5).forEach(h => texts.push({ text: h, text_type: 'headline' }));
+                (flexGroup.descriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
+                (flexGroup.linkDescriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'description' }));
+                if (texts.filter(t => t.text_type === 'headline').length === 0) texts.push({ text: 'Conoce más', text_type: 'headline' });
+                if (texts.filter(t => t.text_type === 'primary_text').length === 0) texts.push({ text: 'Descubre más', text_type: 'primary_text' });
+                const adCta = flexGroup.ctas?.[0] || defaultCta;
 
-              // Construir textos (máximo 5 por tipo)
-              const texts = [];
-              const headlines = [...allHeadlines].slice(0, 5);
-              const primaryTexts = [...allPrimaryTexts].slice(0, 5);
-              const descriptions = [...allDescriptions].slice(0, 5);
-              if (headlines.length === 0) headlines.push('Conoce más');
-              if (primaryTexts.length === 0) primaryTexts.push('Descubre más');
-              headlines.forEach(h => texts.push({ text: h, text_type: 'headline' }));
-              primaryTexts.forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
-              descriptions.forEach(d => texts.push({ text: d, text_type: 'description' }));
+                const flexResult = await metaService.createFlexibleAd(job.adAccountId, {
+                  name: `${job.campaignName} - Flexible Ad${audPrefix}${groupLabel}`,
+                  adsetId: adSetResult.data.id,
+                  pageId: job.pageId,
+                  igActorId: isIgDM ? job.igActorId : null,
+                  images,
+                  videos,
+                  texts,
+                  callToAction: { type: adCta, value: { link: flexLink } },
+                  linkUrl: flexLink,
+                  status: 'ACTIVE'
+                });
 
-              const flexLink = isIgDM
-                ? `https://ig.me/m/${job.igActorId}`
-                : `https://m.me/${job.pageId}`;
-              const adCta = firstCta || defaultCta;
-
-              const flexResult = await metaService.createFlexibleAd(job.adAccountId, {
-                name: `${job.campaignName} - Flexible Ad${audPrefix}`,
-                adsetId: adSetResult.data.id,
-                pageId: job.pageId,
-                igActorId: isIgDM ? job.igActorId : null,
-                images: allImages,
-                videos: allVideos,
-                texts,
-                callToAction: { type: adCta, value: { link: flexLink } },
-                linkUrl: flexLink,
-                status: 'ACTIVE'
-              });
-
-              if (!flexResult.success) {
-                errors.push(`Flexible Ad${audPrefix}: ${flexResult.error}`);
-                addLog(`Error flexible ad${audPrefix}: ${flexResult.error}`);
-              } else {
-                createdAds.push(flexResult.data);
-                addLog(`Flexible Ad${audPrefix} creado: ${flexResult.data.id}`);
+                if (!flexResult.success) {
+                  errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error}`);
+                  addLog(`Error flexible ad${audPrefix}${groupLabel}: ${flexResult.error}`);
+                } else {
+                  createdAds.push(flexResult.data);
+                  addLog(`Flexible Ad${audPrefix}${groupLabel} creado: ${flexResult.data.id}`);
+                }
               }
             }
           } else {
@@ -3612,6 +3596,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           budgetLevel: job.budgetLevel || 'campaign',
           adSetMode: job.adSetMode || 'single',
           multiAudiences: job.multiAudiences || [],
+          flexibleAdGroups: job.flexibleAdGroups || [],
           ads: job.ads || [{
             adName: job.adName,
             imageUrl: job.imageUrl,
