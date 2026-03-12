@@ -4039,32 +4039,58 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             </div>
           )}
           <div className="summary-item summary-item--full">
-            <label>Media por Anuncio</label>
-            {job.ads?.map((ad, i) => (
-              <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
-                {ad.adName || `Ad ${i + 1}`}: {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
-              </p>
-            )) || <p>Sin media</p>}
+            <label>{job.adSetMode === 'flexible' ? 'Anuncios Flexibles' : 'Media por Anuncio'}</label>
+            {job.adSetMode === 'flexible' ? (
+              (job.flexibleAdGroups || []).map((g, i) => (
+                <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
+                  Anuncio {i + 1}: {g.mediaItems?.length || 0} medio(s) — {g.mediaItems?.filter(m => m.type === 'image').length || 0} img · {g.mediaItems?.filter(m => m.type === 'video').length || 0} vid
+                </p>
+              ))
+            ) : (
+              job.ads?.map((ad, i) => (
+                <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
+                  {ad.adName || `Ad ${i + 1}`}: {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
+                </p>
+              )) || <p>Sin media</p>
+            )}
           </div>
         </div>
 
-        {/* Creative Copy Summary - Per Ad */}
-        {job.ads?.length > 0 && (
-          <div className="creative-summary">
-            <h4>Contenido de los Anuncios ({job.ads.length})</h4>
-            {job.ads.map((ad, i) => (
-              <div key={i} className="draft-variation-card" style={{ borderLeftColor: 'var(--accent)' }}>
-                <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
-                  {ad.adName || `Ad ${i + 1}`}
-                  {ad.videoId ? ' (Video)' : ad.imageUrl || ad.imageHash ? ' (Imagen)' : ' (Sin media)'}
-                  {job.adSetMode === 'per-ad' && ad.audienceName ? ` - ${ad.audienceName}` : ''}
-                </p>
-                <p className="text-muted" style={{ fontSize: '12px' }}>
-                  {ad.headlines?.length || 0} títulos + {ad.descriptions?.length || 0} descripciones + {[...new Set(ad.ctas || [])].length} CTAs
-                </p>
-              </div>
-            ))}
-          </div>
+        {/* Creative Copy Summary */}
+        {job.adSetMode === 'flexible' ? (
+          (job.flexibleAdGroups?.length > 0) && (
+            <div className="creative-summary">
+              <h4>Anuncios Flexibles ({job.flexibleAdGroups.length})</h4>
+              {job.flexibleAdGroups.map((g, i) => (
+                <div key={i} className="draft-variation-card" style={{ borderLeftColor: 'var(--accent)' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
+                    Anuncio Flexible {i + 1} — {g.mediaItems?.length || 0} medio(s)
+                  </p>
+                  <p className="text-muted" style={{ fontSize: '12px' }}>
+                    {g.headlines?.length || 0} títulos + {g.descriptions?.length || 0} textos + {[...new Set(g.ctas || [])].length} CTAs
+                  </p>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          job.ads?.length > 0 && (
+            <div className="creative-summary">
+              <h4>Contenido de los Anuncios ({job.ads.length})</h4>
+              {job.ads.map((ad, i) => (
+                <div key={i} className="draft-variation-card" style={{ borderLeftColor: 'var(--accent)' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
+                    {ad.adName || `Ad ${i + 1}`}
+                    {ad.videoId ? ' (Video)' : ad.imageUrl || ad.imageHash ? ' (Imagen)' : ' (Sin media)'}
+                    {job.adSetMode === 'per-ad' && ad.audienceName ? ` - ${ad.audienceName}` : ''}
+                  </p>
+                  <p className="text-muted" style={{ fontSize: '12px' }}>
+                    {ad.headlines?.length || 0} títulos + {ad.descriptions?.length || 0} descripciones + {[...new Set(ad.ctas || [])].length} CTAs
+                  </p>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
@@ -4106,11 +4132,17 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           </ul>
           {job.adSetMode === 'flexible' ? (
             <div className="text-muted mt-sm" style={{ fontSize: '13px' }}>
-              {job.ads?.map((ad, i) => (
-                <p key={i} style={{ margin: '3px 0' }}>
-                  Asset {i + 1}: {ad.adName || `Ad ${i + 1}`} | {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
-                </p>
-              ))}
+              {(job.flexibleAdGroups || []).map((g, gi) => {
+                const imgs = (g.mediaItems || []).filter(m => m.type === 'image').length;
+                const vids = (g.mediaItems || []).filter(m => m.type === 'video').length;
+                const txts = (g.headlines || []).length;
+                const descs = (g.descriptions || []).length;
+                return (
+                  <p key={gi} style={{ margin: '3px 0' }}>
+                    Anuncio Flexible {gi + 1}: {(g.mediaItems || []).length} medio(s) ({imgs} img · {vids} vid) · {txts}T + {descs}D
+                  </p>
+                );
+              })}
             </div>
           ) : job.ads?.length > 1 && (
             <div className="text-muted mt-sm" style={{ fontSize: '13px' }}>
