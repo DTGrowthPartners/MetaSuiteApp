@@ -1399,6 +1399,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         useAdvantagePlacements: useAdvantagePlacements,
         excludedPlacements: excludedPlacements,
         // Múltiples públicos (replicar estructura por cada público adicional)
+        whatsappMode: whatsappMode,
         multiAudiences: adSetMode !== 'per-ad' && multiAudiences.length > 0 ? multiAudiences : [],
         // Chat editor (WhatsApp leads)
         chatGreeting: chatGreeting || null,
@@ -1657,7 +1658,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* WhatsApp Number - Selector de WhatsApp Business */}
         {(templateRequirements.whatsapp || (destinationOptions && selectedDestination === 'WHATSAPP')) && (
           <div className="form-group">
-            <label>Número de WhatsApp Business *</label>
+            <label>{whatsappMode === 'per-ad' ? 'Número de WhatsApp - Conjunto 1 *' : 'Número de WhatsApp Business *'}</label>
             {loadingWhatsAppNumbers ? (
               <select disabled>
                 <option>Cargando números de WhatsApp...</option>
@@ -1715,8 +1716,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </>
             )}
 
-            {/* Toggle: mismo número vs número por ad set (solo con 2+ ads) */}
-            {ads.length > 1 && whatsAppNumbers.length > 1 && (
+            {/* Toggle: mismo número vs número por conjunto */}
+            {whatsAppNumbers.length > 1 && (
               <div className="whatsapp-mode-toggle" style={{ marginTop: '8px' }}>
                 <div className="budget-level-selector">
                   <button
@@ -1724,18 +1725,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     className={`budget-btn ${whatsappMode === 'same' ? 'active' : ''}`}
                     onClick={() => setWhatsappMode('same')}
                   >
-                    Mismo número para todos
+                    Número para toda la campaña
                   </button>
                   <button
                     type="button"
                     className={`budget-btn ${whatsappMode === 'per-ad' ? 'active' : ''}`}
                     onClick={() => setWhatsappMode('per-ad')}
                   >
-                    Número por Ad Set
+                    Número por conjunto
                   </button>
                 </div>
                 {whatsappMode === 'per-ad' && (
-                  <p className="hint">Selecciona un número de WhatsApp diferente en cada anuncio abajo.</p>
+                  <p className="hint">Selecciona un número de WhatsApp para cada conjunto de anuncios en la sección de Público.</p>
                 )}
               </div>
             )}
@@ -1817,7 +1818,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>{/* fin section-card Presupuesto */}
 
         <div className="section-card" id="section-publico">
-          <h4><span className="section-icon">👥</span> Público</h4>
+          <h4><span className="section-icon">👥</span> Público por conjunto de anuncio</h4>
 
         {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
@@ -1890,7 +1891,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           }}
                         >
                           {allAudiences
-                            .filter(a => a.id !== selectedAudience && !multiAudiences.some((ma, mi) => ma.id === a.id && mi !== index))
                             .map((audience) => (
                               <option key={audience.id} value={audience.id}>
                                 {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
@@ -1907,6 +1907,28 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                             onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, dailyBudget: e.target.value } : a))}
                             style={{ width: '110px', fontSize: '12px' }}
                           />
+                        )}
+                        {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
+                          <select
+                            value={aud.whatsappNumberId || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
+                              setMultiAudiences(prev => prev.map((a, i) => i === index ? {
+                                ...a,
+                                whatsappNumberId: val,
+                                whatsappNumber: selected ? selected.display_phone_number.replace(/\D/g, '') : ''
+                              } : a));
+                            }}
+                            style={{ width: '150px', fontSize: '12px' }}
+                          >
+                            <option value="">Número WA...</option>
+                            {whatsAppNumbers.map(num => (
+                              <option key={num.id} value={String(num.id)}>
+                                {num.display_phone_number}
+                              </option>
+                            ))}
+                          </select>
                         )}
                       </div>
                       {budgetLevel === 'adset' && (
@@ -1935,7 +1957,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               >
                 <option value="">+ Selecciona otro público para crear otro conjunto</option>
                 {allAudiences
-                  .filter(a => a.id !== selectedAudience && !multiAudiences.some(ma => ma.id === a.id))
                   .map((audience) => (
                     <option key={audience.id} value={audience.id}>
                       {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}

@@ -2849,7 +2849,8 @@ class MetaAdsService {
         ? [primaryAud, ...multiAudiences.map(a => ({
             name: a.name,
             targeting: { ...(a.targeting || targeting) },
-            dailyBudget: a.dailyBudget ? Number(a.dailyBudget) : null
+            dailyBudget: a.dailyBudget ? Number(a.dailyBudget) : null,
+            whatsappNumber: a.whatsappNumber || null
           }))]
         : [primaryAud];
 
@@ -2861,6 +2862,7 @@ class MetaAdsService {
         const currentAudience = audiencesToProcess[audIdx];
         const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
         const audDailyBudget = currentAudience.dailyBudget || dailyBudget;
+        const audWhatsappNumber = currentAudience.whatsappNumber || whatsappNumber;
         let sharedAdSetId = null;
 
       if (adSetMode === 'single' || adSetMode === 'flexible') {
@@ -2872,7 +2874,7 @@ class MetaAdsService {
           targeting: currentAudience.targeting,
           optimizationGoal,
           promotedObject: { page_id: pageId },
-          whatsappPhoneNumber: whatsappNumber,
+          whatsappPhoneNumber: audWhatsappNumber,
           dailyBudget: !isCBO ? audDailyBudget : null,
           isDynamicCreative: false,
           startTime,
@@ -2882,7 +2884,7 @@ class MetaAdsService {
         });
 
         // Fallback: si falla con número de WhatsApp, reintentar sin él
-        if (!adSetResult.success && whatsappNumber) {
+        if (!adSetResult.success && audWhatsappNumber) {
           console.warn(`AdSet${audPrefix}: falló con WhatsApp number, reintentando sin número...`);
           adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
             name: `${campaignName} - Ad Set${audPrefix}`,
@@ -2949,7 +2951,7 @@ class MetaAdsService {
         descriptions.forEach(d => texts.push({ text: d, text_type: 'description' }));
 
         // WhatsApp flexible: link obligatorio → deep link de WhatsApp
-        const waLink = `https://api.whatsapp.com/send?phone=${(whatsappNumber || ads[0]?.whatsappNumber || '').replace(/\D/g, '')}`;
+        const waLink = `https://api.whatsapp.com/send?phone=${(audWhatsappNumber || ads[0]?.whatsappNumber || '').replace(/\D/g, '')}`;
 
         const flexResult = await this.createFlexibleAd(adAccountId, {
           name: `${campaignName} - Flexible Ad${audPrefix}`,
@@ -2976,7 +2978,7 @@ class MetaAdsService {
       for (let i = 0; i < ads.length; i++) {
         const ad = ads[i];
         const adLabel = ads.length > 1 ? ` ${i + 1}` : '';
-        const adWhatsappNumber = ad.whatsappNumber || whatsappNumber;
+        const adWhatsappNumber = ad.whatsappNumber || audWhatsappNumber;
 
         if (adSetMode !== 'single') {
           // MODO DYNAMIC/PER-AD: crear 1 AdSet por cada ad
