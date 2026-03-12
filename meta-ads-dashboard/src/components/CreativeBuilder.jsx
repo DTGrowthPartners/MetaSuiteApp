@@ -1658,87 +1658,82 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* WhatsApp Number - Selector de WhatsApp Business */}
         {(templateRequirements.whatsapp || (destinationOptions && selectedDestination === 'WHATSAPP')) && (
           <div className="form-group">
-            <label>{whatsappMode === 'per-ad' ? 'Número de WhatsApp - Conjunto 1 *' : 'Número de WhatsApp Business *'}</label>
-            {loadingWhatsAppNumbers ? (
-              <select disabled>
-                <option>Cargando números de WhatsApp...</option>
-              </select>
-            ) : whatsAppNumbers.length > 0 ? (
-              <>
-                <select
-                  value={selectedWhatsAppNumber}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
-                    setSelectedWhatsAppNumber(val);
-                    if (selected) {
-                      const digits = selected.display_phone_number.replace(/\D/g, '');
-                      setWhatsappNumber(digits);
-                      console.log('WhatsApp number selected:', digits, 'ID:', val);
-                    }
-                  }}
-                  required
-                >
-                  <option value="">Selecciona un número de WhatsApp</option>
-                  {whatsAppNumbers.map(num => {
-                    const statusLabel = num.quality_score?.score
-                      ? ` [${num.quality_score.score}]`
-                      : '';
-                    const pageName = num.page_name
-                      ? ` - ${num.page_name}`
-                      : num.whatsapp_business_account_name
-                        ? ` - ${num.whatsapp_business_account_name}`
-                        : '';
-                    return (
-                      <option key={num.id} value={String(num.id)}>
-                        {num.display_phone_number} ({num.verified_name}{pageName}){statusLabel}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="hint">
-                  {whatsAppNumbers.length} número(s) encontrado(s). Selecciona el número de destino para tu campaña.
-                </p>
-              </>
-            ) : (
-              <>
-                <input
-                  type="tel"
-                  placeholder="573001234567"
-                  value={whatsappNumber}
-                  onChange={(e) => {
-                    setWhatsappNumber(e.target.value);
-                  }}
-                  required
-                />
-                {whatsAppNumbersError && <p className="hint error">{whatsAppNumbersError}</p>}
-                <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
-              </>
-            )}
+            <label>Número de WhatsApp Business *</label>
 
-            {/* Toggle: mismo número vs número por conjunto */}
+            {/* Toggle por campaña / por conjunto — siempre visible si hay 2+ números */}
             {whatsAppNumbers.length > 1 && (
-              <div className="whatsapp-mode-toggle" style={{ marginTop: '8px' }}>
-                <div className="budget-level-selector">
+              <div style={{ marginBottom: '10px' }}>
+                <div className="toggle-group">
                   <button
                     type="button"
-                    className={`budget-btn ${whatsappMode === 'same' ? 'active' : ''}`}
+                    className={`toggle-btn ${whatsappMode === 'same' ? 'active' : ''}`}
                     onClick={() => setWhatsappMode('same')}
                   >
-                    Número para toda la campaña
+                    Por campaña
                   </button>
                   <button
                     type="button"
-                    className={`budget-btn ${whatsappMode === 'per-ad' ? 'active' : ''}`}
+                    className={`toggle-btn ${whatsappMode === 'per-ad' ? 'active' : ''}`}
                     onClick={() => setWhatsappMode('per-ad')}
                   >
-                    Número por conjunto
+                    Por conjunto
                   </button>
                 </div>
                 {whatsappMode === 'per-ad' && (
-                  <p className="hint">Selecciona un número de WhatsApp para cada conjunto de anuncios en la sección de Público.</p>
+                  <p className="hint" style={{ marginTop: '4px' }}>Selecciona el número para cada conjunto en la sección de Público.</p>
                 )}
               </div>
+            )}
+
+            {/* Selector global — solo cuando es "por campaña" o no hay números cargados */}
+            {(whatsappMode === 'same' || whatsAppNumbers.length <= 1) && (
+              loadingWhatsAppNumbers ? (
+                <select disabled><option>Cargando números de WhatsApp...</option></select>
+              ) : whatsAppNumbers.length > 0 ? (
+                <>
+                  <select
+                    value={selectedWhatsAppNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
+                      setSelectedWhatsAppNumber(val);
+                      if (selected) {
+                        const digits = selected.display_phone_number.replace(/\D/g, '');
+                        setWhatsappNumber(digits);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">Selecciona un número de WhatsApp</option>
+                    {whatsAppNumbers.map(num => {
+                      const statusLabel = num.quality_score?.score ? ` [${num.quality_score.score}]` : '';
+                      const pageName = num.page_name
+                        ? ` - ${num.page_name}`
+                        : num.whatsapp_business_account_name
+                          ? ` - ${num.whatsapp_business_account_name}`
+                          : '';
+                      return (
+                        <option key={num.id} value={String(num.id)}>
+                          {num.display_phone_number} ({num.verified_name}{pageName}){statusLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="hint">{whatsAppNumbers.length} número(s) encontrado(s).</p>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="tel"
+                    placeholder="573001234567"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    required
+                  />
+                  {whatsAppNumbersError && <p className="hint error">{whatsAppNumbersError}</p>}
+                  <p className="hint">Número con código de país sin espacios ni guiones (ej: 573001234567)</p>
+                </>
+              )
             )}
           </div>
         )}
@@ -1823,15 +1818,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
           <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
-          {/* Cabecera de columnas cuando hay presupuesto por conjunto */}
-          {budgetLevel === 'adset' && (
+          {/* Cabecera de columnas */}
+          {(budgetLevel === 'adset' || (whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1)) && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', paddingRight: '28px' }}>
               <div style={{ flex: 1 }} />
-              <div style={{ width: '110px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Presupuesto por conjunto</div>
+              {budgetLevel === 'adset' && (
+                <div style={{ width: '110px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Presupuesto</div>
+              )}
+              {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
+                <div style={{ width: '150px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Número WhatsApp</div>
+              )}
             </div>
           )}
           <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto 1</label>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: budgetLevel === 'adset' ? '28px' : '0' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: '28px' }}>
             <select
               style={{ flex: 1 }}
               value={selectedAudience}
@@ -1863,6 +1863,25 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 onChange={(e) => setDailyBudget(e.target.value)}
                 style={{ width: '110px', fontSize: '12px' }}
               />
+            )}
+            {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
+              <select
+                value={selectedWhatsAppNumber}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
+                  setSelectedWhatsAppNumber(val);
+                  if (selected) setWhatsappNumber(selected.display_phone_number.replace(/\D/g, ''));
+                }}
+                style={{ width: '150px', fontSize: '12px' }}
+              >
+                <option value="">Número WA...</option>
+                {whatsAppNumbers.map(num => (
+                  <option key={num.id} value={String(num.id)}>
+                    {num.display_phone_number}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
           {audienceError && (
