@@ -323,8 +323,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     if (!group || group.mediaItems.length === 0) return;
     // Use the first media item as the primary reference for AI generation
     const firstItem = group.mediaItems[0];
-    const mediaUrl = firstItem.type === 'video' ? (firstItem.url || firstItem.thumbnailUrl || '') : firstItem.url;
-    const mediaType = firstItem.type;
+    // For videos we only have the thumbnail URL (not the raw video file), so analyze it as an image
+    const mediaUrl = firstItem.thumbnailUrl || firstItem.url || '';
+    const mediaType = 'image';
     updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA...` });
     try {
       const metaService = new MetaAdsService(accessToken);
