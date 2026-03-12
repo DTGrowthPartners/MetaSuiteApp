@@ -1391,15 +1391,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
     }
 
-    // Validar que todos los ads tienen media (imagen o video)
-    const adsWithoutMedia = ads.filter(ad => !ad.imageHash && !ad.videoId);
-    if (adsWithoutMedia.length === ads.length) {
-      setError('Sube al menos una imagen o video para tus anuncios');
-      return;
-    }
-    if (adsWithoutMedia.length > 0) {
-      setError(`${adsWithoutMedia.length} anuncio(s) no tienen imagen ni video. Sube contenido o elimina los anuncios vacíos.`);
-      return;
+    // Validar media — en flexible mode se valida por grupos (ya hecho arriba)
+    if (adSetMode !== 'flexible') {
+      const adsWithoutMedia = ads.filter(ad => !ad.imageHash && !ad.videoId);
+      if (adsWithoutMedia.length === ads.length) {
+        setError('Sube al menos una imagen o video para tus anuncios');
+        return;
+      }
+      if (adsWithoutMedia.length > 0) {
+        setError(`${adsWithoutMedia.length} anuncio(s) no tienen imagen ni video. Sube contenido o elimina los anuncios vacíos.`);
+        return;
+      }
     }
 
     // El público es opcional - si no hay ninguno disponible, se usa targeting por defecto
