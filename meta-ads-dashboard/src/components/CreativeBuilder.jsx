@@ -1824,13 +1824,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
           {/* Cabecera de columnas cuando hay presupuesto por conjunto */}
           {budgetLevel === 'adset' && (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', paddingRight: '0px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', paddingRight: '28px' }}>
               <div style={{ flex: 1 }} />
               <div style={{ width: '110px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Presupuesto por conjunto</div>
             </div>
           )}
           <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto 1</label>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: budgetLevel === 'adset' ? '28px' : '0' }}>
             <select
               style={{ flex: 1 }}
               value={selectedAudience}
