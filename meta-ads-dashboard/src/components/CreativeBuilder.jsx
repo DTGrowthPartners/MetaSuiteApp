@@ -539,97 +539,35 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   };
 
   // Multi-file upload handler
+  // Sube archivos a la biblioteca de Meta (sin crear ads)
   const handleMultiFileUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0 || !selectedAccount) return;
-
-    // Reset input so same files can be re-selected
     e.target.value = '';
 
-    if (multiUploadMode === 'per-ad') {
-      // MODE: 1 file per ad — create N ads
-      setMultiUploadProgress(`Procesando ${files.length} archivo(s)...`);
+    const metaService = new MetaAdsService(accessToken);
+    setMultiUploadProgress(`Subiendo ${files.length} archivo(s) a biblioteca...`);
 
-      // Figure out which files go to existing empty ads and which need new ads
-      const fileAdPairs = await new Promise(resolve => {
-        setAds(prev => {
-          const pairs = [];
-          let updatedAds = [...prev];
-          const usedIndices = new Set();
-
-          for (let i = 0; i < files.length; i++) {
-            const emptyIdx = updatedAds.findIndex((ad, idx) =>
-              ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId && !usedIndices.has(idx)
-            );
-
-            if (emptyIdx !== -1) {
-              pairs.push({ file: files[i], adIndex: emptyIdx });
-              usedIndices.add(emptyIdx);
-            } else {
-              const newAd = createEmptyAd(updatedAds.length);
-              updatedAds = [...updatedAds, newAd];
-              pairs.push({ file: files[i], adIndex: updatedAds.length - 1 });
-            }
-          }
-
-          resolve(pairs);
-          return updatedAds;
-        });
-      });
-
-      // Wait for state to flush
-      await new Promise(r => setTimeout(r, 100));
-
-      for (let i = 0; i < fileAdPairs.length; i++) {
-        const { file, adIndex } = fileAdPairs[i];
-        setMultiUploadProgress(`Subiendo ${i + 1}/${fileAdPairs.length}: ${file.name}`);
-        const fakeEvent = { target: { files: [file] } };
-        await handleAdFileUpload(adIndex, fakeEvent);
-        if (i < fileAdPairs.length - 1) {
-          await new Promise(r => setTimeout(r, 500));
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setMultiUploadProgress(`Subiendo ${i + 1}/${files.length}: ${file.name}`);
+      const isVideo = file.type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(file.name.toLowerCase().split('.').pop());
+      try {
+        if (isVideo) {
+          await metaService.uploadVideoFile(selectedAccount, file);
+        } else {
+          await metaService.uploadImageFile(selectedAccount, file);
         }
+      } catch (err) {
+        console.error(`Error uploading ${file.name} to library:`, err);
       }
-
-      setMultiUploadProgress(`${fileAdPairs.length} ad(s) creado(s)`);
-      setTimeout(() => setMultiUploadProgress(''), 5000);
-
-    } else {
-      // MODE: All files for 1 ad — upload all to the first empty ad (only first file used, rest go to Meta library)
-      // Find first empty ad or use first ad
-      const targetAdIdx = ads.findIndex(ad => ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId) !== -1
-        ? ads.findIndex(ad => ad.mediaSource === 'none' && !ad.imageHash && !ad.videoId)
-        : 0;
-
-      // Upload first file to the ad (with AI analysis)
-      setMultiUploadProgress(`Subiendo archivo principal: ${files[0].name}`);
-      const fakeEvent = { target: { files: [files[0]] } };
-      await handleAdFileUpload(targetAdIdx, fakeEvent);
-
-      // Upload remaining files to Meta library only (no ad creation)
-      if (files.length > 1) {
-        const metaService = new MetaAdsService(accessToken);
-        for (let i = 1; i < files.length; i++) {
-          setMultiUploadProgress(`Subiendo a biblioteca ${i + 1}/${files.length}: ${files[i].name}`);
-          const file = files[i];
-          const isVideo = file.type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(file.name.toLowerCase().split('.').pop());
-          try {
-            if (isVideo) {
-              await metaService.uploadVideoFile(selectedAccount, file);
-            } else {
-              await metaService.uploadImageFile(selectedAccount, file);
-            }
-          } catch (err) {
-            console.error(`Error uploading ${file.name} to library:`, err);
-          }
-          if (i < files.length - 1) {
-            await new Promise(r => setTimeout(r, 500));
-          }
-        }
-      }
-
-      setMultiUploadProgress(`1 ad creado + ${files.length - 1} archivo(s) subido(s) a biblioteca`);
-      setTimeout(() => setMultiUploadProgress(''), 5000);
+      if (i < files.length - 1) await new Promise(r => setTimeout(r, 300));
     }
+
+    setMultiUploadProgress(`${files.length} archivo(s) subido(s) a biblioteca`);
+    setTimeout(() => setMultiUploadProgress(''), 4000);
+    // Recargar biblioteca para mostrar los nuevos archivos
+    handleLoadMediaLibrary();
   };
 
   // Campos dinámicos según tipo de campaña
@@ -2188,12 +2126,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           </p>
         </div>
 
-        {/* Multi-file Upload Section */}
+        {/* Library Upload Section */}
         <div className="upload-area">
-          <h4 style={{ marginBottom: '4px', color: 'var(--text-primary)' }}>Subir Múltiples Imágenes o Videos para Anuncios</h4>
-          <p className="hint mb-md" style={{ marginTop: '0' }}>
-            Sube las imágenes o videos para tus anuncios. La IA analizará cada archivo y generará automáticamente los textos (títulos, descripciones).
-          </p>
           <input
             ref={multiFileInputRef}
             type="file"
@@ -2202,31 +2136,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             onChange={handleMultiFileUpload}
             style={{ display: 'none' }}
           />
-          {/* Mode selector */}
-          <div className="toggle-group mb-sm" style={{ alignItems: 'center' }}>
-            <span className="text-muted" style={{ fontSize: '12px', marginRight: '4px' }}>Subida multiple:</span>
-            <button
-              type="button"
-              onClick={() => setMultiUploadMode('per-ad')}
-              className={`toggle-btn ${multiUploadMode === 'per-ad' ? 'active' : ''}`}
-            >
-              1 archivo por Ad
-            </button>
-            <button
-              type="button"
-              onClick={() => setMultiUploadMode('single')}
-              className={`toggle-btn ${multiUploadMode === 'single' ? 'active' : ''}`}
-            >
-              Todo para 1 Ad
-            </button>
-          </div>
-          <p className="hint mb-sm">
-            {multiUploadMode === 'per-ad'
-              ? 'Cada archivo crea un ad nuevo automaticamente con su contenido IA.'
-              : 'El primer archivo se usa para el ad, el resto se sube a la biblioteca de Meta.'}
-          </p>
-          {/* Buttons */}
-          <div className="toggle-group" style={{ alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"
               onClick={() => multiFileInputRef.current?.click()}
@@ -2234,7 +2144,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               className="toggle-btn active"
               style={{ padding: '10px 18px', opacity: selectedAccount ? 1 : 0.5 }}
             >
-              Subir Multiples Archivos
+              Subir archivos a biblioteca de Meta
             </button>
             {multiUploadProgress && (
               <span className="text-accent" style={{ fontSize: '12px' }}>
@@ -3087,6 +2997,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
   const [error, setError] = useState('');
   const [logs, setLogs] = useState([]);
 
+  // Auto-start creation on mount
+  useEffect(() => {
+    handleCreateDraft();
+  }, []);
+
   const addLog = (message) => {
     setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
@@ -3924,9 +3839,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <button className="back-button" onClick={onBack}>← Volver</button>
-
-      <h2>Crear Campaña</h2>
+      <h2>Creando Campaña...</h2>
 
       <div className="campaign-type-badge">
         {job.conversionLocation === 'WHATSAPP' ? (
@@ -3940,7 +3853,32 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         )}
       </div>
 
-      <div className="summary-section">
+      <div style={{ textAlign: 'center', padding: '40px 0' }}>
+        <span className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }}></span>
+        <p className="text-muted" style={{ marginTop: '16px' }}>Enviando a Meta Ads...</p>
+      </div>
+
+      {/* Logs */}
+      {logs.length > 0 && (
+        <div className="logs-section">
+          <h4>Progreso:</h4>
+          {logs.map((log, i) => (
+            <p key={i} className="log-line">{log}</p>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <>
+          <div className="error-message">⚠️ {error}</div>
+          <button className="create-button" onClick={handleCreateDraft} style={{ marginTop: '16px' }}>
+            Reintentar
+          </button>
+        </>
+      )}
+
+      {/* HIDDEN — kept for structure but replaced above */}
+      <div style={{ display: 'none' }}>
         <h3>Configuración de Campaña</h3>
         <div className="summary-grid">
           <div className="summary-item">
@@ -4157,32 +4095,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         </div>
       </div>
 
-      {/* Logs */}
-      {logs.length > 0 && (
-        <div className="logs-section">
-          <h4>Progreso:</h4>
-          {logs.map((log, i) => (
-            <p key={i} className="log-line">{log}</p>
-          ))}
-        </div>
-      )}
-
-      {error && <div className="error-message">⚠️ {error}</div>}
-
-      <button
-        className="create-button"
-        onClick={handleCreateDraft}
-        disabled={creating}
-      >
-        {creating ? (
-          <>
-            <span className="spinner"></span>
-            Creando en Meta...
-          </>
-        ) : (
-          'Crear Campaña en Meta'
-        )}
-      </button>
     </div>
   );
 }
