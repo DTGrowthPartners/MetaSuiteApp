@@ -1171,7 +1171,7 @@ Responde en este formato JSON exacto:
       data: {
         headlines: generatedContent.headlines.slice(0, 5),
         descriptions: generatedContent.descriptions.slice(0, 5),
-        linkDescriptions: (generatedContent.linkDescriptions || []).slice(0, 5),
+        linkDescriptions: (() => { const ld = (generatedContent.linkDescriptions || []).filter(d => d && d.trim()).slice(0, 5); while (ld.length < 5) ld.push(''); return ld; })(),
         ctas: generatedContent.ctas.slice(0, 5),
         suggestedBudget: generatedContent.suggestedBudget || 50000,
         targetAudience: generatedContent.targetAudience || ''
@@ -1432,6 +1432,11 @@ JSON exacto:
       parsed.ctas.push(next);
     }
   }
+  // Ensure exactly 5 linkDescriptions
+  if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
+    parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+    while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
+  }
   return parsed;
 }
 
@@ -1517,6 +1522,11 @@ CTAs variados de esta lista: ${ctx.ctas}`
       const next = fallbackCtas.find(c => !parsed.ctas.includes(c)) || 'LEARN_MORE';
       parsed.ctas.push(next);
     }
+  }
+  // Ensure exactly 5 linkDescriptions
+  if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
+    parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+    while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
   }
   return parsed;
 }

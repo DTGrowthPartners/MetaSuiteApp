@@ -662,13 +662,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
         const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
-          headlines: result.data.headlines || ['', '', '', '', ''],
-          descriptions: result.data.descriptions || ['', '', '', '', ''],
-          linkDescriptions: result.data.linkDescriptions || ['', '', '', '', ''],
+          headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
+          descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions?.length ? result.data.linkDescriptions : ['', '', '', '', ''],
           // Messaging destinations: forzar CTA de mensajería, no usar los generados por IA
           ...((isWhatsApp || isMessaging || isIgProfile)
             ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
-            : { ctas: result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
+            : { ctas: result.data.ctas?.length ? result.data.ctas : [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method === 'whisper' ? 'audio transcrito' : 'análisis visual'})`,
@@ -823,13 +823,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
         const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
-          headlines: result.data.headlines || ['', '', '', '', ''],
-          descriptions: result.data.descriptions || ['', '', '', '', ''],
-          linkDescriptions: result.data.linkDescriptions || ['', '', '', '', ''],
+          headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
+          descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions?.length ? result.data.linkDescriptions : ['', '', '', '', ''],
           // Messaging destinations: forzar CTA de mensajería
           ...((isWhatsApp || isMessaging || isIgProfile)
             ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
-            : { ctas: result.data.ctas || [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
+            : { ctas: result.data.ctas?.length ? result.data.ctas : [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
           analyzingMedia: false,
           contentGenerated: true,
           uploadProgress: `Contenido generado (${result.data.method || mediaType})`,
@@ -3600,26 +3600,42 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             <li><strong>{(() => {
               const numAds = job.ads?.length || 1;
               const numAuds = (job.multiAudiences?.length || 0) + 1;
-              if (job.adSetMode === 'single') {
+              if (job.adSetMode === 'flexible') {
+                return numAuds > 1 ? `${numAuds} Ad Sets` : '1 Ad Set';
+              } else if (job.adSetMode === 'single') {
                 return numAuds > 1 ? `${numAuds} Ad Sets` : '1 Ad Set';
               } else {
                 return numAuds > 1 ? `${numAds * numAuds} Ad Sets` : `${numAds} Ad Sets`;
               }
-            })()}</strong> - {job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}
+            })()}</strong> - {job.adSetMode === 'flexible' ? 'Flexible (todos los assets en 1 Ad)' : job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}
             {(job.multiAudiences?.length || 0) > 0 && <span className="text-accent"> ({(job.multiAudiences.length || 0) + 1} públicos)</span>}
             </li>
-            <li><strong>{job.ads?.length || 1} Creative(s)</strong>{job.adSetMode !== 'single' ? ' - Cada uno con 5+5+5' : ''}</li>
+            {job.adSetMode === 'flexible' ? (
+              <li><strong>1 Creative Flexible</strong> - {job.ads?.length || 1} asset(s) · 5+5+5 Copys</li>
+            ) : (
+              <li><strong>{job.ads?.length || 1} Creative(s)</strong>{job.adSetMode !== 'single' ? ' - Cada uno con 5+5+5' : ''}</li>
+            )}
             <li><strong>{(() => {
               const numAds = job.ads?.length || 1;
               const numAuds = (job.multiAudiences?.length || 0) + 1;
-              if (job.adSetMode === 'single') {
+              if (job.adSetMode === 'flexible') {
+                return numAuds > 1 ? `${numAuds} Anuncio(s)` : '1 Anuncio';
+              } else if (job.adSetMode === 'single') {
                 return numAuds > 1 ? `${numAds * numAuds} Anuncio(s)` : `${numAds} Anuncio(s)`;
               } else {
                 return numAuds > 1 ? `${numAds * numAuds} Anuncio(s)` : `${numAds} Anuncio(s)`;
               }
-            })()}</strong></li>
+            })()}</strong>{job.adSetMode === 'flexible' ? ' flexible con todos los contenidos' : ''}</li>
           </ul>
-          {job.ads?.length > 1 && (
+          {job.adSetMode === 'flexible' ? (
+            <div className="text-muted mt-sm" style={{ fontSize: '13px' }}>
+              {job.ads?.map((ad, i) => (
+                <p key={i} style={{ margin: '3px 0' }}>
+                  Asset {i + 1}: {ad.adName || `Ad ${i + 1}`} | {ad.videoId ? 'Video' : ad.imageUrl || ad.imageHash ? 'Imagen' : 'Sin media'}
+                </p>
+              ))}
+            </div>
+          ) : job.ads?.length > 1 && (
             <div className="text-muted mt-sm" style={{ fontSize: '13px' }}>
               {job.ads.map((ad, i) => (
                 <p key={i} style={{ margin: '3px 0' }}>
