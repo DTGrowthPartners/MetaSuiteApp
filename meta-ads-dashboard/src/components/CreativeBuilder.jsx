@@ -15,8 +15,13 @@ import {
 } from '../config/campaignTemplates';
 import './CreativeBuilder.css';
 
-// Prefijo para identificar campañas creadas por esta herramienta
-const CAMPAIGN_PREFIX = 'DTGP - ';
+// Prefijo dinámico según objetivo de campaña
+function getCampaignPrefix(objective) {
+  if (objective === 'OUTCOME_LEADS') return '🟨 DTGP - ';
+  if (objective === 'OUTCOME_SALES' || objective === 'OUTCOME_ENGAGEMENT') return '🟥 DTGP - ';
+  // OUTCOME_TRAFFIC, OUTCOME_AWARENESS (ThruPlay), etc.
+  return '🟦 DTGP - ';
+}
 
 // Las plantillas ahora se importan desde campaignTemplates.js
 
@@ -1364,8 +1369,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         : null;
       const selectedPageData = pages.find(p => p.id === selectedPage);
 
-      // Agregar prefijo "CARLOS - " al nombre de la campaña
-      const fullCampaignName = `${CAMPAIGN_PREFIX}${campaignName.trim()}`;
+      const campaignPrefix = getCampaignPrefix(selectedTemplate?.objective);
+      const fullCampaignName = `${campaignPrefix}${campaignName.trim()}`;
 
       // Determinar tipo de campaña basado en la plantilla (o destino seleccionado por el usuario)
       const conversionLocation = destinationOptions ? selectedDestination : (templateAdSetConfig.conversionLocation || 'WEBSITE');
@@ -1541,7 +1546,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <div className="form-group">
           <label>Nombre de la Campaña *</label>
           <div className="input-with-prefix">
-            <span className="input-prefix">{CAMPAIGN_PREFIX}</span>
+            <span className="input-prefix">{getCampaignPrefix(selectedTemplate?.objective)}</span>
             <input
               type="text"
               placeholder="Ej: Landing Febrero 2024"
@@ -1550,7 +1555,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               required
             />
           </div>
-          <p className="hint">Se agregará "{CAMPAIGN_PREFIX}" al inicio para identificar tus campañas</p>
+          <p className="hint">Se agregará "{getCampaignPrefix(selectedTemplate?.objective)}" al inicio para identificar tus campañas</p>
         </div>
 
         {/* Ad Account Selection */}
