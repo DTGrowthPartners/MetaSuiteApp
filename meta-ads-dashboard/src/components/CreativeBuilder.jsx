@@ -304,7 +304,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   useEffect(() => {
     const sectionIds = [
       'section-campana', 'section-identidad', 'section-destino',
-      'section-publico', 'section-presupuesto', 'section-anuncios'
+      'section-presupuesto', 'section-publico', 'section-anuncios'
     ];
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1470,8 +1470,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             { id: 'section-campana', label: 'Campaña' },
             { id: 'section-identidad', label: 'Identidad' },
             { id: 'section-destino', label: 'Destino' },
-            { id: 'section-publico', label: 'Público' },
             { id: 'section-presupuesto', label: 'Presupuesto' },
+            { id: 'section-publico', label: 'Público' },
             { id: 'section-anuncios', label: 'Anuncios' },
           ].map(nav => (
             <button
@@ -1760,6 +1760,57 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>{/* fin section-card Destino */}
 
         {/* ===================== SECCIÓN: PÚBLICO ===================== */}
+        {/* ===================== SECCIÓN: PRESUPUESTO Y CALENDARIO ===================== */}
+        <div className="section-card" id="section-presupuesto">
+          <h4><span className="section-icon">💰</span> Presupuesto y Calendario</h4>
+
+        {/* Budget Level Selector (only for templates that allow it) */}
+        {templateAdSetConfig.allowBudgetLevel && (
+          <div className="form-group">
+            <label>Nivel de Presupuesto</label>
+            <div className="toggle-group">
+              <button
+                type="button"
+                className={`toggle-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
+                onClick={() => setBudgetLevel('campaign')}
+              >
+                Por Campaña (CBO)
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
+                onClick={() => setBudgetLevel('adset')}
+              >
+                Por Conjunto de Anuncios
+              </button>
+            </div>
+            <p className="hint">
+              {budgetLevel === 'campaign'
+                ? 'Meta distribuye el presupuesto automáticamente entre los conjuntos de anuncios'
+                : 'Tú controlas cuánto gasta cada conjunto de anuncios'}
+            </p>
+          </div>
+        )}
+
+        {/* Daily Budget in COP */}
+        <div className="form-group">
+          <label>Presupuesto Diario {budgetLevel === 'adset' ? '(COP) - Por defecto por conjunto *' : '(COP) *'}</label>
+          <input
+            type="number"
+            placeholder="20000"
+            min="5000"
+            step="1000"
+            value={dailyBudget}
+            onChange={(e) => setDailyBudget(e.target.value)}
+            required
+          />
+          <p className="hint">
+            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día ({budgetLevel === 'campaign' ? 'CBO' : 'por Ad Set'}) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 20000)}
+          </p>
+        </div>
+
+        </div>{/* fin section-card Presupuesto */}
+
         <div className="section-card" id="section-publico">
           <h4><span className="section-icon">👥</span> Público</h4>
 
@@ -1804,21 +1855,41 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto {index + 2}</label>
-                      <select
-                        value={aud.id}
-                        onChange={(e) => {
-                          const newAud = allAudiences.find(a => a.id === e.target.value);
-                          if (newAud) setMultiAudiences(prev => prev.map((a, i) => i === index ? { id: newAud.id, name: newAud.name, targeting: newAud.targeting, audienceType: newAud.audienceType } : a));
-                        }}
-                      >
-                        {allAudiences
-                          .filter(a => a.id !== selectedAudience && !multiAudiences.some((ma, mi) => ma.id === a.id && mi !== index))
-                          .map((audience) => (
-                            <option key={audience.id} value={audience.id}>
-                              {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
-                            </option>
-                          ))}
-                      </select>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <select
+                          style={{ flex: 1 }}
+                          value={aud.id}
+                          onChange={(e) => {
+                            const newAud = allAudiences.find(a => a.id === e.target.value);
+                            if (newAud) setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, id: newAud.id, name: newAud.name, targeting: newAud.targeting, audienceType: newAud.audienceType } : a));
+                          }}
+                        >
+                          {allAudiences
+                            .filter(a => a.id !== selectedAudience && !multiAudiences.some((ma, mi) => ma.id === a.id && mi !== index))
+                            .map((audience) => (
+                              <option key={audience.id} value={audience.id}>
+                                {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
+                              </option>
+                            ))}
+                        </select>
+                        {budgetLevel === 'adset' && (
+                          <input
+                            type="number"
+                            min="5000"
+                            step="1000"
+                            placeholder={dailyBudget || '20000'}
+                            value={aud.dailyBudget || ''}
+                            onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, dailyBudget: e.target.value } : a))}
+                            style={{ width: '110px', fontSize: '12px' }}
+                            title="Presupuesto diario para este conjunto (COP)"
+                          />
+                        )}
+                      </div>
+                      {budgetLevel === 'adset' && (
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                          ${formatCOP(aud.dailyBudget || dailyBudget || 0)} COP/día
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -1862,57 +1933,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>
 
         </div>{/* fin section-card Público */}
-
-        {/* ===================== SECCIÓN: PRESUPUESTO Y CALENDARIO ===================== */}
-        <div className="section-card" id="section-presupuesto">
-          <h4><span className="section-icon">💰</span> Presupuesto y Calendario</h4>
-
-        {/* Budget Level Selector (only for templates that allow it) */}
-        {templateAdSetConfig.allowBudgetLevel && (
-          <div className="form-group">
-            <label>Nivel de Presupuesto</label>
-            <div className="toggle-group">
-              <button
-                type="button"
-                className={`toggle-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
-                onClick={() => setBudgetLevel('campaign')}
-              >
-                Por Campaña (CBO)
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
-                onClick={() => setBudgetLevel('adset')}
-              >
-                Por Conjunto de Anuncios
-              </button>
-            </div>
-            <p className="hint">
-              {budgetLevel === 'campaign'
-                ? 'Meta distribuye el presupuesto automáticamente entre los conjuntos de anuncios'
-                : 'Tú controlas cuánto gasta cada conjunto de anuncios'}
-            </p>
-          </div>
-        )}
-
-        {/* Daily Budget in COP */}
-        <div className="form-group">
-          <label>Presupuesto Diario (COP) *</label>
-          <input
-            type="number"
-            placeholder="20000"
-            min="5000"
-            step="1000"
-            value={dailyBudget}
-            onChange={(e) => setDailyBudget(e.target.value)}
-            required
-          />
-          <p className="hint">
-            Presupuesto: ${formatCOP(dailyBudget || 0)} COP/día ({budgetLevel === 'campaign' ? 'CBO' : 'por Ad Set'}) - Sugerido: ${formatCOP(templateAdSetConfig.suggestedBudget || selectedTemplate?.suggestedBudget || 20000)}
-          </p>
-        </div>
-
-        </div>{/* fin section-card Presupuesto */}
 
         {/* ===================== SECCIÓN: ANUNCIOS ===================== */}
         <div className="section-card" id="section-anuncios">
@@ -3136,6 +3156,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           conversionLocation,
           pixelId: job.pixelId || null,
           whatsappNumber: job.whatsappNumber || null,
+          budgetLevel: job.budgetLevel || 'campaign',
           adSetMode: job.adSetMode || 'single',
           multiAudiences: job.multiAudiences || [],
           ads: job.ads || [{

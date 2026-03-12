@@ -2848,7 +2848,8 @@ class MetaAdsService {
       const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
         ? [primaryAud, ...multiAudiences.map(a => ({
             name: a.name,
-            targeting: { ...(a.targeting || targeting) }
+            targeting: { ...(a.targeting || targeting) },
+            dailyBudget: a.dailyBudget ? Number(a.dailyBudget) : null
           }))]
         : [primaryAud];
 
@@ -2859,6 +2860,7 @@ class MetaAdsService {
       for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
         const currentAudience = audiencesToProcess[audIdx];
         const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
+        const audDailyBudget = currentAudience.dailyBudget || dailyBudget;
         let sharedAdSetId = null;
 
       if (adSetMode === 'single' || adSetMode === 'flexible') {
@@ -2871,7 +2873,7 @@ class MetaAdsService {
           optimizationGoal,
           promotedObject: { page_id: pageId },
           whatsappPhoneNumber: whatsappNumber,
-          dailyBudget: !isCBO ? dailyBudget : null,
+          dailyBudget: !isCBO ? audDailyBudget : null,
           isDynamicCreative: false,
           startTime,
           endTime,
@@ -2889,7 +2891,7 @@ class MetaAdsService {
             optimizationGoal,
             promotedObject: { page_id: pageId },
             whatsappPhoneNumber: null,
-            dailyBudget: !isCBO ? dailyBudget : null,
+            dailyBudget: !isCBO ? audDailyBudget : null,
             isDynamicCreative: false,
             startTime,
             endTime,
@@ -2990,7 +2992,7 @@ class MetaAdsService {
             optimizationGoal,
             promotedObject: { page_id: pageId },
             whatsappPhoneNumber: adWhatsappNumber,
-            dailyBudget: !isCBO ? dailyBudget : null,
+            dailyBudget: !isCBO ? audDailyBudget : null,
             isDynamicCreative: useDynamicCreative,
             startTime,
             endTime,
@@ -3008,7 +3010,7 @@ class MetaAdsService {
               optimizationGoal,
               promotedObject: { page_id: pageId },
               whatsappPhoneNumber: null,
-              dailyBudget: !isCBO ? dailyBudget : null,
+              dailyBudget: !isCBO ? audDailyBudget : null,
               isDynamicCreative: useDynamicCreative,
               startTime,
               endTime,
@@ -3207,7 +3209,7 @@ class MetaAdsService {
             optimizationGoal,
             promotedObject: { page_id: pageId },
             whatsappPhoneNumber: adWhatsappNumber,
-            dailyBudget: !isCBO ? dailyBudget : null,
+            dailyBudget: !isCBO ? audDailyBudget : null,
             isDynamicCreative: false,
             startTime,
             endTime,
@@ -3711,7 +3713,8 @@ class MetaAdsService {
     whatsappNumber = null, // Número de WhatsApp (ej: "573005410171")
     adSetMode = 'single', // 'single' | 'per-ad'
     ads = [],
-    multiAudiences = [] // Múltiples públicos: replicar AdSets por cada público
+    multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
+    budgetLevel = 'campaign' // 'campaign' (CBO) o 'adset'
   }) {
     const VALID_LINK_CLICKS_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
@@ -3918,14 +3921,15 @@ class MetaAdsService {
         }
       }
 
-      // 1. Crear Campaña con CBO
-      console.log(`Creating campaign with CBO for ${ads.length} ads... (destination: ${destinationType || 'auto'})`);
+      const isCBO = budgetLevel === 'campaign';
+      // 1. Crear Campaña (con presupuesto si es CBO)
+      console.log(`Creating campaign (budget: ${budgetLevel}) for ${ads.length} ads... (destination: ${destinationType || 'auto'})`);
       const campaignResult = await this.createCampaign(adAccountId, {
         name: campaignName,
         objective,
         status: 'PAUSED',
         specialAdCategories,
-        dailyBudget
+        dailyBudget: isCBO ? dailyBudget : null
       });
 
       if (!campaignResult.success) {
@@ -4108,7 +4112,8 @@ class MetaAdsService {
       const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
         ? [primaryAud, ...multiAudiences.map(a => ({
             name: a.name,
-            targeting: { ...(a.targeting || targeting) }
+            targeting: { ...(a.targeting || targeting) },
+            dailyBudget: a.dailyBudget ? Number(a.dailyBudget) : null
           }))]
         : [primaryAud];
 
@@ -4122,12 +4127,14 @@ class MetaAdsService {
         // ========================================================
         for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
           const currentAudience = audiencesToProcess[audIdx];
+          const audDailyBudget = currentAudience.dailyBudget || dailyBudget;
           const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
           console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
             name: `${campaignName} - Ad Set${audPrefix}`,
             campaignId: results.campaign.id,
+            dailyBudget: !isCBO ? audDailyBudget : null,
             billingEvent,
             optimizationGoal,
             targeting: currentAudience.targeting,
@@ -4156,6 +4163,7 @@ class MetaAdsService {
         // ========================================================
         for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
           const currentAudience = audiencesToProcess[audIdx];
+          const audDailyBudget = currentAudience.dailyBudget || dailyBudget;
           const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
           console.log(`Mode: ${ads.length} ADSETS con 5+5+5 Dynamic Creative${audPrefix}`);
 
@@ -4165,6 +4173,7 @@ class MetaAdsService {
             const adSetResult = await this.createAdSet(adAccountId, {
               name: `${campaignName} - Ad Set ${i + 1}${audPrefix}`,
               campaignId: results.campaign.id,
+              dailyBudget: !isCBO ? audDailyBudget : null,
               billingEvent,
               optimizationGoal,
               targeting: currentAudience.targeting,
@@ -4195,12 +4204,14 @@ class MetaAdsService {
         // ========================================================
         for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
           const currentAudience = audiencesToProcess[audIdx];
+          const audDailyBudget = currentAudience.dailyBudget || dailyBudget;
           const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
           console.log(`Mode: FLEXIBLE - 1 ADSET${audPrefix} → 1 Flexible Ad (${ads.length} contenidos combinados)`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
             name: `${campaignName} - Ad Set${audPrefix}`,
             campaignId: results.campaign.id,
+            dailyBudget: !isCBO ? audDailyBudget : null,
             billingEvent,
             optimizationGoal,
             targeting: currentAudience.targeting,
@@ -4314,6 +4325,7 @@ class MetaAdsService {
           const adSetResult = await this.createAdSet(adAccountId, {
             name: `${campaignName} - Ad Set ${i + 1}${audienceLabel}`,
             campaignId: results.campaign.id,
+            dailyBudget: !isCBO ? dailyBudget : null,
             billingEvent,
             optimizationGoal,
             targeting: adTargeting,
