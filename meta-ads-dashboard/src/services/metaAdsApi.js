@@ -2797,7 +2797,8 @@ class MetaAdsService {
     endTime = null,
     linkUrl = null,
     pageWelcomeMessage = null, // Plantilla de mensaje de bienvenida para WhatsApp
-    multiAudiences = [] // Múltiples públicos: replicar AdSets por cada público
+    multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
+    flexibleAdGroups = []
   }) {
     const results = { campaign: null, adSets: [], creatives: [], ads: [], errors: [] };
 
@@ -2913,63 +2914,57 @@ class MetaAdsService {
         sharedAdSetId = adSetResult.data.id;
       }
 
-      // ====== FLEXIBLE AD: Agrupar TODO el contenido en UN SOLO ad ======
+      // ====== FLEXIBLE AD: N Flexible Ads per AdSet ======
       if (useFlexible) {
-        console.log(`Creating 1 flexible ad with all content (${ads.length} pieces) in shared AdSet${audPrefix}...`);
+        // FLEXIBLE MODE: N Flexible Ads per AdSet
+        const groupsToCreate = flexibleAdGroups.length > 0 ? flexibleAdGroups : [{
+          mediaItems: ads.map(ad => ad.videoId
+            ? { type: 'video', hash: ad.imageHash || '', url: ad.videoThumbnailUrl || '', videoId: ad.videoId, thumbnailUrl: ad.videoThumbnailUrl || '' }
+            : { type: 'image', hash: ad.imageHash || '', url: ad.imageUrl || '' }),
+          headlines: [...new Set(ads.flatMap(a => (a.headlines || [])).filter(Boolean))].slice(0, 5),
+          descriptions: [...new Set(ads.flatMap(a => (a.descriptions || a.primaryTexts || [])).filter(Boolean))].slice(0, 5),
+          linkDescriptions: [...new Set(ads.flatMap(a => (a.linkDescriptions || [])).filter(Boolean))].slice(0, 5),
+          ctas: ads[0]?.ctas || ['WHATSAPP_MESSAGE']
+        }];
 
-        const allImages = [];
-        const allVideos = [];
-        const allHeadlines = new Set();
-        const allPrimaryTexts = new Set();
-        const allDescriptions = new Set();
+        for (let gi = 0; gi < groupsToCreate.length; gi++) {
+          const flexGroup = groupsToCreate[gi];
+          const groupLabel = groupsToCreate.length > 1 ? ` (Ad ${gi + 1})` : '';
 
-        for (let i = 0; i < ads.length; i++) {
-          const ad = ads[i];
-          // Acumular contenido
-          if (ad.videoId) {
-            const vid = { video_id: ad.videoId };
-            if (ad.videoThumbnailUrl) vid.image_url = ad.videoThumbnailUrl;
-            allVideos.push(vid);
-          } else if (ad.imageHash) {
-            allImages.push({ hash: ad.imageHash });
+          const images = flexGroup.mediaItems.filter(m => m.type === 'image' && m.hash).map(m => ({ hash: m.hash }));
+          const videos = flexGroup.mediaItems.filter(m => m.type === 'video' && m.videoId).map(m => {
+            const vObj = { video_id: m.videoId };
+            if (m.hash) vObj.image_hash = m.hash;
+            else if (m.thumbnailUrl) vObj.image_url = m.thumbnailUrl;
+            return vObj;
+          });
+
+          const waLinkForGroup = `https://api.whatsapp.com/send?phone=${(audWhatsappNumber || '').replace(/\D/g, '')}`;
+          const texts = [];
+          (flexGroup.headlines || []).filter(Boolean).slice(0, 5).forEach(h => texts.push({ text: h, text_type: 'headline' }));
+          (flexGroup.descriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
+          (flexGroup.linkDescriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'description' }));
+          if (texts.filter(t => t.text_type === 'headline').length === 0) texts.push({ text: 'Contáctanos', text_type: 'headline' });
+          if (texts.filter(t => t.text_type === 'primary_text').length === 0) texts.push({ text: 'Escríbenos por WhatsApp', text_type: 'primary_text' });
+
+          const flexResult = await this.createFlexibleAd(adAccountId, {
+            name: `${campaignName} - Flexible Ad${audPrefix}${groupLabel}`,
+            adsetId: sharedAdSetId,
+            pageId,
+            igActorId,
+            images,
+            videos,
+            texts,
+            callToAction: { type: 'WHATSAPP_MESSAGE', value: { link: waLinkForGroup } },
+            linkUrl: waLinkForGroup,
+            status: 'ACTIVE'
+          });
+
+          if (!flexResult.success) {
+            results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error}`);
+          } else {
+            results.ads.push(flexResult.data);
           }
-          // Acumular textos (deduplicados)
-          (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
-          (ad.descriptions || []).filter(d => d?.trim()).forEach(d => allPrimaryTexts.add(d.trim()));
-          (ad.linkDescriptions || []).filter(d => d?.trim()).forEach(d => allDescriptions.add(d.trim()));
-        }
-
-        // Construir textos (máximo 5 por tipo)
-        const texts = [];
-        const headlines = [...allHeadlines].slice(0, 5);
-        const primaryTexts = [...allPrimaryTexts].slice(0, 5);
-        const descriptions = [...allDescriptions].slice(0, 5);
-        if (headlines.length === 0) headlines.push('Contáctanos');
-        if (primaryTexts.length === 0) primaryTexts.push('Escríbenos por WhatsApp');
-        headlines.forEach(h => texts.push({ text: h, text_type: 'headline' }));
-        primaryTexts.forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
-        descriptions.forEach(d => texts.push({ text: d, text_type: 'description' }));
-
-        // WhatsApp flexible: link obligatorio → deep link de WhatsApp
-        const waLink = `https://api.whatsapp.com/send?phone=${(audWhatsappNumber || ads[0]?.whatsappNumber || '').replace(/\D/g, '')}`;
-
-        const flexResult = await this.createFlexibleAd(adAccountId, {
-          name: `${campaignName} - Flexible Ad${audPrefix}`,
-          adsetId: sharedAdSetId,
-          pageId,
-          igActorId,
-          images: allImages,
-          videos: allVideos,
-          texts,
-          callToAction: { type: 'WHATSAPP_MESSAGE', value: { link: waLink } },
-          linkUrl: waLink,
-          status: 'ACTIVE'
-        });
-
-        if (!flexResult.success) {
-          results.errors.push(`Flexible Ad${audPrefix}: ${flexResult.error}`);
-        } else {
-          results.ads.push(flexResult.data);
         }
       }
 
@@ -3716,7 +3711,8 @@ class MetaAdsService {
     adSetMode = 'single', // 'single' | 'per-ad'
     ads = [],
     multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
-    budgetLevel = 'campaign' // 'campaign' (CBO) o 'adset'
+    budgetLevel = 'campaign', // 'campaign' (CBO) o 'adset'
+    flexibleAdGroups = []
   }) {
     const VALID_LINK_CLICKS_CTAS = [
       'LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE',
@@ -4229,85 +4225,66 @@ class MetaAdsService {
             continue;
           }
           results.adSets.push(adSetResult.data);
+          const flexAdSetId = adSetResult.data.id;
 
-          // FLEXIBLE: Agrupar TODO el contenido (imágenes + videos) en UN SOLO ad
-          console.log(`Creating 1 flexible ad with all content (${ads.length} pieces)${audPrefix}...`);
+          // FLEXIBLE MODE: 1 AdSet per audience → N Flexible Ads (1 per flexibleAdGroups entry)
+          const groupsToCreate = flexibleAdGroups.length > 0 ? flexibleAdGroups : [{
+            mediaItems: ads.map(ad => ad.videoId
+              ? { type: 'video', hash: ad.imageHash || '', url: ad.videoThumbnailUrl || '', videoId: ad.videoId, thumbnailUrl: ad.videoThumbnailUrl || '' }
+              : { type: 'image', hash: ad.imageHash || '', url: ad.imageUrl || '' }),
+            headlines: [...new Set(ads.flatMap(a => (a.headlines || [])).filter(Boolean))].slice(0, 5),
+            descriptions: [...new Set(ads.flatMap(a => (a.descriptions || a.primaryTexts || [])).filter(Boolean))].slice(0, 5),
+            linkDescriptions: [...new Set(ads.flatMap(a => (a.linkDescriptions || [])).filter(Boolean))].slice(0, 5),
+            ctas: ads[0]?.ctas || ['LEARN_MORE']
+          }];
 
-          const allImages = [];
-          const allVideos = [];
-          const allHeadlines = new Set();
-          const allPrimaryTexts = new Set();
-          const allDescriptions = new Set();
-          let firstCTAType = null;
+          for (let gi = 0; gi < groupsToCreate.length; gi++) {
+            const flexGroup = groupsToCreate[gi];
+            const groupLabel = groupsToCreate.length > 1 ? ` (Ad ${gi + 1})` : '';
 
-          for (let i = 0; i < ads.length; i++) {
-            const ad = ads[i];
-            const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, i);
+            const images = flexGroup.mediaItems.filter(m => m.type === 'image' && m.hash).map(m => ({ hash: m.hash }));
+            const videos = flexGroup.mediaItems.filter(m => m.type === 'video' && m.videoId).map(m => {
+              const vObj = { video_id: m.videoId };
+              if (m.hash) vObj.image_hash = m.hash;
+              else if (m.thumbnailUrl) vObj.image_url = m.thumbnailUrl;
+              return vObj;
+            });
 
-            // Acumular contenido
-            if (ad.videoId) {
-              const vid = { video_id: ad.videoId };
-              if (resolvedThumbHash) {
-                vid.image_hash = resolvedThumbHash;
-              } else if (resolvedThumbUrl) {
-                vid.image_url = resolvedThumbUrl;
-              }
-              allVideos.push(vid);
-            } else if (ad.imageHash) {
-              allImages.push({ hash: ad.imageHash });
+            const texts = [];
+            (flexGroup.headlines || []).filter(Boolean).slice(0, 5).forEach(h => texts.push({ text: h, text_type: 'headline' }));
+            (flexGroup.descriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'primary_text' }));
+            (flexGroup.linkDescriptions || []).filter(Boolean).slice(0, 5).forEach(d => texts.push({ text: d, text_type: 'description' }));
+            if (texts.filter(t => t.text_type === 'headline').length === 0) texts.push({ text: 'Descubre más', text_type: 'headline' });
+            if (texts.filter(t => t.text_type === 'primary_text').length === 0) texts.push({ text: 'Conoce nuestros productos', text_type: 'primary_text' });
+
+            const groupCTAType = (flexGroup.ctas?.[0]) || defaultCTAForStandard || 'LEARN_MORE';
+            let groupFlexLinkUrl = linkUrl;
+            if (groupCTAType === 'WHATSAPP_MESSAGE' && whatsappNumber) {
+              groupFlexLinkUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber.replace(/\D/g, '')}`;
+            } else if (groupCTAType === 'INSTAGRAM_MESSAGE' && igActorId) {
+              groupFlexLinkUrl = `https://ig.me/m/${igActorId}`;
+            } else if (groupCTAType === 'MESSAGE_PAGE' && pageId) {
+              groupFlexLinkUrl = `https://m.me/${pageId}`;
             }
 
-            // Acumular textos (deduplicados)
-            (ad.headlines || []).filter(h => h?.trim()).forEach(h => allHeadlines.add(h.trim()));
-            (ad.descriptions || []).filter(d => d?.trim()).forEach(d => allPrimaryTexts.add(d.trim()));
-            (ad.linkDescriptions || []).filter(d => d?.trim()).forEach(d => allDescriptions.add(d.trim()));
+            const flexResult = await this.createFlexibleAd(adAccountId, {
+              name: `${campaignName} - Flexible Ad${audPrefix}${groupLabel}`,
+              adsetId: flexAdSetId,
+              pageId,
+              igActorId,
+              images,
+              videos,
+              texts,
+              callToAction: { type: groupCTAType, value: { link: groupFlexLinkUrl || '' } },
+              linkUrl: groupFlexLinkUrl,
+              status: 'ACTIVE'
+            });
 
-            // CTA: usar el primero encontrado
-            if (!firstCTAType) {
-              const validCTAs = sanitizeCTAs(ad.ctas, false);
-              if (validCTAs.length > 0) firstCTAType = validCTAs[0];
+            if (!flexResult.success) {
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error}`);
+            } else {
+              results.ads.push(flexResult.data);
             }
-          }
-
-          // Construir textos (máximo 5 por tipo)
-          const texts = [];
-          const headlines = [...allHeadlines].slice(0, 5);
-          const primaryTexts = [...allPrimaryTexts].slice(0, 5);
-          const descriptions = [...allDescriptions].slice(0, 5);
-          if (headlines.length === 0) headlines.push('Conoce más');
-          if (primaryTexts.length === 0) primaryTexts.push('Descubre más');
-          headlines.forEach(t => texts.push({ text: t, text_type: 'headline' }));
-          primaryTexts.forEach(b => texts.push({ text: b, text_type: 'primary_text' }));
-          descriptions.forEach(d => texts.push({ text: d, text_type: 'description' }));
-
-          // CTA
-          const ctaType = firstCTAType || defaultCTAForStandard;
-          let flexLinkUrl = linkUrl;
-          if (ctaType === 'WHATSAPP_MESSAGE' && whatsappNumber) {
-            flexLinkUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber.replace(/\D/g, '')}`;
-          } else if (ctaType === 'INSTAGRAM_MESSAGE' && igActorId) {
-            flexLinkUrl = `https://ig.me/m/${igActorId}`;
-          } else if (ctaType === 'MESSAGE_PAGE' && pageId) {
-            flexLinkUrl = `https://m.me/${pageId}`;
-          }
-
-          const flexResult = await this.createFlexibleAd(adAccountId, {
-            name: `${campaignName} - Flexible Ad${audPrefix}`,
-            adsetId: adSetResult.data.id,
-            pageId,
-            igActorId,
-            images: allImages,
-            videos: allVideos,
-            texts,
-            callToAction: { type: ctaType, value: { link: flexLinkUrl || '' } },
-            linkUrl: flexLinkUrl,
-            status: 'ACTIVE'
-          });
-
-          if (!flexResult.success) {
-            results.errors.push(`Flexible Ad${audPrefix}: ${flexResult.error}`);
-          } else {
-            results.ads.push(flexResult.data);
           }
         }
 

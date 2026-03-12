@@ -282,6 +282,88 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   });
   const [ads, setAds] = useState([createEmptyAd(0)]);
 
+  // ===== FLEXIBLE AD GROUPS (only used when adSetMode === 'flexible') =====
+  const createEmptyFlexGroup = (index) => ({
+    id: Date.now() + index,
+    mediaItems: [], // [{ type: 'image'|'video', hash, url, videoId, thumbnailUrl, name }]
+    headlines: ['', '', '', '', ''],
+    descriptions: ['', '', '', '', ''], // primary texts
+    linkDescriptions: ['', '', '', '', ''],
+    ctas: ['LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE', 'LEARN_MORE'],
+    contentGenerated: false,
+    showEditContent: false,
+    analyzingMedia: false,
+    uploadProgress: ''
+  });
+  const [flexibleAdGroups, setFlexibleAdGroups] = useState([createEmptyFlexGroup(0)]);
+  const [flexGroupPickerOpen, setFlexGroupPickerOpen] = useState(null); // index of group with open media picker
+  const [flexGroupPickerTab, setFlexGroupPickerTab] = useState('images');
+  const [flexGroupUploadRefs] = useState(() => ({})); // keyed by group index
+
+  const updateFlexGroup = (index, updates) =>
+    setFlexibleAdGroups(prev => prev.map((g, i) => i === index ? { ...g, ...updates } : g));
+
+  const addFlexGroup = () =>
+    setFlexibleAdGroups(prev => [...prev, createEmptyFlexGroup(prev.length)]);
+
+  const removeFlexGroup = (index) => {
+    if (flexibleAdGroups.length <= 1) return;
+    setFlexibleAdGroups(prev => prev.filter((_, i) => i !== index));
+    if (flexGroupPickerOpen === index) setFlexGroupPickerOpen(null);
+  };
+
+  const addMediaToFlexGroup = (groupIndex, item) =>
+    setFlexibleAdGroups(prev => prev.map((g, i) => i === groupIndex ? { ...g, mediaItems: [...g.mediaItems, item] } : g));
+
+  const removeMediaFromFlexGroup = (groupIndex, mediaIndex) =>
+    setFlexibleAdGroups(prev => prev.map((g, i) => i === groupIndex ? { ...g, mediaItems: g.mediaItems.filter((_, mi) => mi !== mediaIndex) } : g));
+
+  const analyzeFlexGroupWithMedia = async (groupIndex) => {
+    const group = flexibleAdGroups[groupIndex];
+    if (!group || group.mediaItems.length === 0) return;
+    // Use the first media item as the primary reference for AI generation
+    const firstItem = group.mediaItems[0];
+    const mediaUrl = firstItem.type === 'video' ? (firstItem.url || firstItem.thumbnailUrl || '') : firstItem.url;
+    const mediaType = firstItem.type;
+    updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA...` });
+    try {
+      const metaService = new MetaAdsService(accessToken);
+      const category = selectedTemplate?.category || '';
+      const objective = selectedTemplate?.objective || '';
+      const templateName = selectedTemplate?.name || '';
+      const destType = templateAdConfig.destinationConfig?.type || '';
+      const result = await metaService.analyzeMediaUrl(
+        mediaUrl, mediaType, groupIndex, category, objective, templateName, destType, textLength, campaignContext
+      );
+      if (result.success && result.data) {
+        const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+        const isWhatsApp = effectiveDestination === 'WHATSAPP';
+        const isMessenger = effectiveDestination === 'MESSENGER';
+        const isIgDirect = effectiveDestination === 'INSTAGRAM_DIRECT';
+        const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
+        const isMessaging = isMessenger || isIgDirect;
+        const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        updateFlexGroup(groupIndex, {
+          headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
+          descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions?.length ? result.data.linkDescriptions : ['', '', '', '', ''],
+          ctas: (isWhatsApp || isMessaging || isIgProfile)
+            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
+            : (result.data.ctas?.length ? result.data.ctas : [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]),
+          contentGenerated: true,
+          analyzingMedia: false,
+          uploadProgress: `Contenido generado con IA ✓`,
+          showEditContent: true
+        });
+      } else {
+        updateFlexGroup(groupIndex, { analyzingMedia: false, uploadProgress: `Media agregada. IA: ${result.error || 'Error'}` });
+      }
+    } catch (err) {
+      updateFlexGroup(groupIndex, { analyzingMedia: false, uploadProgress: `Error IA: ${err.message}` });
+    }
+  };
+
   const addAd = () => {
     setAds(prev => [...prev, createEmptyAd(prev.length)]);
   };
@@ -1300,6 +1382,15 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       return;
     }
 
+    // Flexible mode: validate groups
+    if (adSetMode === 'flexible') {
+      const emptyGroup = flexibleAdGroups.findIndex(g => g.mediaItems.length === 0);
+      if (emptyGroup !== -1) {
+        setError(`El Anuncio Flexible ${emptyGroup + 1} no tiene medios. Agrega al menos una imagen o video.`);
+        return;
+      }
+    }
+
     // Validar que todos los ads tienen media (imagen o video)
     const adsWithoutMedia = ads.filter(ad => !ad.imageHash && !ad.videoId);
     if (adsWithoutMedia.length === ads.length) {
@@ -1400,6 +1491,13 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         excludedPlacements: excludedPlacements,
         // Múltiples públicos (replicar estructura por cada público adicional)
         whatsappMode: whatsappMode,
+        flexibleAdGroups: adSetMode === 'flexible' ? flexibleAdGroups.map(g => ({
+          mediaItems: g.mediaItems,
+          headlines: g.headlines.filter(h => h.trim()),
+          descriptions: g.descriptions.filter(d => d.trim()),
+          linkDescriptions: g.linkDescriptions.filter(d => d.trim()),
+          ctas: g.ctas
+        })) : [],
         multiAudiences: adSetMode !== 'per-ad' && multiAudiences.length > 0 ? multiAudiences : [],
         // Chat editor (WhatsApp leads)
         chatGreeting: chatGreeting || null,
@@ -1986,9 +2084,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               {multiAudiences.length > 0 && (
                 <p className="hint mt-sm text-accent">
                   {multiAudiences.length + 1} conjuntos = {
-                    adSetMode === 'single'
-                      ? `${multiAudiences.length + 1} Ad Sets (cada uno con ${ads.length} ad${ads.length > 1 ? 's' : ''})`
-                      : `${(multiAudiences.length + 1) * ads.length} Ad Sets con 5+5+5`
+                    adSetMode === 'flexible'
+                      ? `${multiAudiences.length + 1} Ad Sets (1 anuncio flexible con ${ads.length} contenido${ads.length > 1 ? 's' : ''} cada uno)`
+                      : adSetMode === 'single'
+                        ? `${multiAudiences.length + 1} Ad Sets (cada uno con ${ads.length} ad${ads.length > 1 ? 's' : ''})`
+                        : `${(multiAudiences.length + 1) * ads.length} Ad Sets con 5+5+5`
                   }
                 </p>
               )}
@@ -2137,6 +2237,320 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Ad Cards */}
         <div className="ads-section">
+          {adSetMode === 'flexible' ? (
+            /* ===== FLEXIBLE MODE: N Groups = N Flexible Ads ===== */
+            <>
+              {flexibleAdGroups.map((group, groupIndex) => (
+                <div key={group.id} className="ad-card" style={{ marginBottom: '16px' }}>
+                  {/* Group Header */}
+                  <div className="ad-card-header">
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Anuncio Flexible {groupIndex + 1}
+                      {group.contentGenerated && (
+                        <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px', fontWeight: 700 }}>IA</span>
+                      )}
+                    </h4>
+                    {flexibleAdGroups.length > 1 && (
+                      <button type="button" className="remove-ad-btn" onClick={() => removeFlexGroup(groupIndex)}>Eliminar</button>
+                    )}
+                  </div>
+
+                  {/* Media Strip */}
+                  <div className="form-group">
+                    <label style={{ marginBottom: '6px', display: 'block' }}>
+                      Medios ({group.mediaItems.length} {group.mediaItems.length === 1 ? 'elemento' : 'elementos'})
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+                      {group.mediaItems.map((item, mi) => (
+                        <div key={mi} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
+                          <img
+                            src={item.type === 'video' ? (item.thumbnailUrl || '') : item.url}
+                            alt={item.name || `Media ${mi + 1}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={e => { e.target.style.display = 'none'; }}
+                          />
+                          {item.type === 'video' && (
+                            <div style={{ position: 'absolute', bottom: 2, left: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '9px', borderRadius: '3px', padding: '1px 4px' }}>VID</div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeMediaFromFlexGroup(groupIndex, mi)}
+                            style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 }}
+                          >×</button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => { setFlexGroupPickerOpen(flexGroupPickerOpen === groupIndex ? null : groupIndex); handleLoadMediaLibrary(); }}
+                        style={{ width: '64px', height: '64px', border: '2px dashed var(--border)', borderRadius: '6px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}
+                        title="Agregar desde biblioteca"
+                      >+</button>
+                      <label
+                        style={{ width: '64px', height: '64px', border: '2px dashed var(--accent)', borderRadius: '6px', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', flexShrink: 0, textAlign: 'center', fontWeight: 600 }}
+                        title="Subir archivo"
+                      >
+                        ↑ Subir
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.mov"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file || !selectedAccount) return;
+                            const ext = file.name.toLowerCase().split('.').pop();
+                            const isVid = file.type.startsWith('video/') || ['mp4','mov','avi','mkv','webm'].includes(ext);
+                            const isImg = !isVid && (file.type.startsWith('image/') || ['jpg','jpeg','png','webp','gif'].includes(ext));
+                            if (!isVid && !isImg) return;
+                            updateFlexGroup(groupIndex, { uploadProgress: `Subiendo ${file.name}...`, analyzingMedia: false });
+                            try {
+                              const metaService = new MetaAdsService(accessToken);
+                              let res;
+                              if (isImg) {
+                                res = await metaService.uploadImageFile(selectedAccount, file);
+                                if (res.success) {
+                                  addMediaToFlexGroup(groupIndex, { type: 'image', hash: res.data.imageHash, url: res.data.url, thumbnailUrl: '', name: file.name });
+                                  updateFlexGroup(groupIndex, { uploadProgress: `Imagen subida ✓` });
+                                }
+                              } else {
+                                res = await metaService.uploadVideoFile(selectedAccount, file);
+                                if (res.success) {
+                                  addMediaToFlexGroup(groupIndex, { type: 'video', hash: res.data.thumbnailHash || '', url: res.data.thumbnailUrl || '', videoId: res.data.videoId, thumbnailUrl: res.data.thumbnailUrl || '', name: file.name });
+                                  updateFlexGroup(groupIndex, { uploadProgress: `Video subido ✓` });
+                                }
+                              }
+                              if (!res.success) updateFlexGroup(groupIndex, { uploadProgress: `Error: ${res.error}` });
+                            } catch (err) {
+                              updateFlexGroup(groupIndex, { uploadProgress: `Error: ${err.message}` });
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Inline media library picker for this group */}
+                    {flexGroupPickerOpen === groupIndex && (
+                      <div className="library-grid" style={{ display: 'block', gridTemplateColumns: 'none', maxHeight: '300px', padding: '10px' }}>
+                        <div className="toggle-group mb-sm">
+                          <button type="button" className={`toggle-btn ${flexGroupPickerTab === 'images' ? 'active' : ''}`} onClick={() => setFlexGroupPickerTab('images')}>
+                            Imágenes ({mediaLibrary.images.length})
+                          </button>
+                          <button type="button" className={`toggle-btn ${flexGroupPickerTab === 'videos' ? 'active' : ''}`} onClick={() => setFlexGroupPickerTab('videos')}>
+                            Videos ({mediaLibrary.videos.length})
+                          </button>
+                          <button type="button" className="toggle-btn" onClick={() => setFlexGroupPickerOpen(null)} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>Cerrar</button>
+                        </div>
+                        <p className="hint mb-sm" style={{ fontSize: '10px' }}>Haz click en un elemento para agregarlo al grupo. Puedes agregar múltiples.</p>
+                        {loadingMedia ? (
+                          <p className="text-muted" style={{ textAlign: 'center', fontSize: '13px' }}>Cargando biblioteca...</p>
+                        ) : (
+                          <>
+                            {flexGroupPickerTab === 'images' && (
+                              <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' }}>
+                                {mediaLibrary.images.map((img, i) => {
+                                  const alreadyIn = group.mediaItems.some(m => m.type === 'image' && m.hash === img.hash);
+                                  return (
+                                    <div
+                                      key={img.hash || i}
+                                      onClick={() => {
+                                        if (alreadyIn) {
+                                          removeMediaFromFlexGroup(groupIndex, group.mediaItems.findIndex(m => m.type === 'image' && m.hash === img.hash));
+                                        } else {
+                                          addMediaToFlexGroup(groupIndex, { type: 'image', hash: img.hash, url: img.url, thumbnailUrl: '', name: img.name || 'Imagen' });
+                                        }
+                                      }}
+                                      className={`library-item ${alreadyIn ? 'selected' : ''}`}
+                                    >
+                                      <img src={img.url} alt={img.name || 'img'} onError={e => { e.target.style.display = 'none'; }} />
+                                      {alreadyIn && <div className="library-item-badge">✓</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {flexGroupPickerTab === 'videos' && (
+                              <div className="library-grid" style={{ maxHeight: 'none', border: 'none', padding: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}>
+                                {mediaLibrary.videos.map((vid, i) => {
+                                  const thumbnail = vid.thumbnails?.data?.[0]?.uri || null;
+                                  const alreadyIn = group.mediaItems.some(m => m.type === 'video' && m.videoId === vid.id);
+                                  return (
+                                    <div
+                                      key={vid.id || i}
+                                      onClick={() => {
+                                        if (alreadyIn) {
+                                          removeMediaFromFlexGroup(groupIndex, group.mediaItems.findIndex(m => m.type === 'video' && m.videoId === vid.id));
+                                        } else {
+                                          addMediaToFlexGroup(groupIndex, { type: 'video', hash: '', url: thumbnail || '', videoId: vid.id, thumbnailUrl: thumbnail || '', name: vid.title || 'Video' });
+                                        }
+                                      }}
+                                      className={`library-item ${alreadyIn ? 'selected' : ''}`}
+                                      style={{ aspectRatio: 'auto' }}
+                                    >
+                                      {thumbnail ? <img src={thumbnail} alt={vid.title} style={{ height: '65px', objectFit: 'cover' }} /> : <div className="text-muted" style={{ width: '100%', height: '65px', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>V</div>}
+                                      <div style={{ padding: '3px 5px', fontSize: '10px' }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{vid.title || 'Sin título'}</p>
+                                      </div>
+                                      {alreadyIn && <div className="library-item-badge">✓</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* AI status */}
+                    {group.analyzingMedia && (
+                      <div className="chip mt-sm" style={{ gap: '8px' }}>
+                        <span className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
+                        <span className="text-accent" style={{ fontSize: '12px' }}>{group.uploadProgress || 'Analizando con IA...'}</span>
+                      </div>
+                    )}
+                    {!group.analyzingMedia && group.uploadProgress && (
+                      <p className={`hint mt-sm ${group.contentGenerated ? 'text-success' : 'text-muted'}`}>{group.uploadProgress}</p>
+                    )}
+                  </div>
+
+                  {/* Generar 5+5+5 con IA */}
+                  {group.mediaItems.length > 0 && (
+                    <div className="mt-sm" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => analyzeFlexGroupWithMedia(groupIndex)}
+                        disabled={group.analyzingMedia}
+                        className="toggle-btn active"
+                        style={{ fontSize: '12px', padding: '6px 14px', opacity: group.analyzingMedia ? 0.6 : 1 }}
+                      >
+                        {group.analyzingMedia ? 'Generando...' : (group.contentGenerated ? 'Regenerar 5+5+5 con IA' : 'Generar 5+5+5 con IA')}
+                      </button>
+                      {!group.contentGenerated && (
+                        <span className="text-muted" style={{ fontSize: '11px' }}>Analiza todos los medios del anuncio</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 5+5+5 Content Toggle */}
+                  <div className="mt-sm">
+                    <button
+                      type="button"
+                      className={`content-editor-toggle ${group.contentGenerated ? 'generated' : ''}`}
+                      onClick={() => updateFlexGroup(groupIndex, { showEditContent: !group.showEditContent })}
+                    >
+                      <div className="flex-row" style={{ gap: '8px', alignItems: 'center' }}>
+                        {group.contentGenerated && (
+                          <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px' }}>IA</span>
+                        )}
+                        <span className={group.contentGenerated ? 'text-success' : 'text-muted'} style={{ fontSize: '13px', fontWeight: '500' }}>
+                          {group.contentGenerated
+                            ? `5+5+5 generado (${group.headlines.filter(h => h.trim()).length}T + ${group.descriptions.filter(d => d.trim()).length}D)`
+                            : `${group.headlines.filter(h => h.trim()).length} Títulos + ${group.descriptions.filter(d => d.trim()).length} Textos`}
+                        </span>
+                      </div>
+                      <span className="content-editor-arrow" style={{ transform: group.showEditContent ? 'rotate(180deg)' : 'none' }}>
+                        {group.showEditContent ? 'v' : '>'}
+                      </span>
+                    </button>
+
+                    {group.showEditContent && (
+                      <div className="content-editor">
+                        {/* Primary Texts */}
+                        <div className="content-editor-section">
+                          <div className="content-editor-section-header">
+                            <span className="content-badge content-badge--d">D</span>
+                            <label>Textos Principales ({group.descriptions.filter(d => d.trim()).length}/5)</label>
+                          </div>
+                          {group.descriptions.map((desc, di) => (
+                            <div key={`fg${groupIndex}-d${di}`} className="content-input-wrapper">
+                              <textarea
+                                placeholder={`Texto principal ${di + 1}`}
+                                value={desc}
+                                onChange={(e) => {
+                                  const arr = [...group.descriptions]; arr[di] = e.target.value;
+                                  updateFlexGroup(groupIndex, { descriptions: arr });
+                                }}
+                                maxLength={500} rows={3}
+                                className={`content-input ${desc.trim() ? 'filled-desc' : ''}`}
+                                style={{ padding: '8px 10px', resize: 'vertical' }}
+                              />
+                              <span className={`char-count ${desc.length > 280 ? 'error' : ''}`} style={{ top: 'auto', bottom: '8px' }}>{desc.length}/500</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Headlines */}
+                        <div className="content-editor-section">
+                          <div className="content-editor-section-header">
+                            <span className="content-badge content-badge--h">H</span>
+                            <label>Títulos ({group.headlines.filter(h => h.trim()).length}/5)</label>
+                          </div>
+                          {group.headlines.map((headline, hi) => (
+                            <div key={`fg${groupIndex}-h${hi}`} className="content-input-wrapper">
+                              <input
+                                type="text" placeholder={`Título ${hi + 1}`} value={headline}
+                                onChange={(e) => {
+                                  const arr = [...group.headlines]; arr[hi] = e.target.value;
+                                  updateFlexGroup(groupIndex, { headlines: arr });
+                                }}
+                                maxLength={55} className={`content-input ${headline.trim() ? 'filled' : ''}`}
+                              />
+                              <span className={`char-count ${headline.length > 50 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{headline.length}/55</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Link Descriptions */}
+                        <div className="content-editor-section">
+                          <div className="content-editor-section-header">
+                            <span className="content-badge content-badge--d" style={{ opacity: 0.7 }}>LD</span>
+                            <label>Descripciones ({group.linkDescriptions.filter(d => d.trim()).length}/5) <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>· texto corto bajo el título</span></label>
+                          </div>
+                          {group.linkDescriptions.map((desc, di) => (
+                            <div key={`fg${groupIndex}-ld${di}`} className="content-input-wrapper">
+                              <input
+                                type="text" placeholder={`Descripción ${di + 1} (máx 30)`} value={desc}
+                                onChange={(e) => {
+                                  const arr = [...group.linkDescriptions]; arr[di] = e.target.value;
+                                  updateFlexGroup(groupIndex, { linkDescriptions: arr });
+                                }}
+                                maxLength={30} className={`content-input ${desc.trim() ? 'filled' : ''}`}
+                              />
+                              <span className={`char-count ${desc.length > 27 ? 'error' : ''}`} style={{ top: '50%', transform: 'translateY(-50%)' }}>{desc.length}/30</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* CTAs */}
+                        <div>
+                          <div className="content-editor-section-header">
+                            <span className="content-badge content-badge--cta">CTA</span>
+                            <label>Llamados a la Acción ({[...new Set(group.ctas)].length} únicos)</label>
+                          </div>
+                          <div className="cta-grid">
+                            {group.ctas.map((cta, ci) => (
+                              <select key={`fg${groupIndex}-c${ci}`} value={cta} className="cta-select"
+                                onChange={(e) => {
+                                  const arr = [...group.ctas]; arr[ci] = e.target.value;
+                                  updateFlexGroup(groupIndex, { ctas: arr });
+                                }}
+                              >
+                                {CTA_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                              </select>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add new flexible ad group button */}
+              <button type="button" className="add-ad-btn" onClick={addFlexGroup}>
+                + Nuevo anuncio flexible
+              </button>
+            </>
+          ) : (
+          /* ===== NON-FLEXIBLE MODES: existing ads list ===== */
+          <>
           {ads.map((ad, adIndex) => (
             <div key={ad.id} className="ad-card">
               {/* Ad Card Header */}
@@ -2584,6 +2998,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           >
             + Agregar Otro Anuncio
           </button>
+          </>
+          )}
         </div>
 
         {/* Editor de Chats (solo para campañas WhatsApp) */}
@@ -2820,7 +3236,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             greeting: job.chatGreeting,
             formFields: job.chatFormFields || []
           } : null,
-          multiAudiences: job.multiAudiences || []
+          multiAudiences: job.multiAudiences || [],
+          flexibleAdGroups: job.flexibleAdGroups || []
         });
 
       } else if (conversionLocation === 'MESSENGER' || conversionLocation === 'INSTAGRAM_DIRECT') {
@@ -3573,7 +3990,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const totalAds = job.totalAds || 1;
               const numAudiences = (job.multiAudiences?.length || 0) + 1;
               const hasMulti = numAudiences > 1 && job.adSetMode !== 'per-ad';
-              if (job.adSetMode === 'single') {
+              if (job.adSetMode === 'flexible') {
+                return hasMulti
+                  ? `${numAudiences} Ad Sets · 1 anuncio flexible con ${totalAds} contenido${totalAds > 1 ? 's' : ''} c/u`
+                  : `1 Ad Set · 1 anuncio flexible con ${totalAds} contenido${totalAds > 1 ? 's' : ''}`;
+              } else if (job.adSetMode === 'single') {
                 return hasMulti
                   ? `${totalAds} ad(s) x ${numAudiences} públicos = ${numAudiences} Ad Sets`
                   : `${totalAds} anuncio(s) | 1 Ad Set`;
