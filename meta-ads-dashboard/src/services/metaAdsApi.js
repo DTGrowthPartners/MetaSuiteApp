@@ -124,15 +124,17 @@ class MetaAdsService {
     }
   }
 
-  // Analyze multiple media URLs at once (for flexible ad groups — all images sent to Claude together)
-  async analyzeMediaUrlBatch(urls, adIndex = 0, category = '', objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
+  // Analyze multiple media items at once (images → visual, videos with sourceUrl → multi-frame extraction)
+  async analyzeMediaUrlBatch(mediaItems, adIndex = 0, category = '', objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
     try {
-      const validUrls = urls.filter(u => u && u.trim());
-      if (validUrls.length === 0) return { success: false, error: 'No hay URLs válidas' };
-      console.log(`Batch analyzing ${validUrls.length} media items for group ${adIndex}...`);
-      const timeout = Math.max(60000, validUrls.length * 15000); // 15s per image, min 60s
+      if (!mediaItems || mediaItems.length === 0) return { success: false, error: 'No hay medios' };
+      const hasVideoWithSource = mediaItems.some(i => i.type === 'video' && i.sourceUrl);
+      // Videos need more time (download + Whisper transcription + frame extraction): 150s per video, 15s per image
+      const timeout = Math.max(120000, mediaItems.reduce((t, i) =>
+        t + (i.type === 'video' && i.sourceUrl ? 150000 : 15000), 0));
+      console.log(`Batch analyzing ${mediaItems.length} items (timeout ${timeout/1000}s, hasVideo: ${hasVideoWithSource})...`);
       const response = await axios.post(`${BACKEND_API_URL}/analyze-media-url-batch`, {
-        urls: validUrls, adIndex, category, objective, templateName, destType, textLength, campaignContext
+        mediaItems, adIndex, category, objective, templateName, destType, textLength, campaignContext
       }, { timeout });
       if (response.data.success) {
         return { success: true, data: response.data.data };

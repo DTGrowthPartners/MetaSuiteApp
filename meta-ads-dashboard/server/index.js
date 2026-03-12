@@ -54,6 +54,16 @@ if (!ffmpegPath) {
   }
 }
 
+// Verificar si faster-whisper está disponible (solo en Linux/VPS)
+const WHISPER_PYTHON = process.env.WHISPER_PYTHON || '/home/ubuntu/whisper-env/bin/python3';
+const WHISPER_SCRIPT = process.env.WHISPER_SCRIPT || '/home/ubuntu/whisper_transcribe.py';
+let whisperAvailable = false;
+try {
+  whisperAvailable = fs.existsSync(WHISPER_PYTHON) && fs.existsSync(WHISPER_SCRIPT);
+  if (whisperAvailable) console.log('faster-whisper disponible ✓');
+  else console.log('faster-whisper no disponible — usando análisis visual de frames');
+} catch (e) {}
+
 const app = express();
 
 // Configurar multer con almacenamiento en memoria
@@ -1265,6 +1275,78 @@ async function extractFrameFromBuffer(videoBuffer, filename) {
   }
 }
 
+// Helper: Transcribe audio from video buffer using faster-whisper
+async function transcribeVideoAudio(videoBuffer, filename) {
+  if (!whisperAvailable || !ffmpegPath) return null;
+  const tmpDir = os.tmpdir();
+  const ts = Date.now();
+  const inputPath = path.join(tmpDir, `whisper_vid_${ts}_${filename}`);
+  const audioPath = path.join(tmpDir, `whisper_aud_${ts}.wav`);
+  try {
+    fs.writeFileSync(inputPath, videoBuffer);
+    // Extract mono 16kHz WAV audio (Whisper optimal format)
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .output(audioPath)
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .audioCodec('pcm_s16le')
+        .noVideo()
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
+    // Transcribe with faster-whisper Python script
+    const { execFile } = await import('child_process');
+    const transcript = await new Promise((resolve, reject) => {
+      execFile(WHISPER_PYTHON, [WHISPER_SCRIPT, audioPath, 'es'], { timeout: 180000 }, (err, stdout, stderr) => {
+        if (err) reject(err);
+        else resolve(stdout.trim());
+      });
+    });
+    return transcript || null;
+  } catch (e) {
+    console.warn(`Whisper transcription failed (${filename}): ${e.message}`);
+    return null;
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch (e) {}
+    try { fs.unlinkSync(audioPath); } catch (e) {}
+  }
+}
+
+// Helper: Extract multiple frames from video buffer at different timestamps
+async function extractMultipleFramesFromBuffer(videoBuffer, filename, count = 3) {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `mframe_input_${Date.now()}_${filename}`);
+  const frames = [];
+  try {
+    fs.writeFileSync(inputPath, videoBuffer);
+    const duration = await new Promise((resolve) => {
+      ffmpeg.ffprobe(inputPath, (err, meta) => {
+        resolve(err ? 10 : (meta?.format?.duration || 10));
+      });
+    });
+    const timestamps = Array.from({ length: count }, (_, i) => Math.max(0.5, duration * ((i + 1) / (count + 1))));
+    for (const ts of timestamps) {
+      const outputPath = path.join(tmpDir, `mframe_${Date.now()}_${ts.toFixed(0)}.jpg`);
+      try {
+        await new Promise((resolve, reject) => {
+          ffmpeg(inputPath)
+            .screenshots({ count: 1, timemarks: [ts.toFixed(1)], filename: path.basename(outputPath), folder: path.dirname(outputPath), size: '640x?' })
+            .on('end', resolve).on('error', reject);
+        });
+        if (fs.existsSync(outputPath)) {
+          frames.push(fs.readFileSync(outputPath).toString('base64'));
+          try { fs.unlinkSync(outputPath); } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* skip frame */ }
+    }
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch (e) { /* ignore */ }
+  }
+  return frames;
+}
+
 // Helper: Generate 5+5+5 content from transcription text
 // Helper: generar contexto específico según tipo de campaña
 function getCampaignContext(objective, destType) {
@@ -1723,41 +1805,88 @@ app.post('/api/analyze-media-url', async (req, res) => {
   }
 });
 
-// POST /api/analyze-media-url-batch - Analyze multiple media URLs at once (for flexible ad groups)
-// Downloads all images, passes all to Claude in one request for better context
+// POST /api/analyze-media-url-batch - Analyze multiple media items (images + videos) for flexible ad groups
+// Images → visual analysis; Videos with sourceUrl → multiple frame extraction (3 frames per video)
 app.post('/api/analyze-media-url-batch', async (req, res) => {
   try {
     if (!anthropic) {
       return res.status(503).json({ success: false, error: 'Anthropic no está configurado.' });
     }
-    const { urls, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
-    if (!urls || !Array.isArray(urls) || urls.length === 0) {
-      return res.status(400).json({ success: false, error: 'Se requiere array de URLs' });
+    const { mediaItems, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
+    if (!mediaItems || !Array.isArray(mediaItems) || mediaItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'Se requiere array de mediaItems' });
     }
     const adIndex = parseInt(adIndexStr) || 0;
     const textLength = tl || 'medium';
     const campaignContext = cc || '';
 
-    console.log(`Batch analyzing ${urls.length} media items for group ${adIndex}...`);
+    const itemsToProcess = mediaItems.slice(0, 6);
+    console.log(`Batch analyzing ${itemsToProcess.length} media items (group ${adIndex})...`);
 
-    // Download all images (cap at 10 to avoid overload)
-    const urlsToProcess = urls.slice(0, 10);
-    const base64Images = [];
-    for (const url of urlsToProcess) {
-      try {
-        const response = await axios.get(url, {
-          responseType: 'arraybuffer',
-          timeout: 30000,
-          maxContentLength: 20 * 1024 * 1024
-        });
-        base64Images.push(Buffer.from(response.data).toString('base64'));
-      } catch (dlErr) {
-        console.warn(`Batch: failed to download ${url.substring(0, 60)}: ${dlErr.message}`);
+    const base64Frames = [];
+    const videoTitles = [];
+    const transcripts = [];
+
+    for (const item of itemsToProcess) {
+      if (item.type === 'video' && item.sourceUrl) {
+        // Download full video → transcribe audio with Whisper + extract visual frames
+        try {
+          console.log(`Downloading video: ${item.sourceUrl.substring(0, 60)}...`);
+          const vidResponse = await axios.get(item.sourceUrl, {
+            responseType: 'arraybuffer', timeout: 90000, maxContentLength: 300 * 1024 * 1024
+          });
+          const vidBuffer = Buffer.from(vidResponse.data);
+          const sizeMB = (vidBuffer.length / 1024 / 1024).toFixed(1);
+          console.log(`Video ${sizeMB}MB — transcribing + extracting frames...`);
+
+          // Run Whisper transcription and frame extraction in parallel
+          const [transcript, frames] = await Promise.all([
+            transcribeVideoAudio(vidBuffer, item.name || 'video.mp4'),
+            ffmpegPath ? extractMultipleFramesFromBuffer(vidBuffer, item.name || 'video.mp4', 2) : Promise.resolve([])
+          ]);
+
+          if (transcript) {
+            console.log(`Transcript (${transcript.length} chars): ${transcript.substring(0, 80)}...`);
+            transcripts.push({ name: item.name || 'video', text: transcript });
+          }
+          if (frames.length > 0) {
+            base64Frames.push(...frames);
+            console.log(`Extracted ${frames.length} frames from video`);
+          } else if (!transcript) {
+            // No transcript and no frames — fall back to thumbnail
+            const thumbUrl = item.thumbnailUrl || item.url;
+            if (thumbUrl) {
+              const tr = await axios.get(thumbUrl, { responseType: 'arraybuffer', timeout: 15000 });
+              base64Frames.push(Buffer.from(tr.data).toString('base64'));
+            }
+          }
+          if (item.name) videoTitles.push(item.name.replace(/\.[^.]+$/, ''));
+        } catch (vidErr) {
+          console.warn(`Video processing failed (${item.name}): ${vidErr.message} — using thumbnail fallback`);
+          const thumbUrl = item.thumbnailUrl || item.url;
+          if (thumbUrl) {
+            try {
+              const tr = await axios.get(thumbUrl, { responseType: 'arraybuffer', timeout: 15000 });
+              base64Frames.push(Buffer.from(tr.data).toString('base64'));
+            } catch (e) { /* skip */ }
+          }
+        }
+      } else {
+        // Image or video without sourceUrl → use image/thumbnail URL
+        const imgUrl = item.url || item.thumbnailUrl;
+        if (imgUrl) {
+          try {
+            const ir = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000, maxContentLength: 20 * 1024 * 1024 });
+            base64Frames.push(Buffer.from(ir.data).toString('base64'));
+          } catch (dlErr) {
+            console.warn(`Image download failed (${item.name}): ${dlErr.message}`);
+          }
+        }
       }
     }
 
-    if (base64Images.length === 0) {
-      return res.status(400).json({ success: false, error: 'No se pudieron descargar los medios' });
+    if (base64Frames.length === 0 && transcripts.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se pudieron procesar los medios' });
     }
 
     const angleVariations = [
@@ -1773,19 +1902,44 @@ app.post('/api/analyze-media-url-batch', async (req, res) => {
     const ctx = getCampaignContext(objective, destType);
     const len = getTextLengthRules(textLength);
 
-    // Build message content: all images + text prompt
-    const msgContent = base64Images.map(b64 => ({
+    const businessContext = campaignContext
+      ? `⚠️ CONTEXTO DEL NEGOCIO (OBLIGATORIO — basa el copy en esto, no en lo que parezcan las imágenes):\n"${campaignContext}"\n\n`
+      : '';
+    const videoCtx = videoTitles.length > 0 ? `Videos analizados: ${videoTitles.join(', ')}\n` : '';
+
+    // Build transcript context if any
+    const transcriptCtx = transcripts.length > 0
+      ? `\n🎙️ TRANSCRIPCIÓN DE AUDIO (lo que se dice en el/los videos):\n${transcripts.map(t => `"${t.text}"`).join('\n')}\n`
+      : '';
+
+    const hasVisual = base64Frames.length > 0;
+    const framesDesc = hasVisual
+      ? (base64Frames.length > 1
+        ? `estas ${base64Frames.length} imágenes/frames del anuncio flexible (${itemsToProcess.length} elemento(s))`
+        : 'esta imagen/frame')
+      : null;
+
+    const framesToSend = base64Frames.slice(0, 8);
+    const msgContent = framesToSend.map(b64 => ({
       type: 'image',
       source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
     }));
+    const analysisDesc = hasVisual && transcripts.length > 0
+      ? `el siguiente material del anuncio flexible (${itemsToProcess.length} elemento(s)):`
+      : hasVisual
+        ? `${framesDesc}:`
+        : 'el siguiente audio transcrito:';
+
     msgContent.push({
       type: 'text',
-      text: `Analiza ${base64Images.length > 1 ? `estas ${base64Images.length} imágenes publicitarias (son parte del mismo anuncio flexible)` : 'esta imagen publicitaria'} y genera contenido para un anuncio de Facebook Ads.
+      text: `${businessContext}${videoCtx}${transcriptCtx}Analiza ${analysisDesc} y genera contenido para un anuncio de Facebook Ads.
 
-${category ? `Categoría del negocio: ${category}` : ''}
 ${templateName ? `Tipo de campaña: ${templateName}` : ''}
-${campaignContext ? `\nCONTEXTO DE LA CAMPAÑA (proporcionado por el anunciante, PRIORIZA esta información):\n"${campaignContext}"\n` : ''}
 Instrucción de ángulo: ${angle}
+
+IMPORTANTE:${transcripts.length > 0 ? '\n- La transcripción de audio muestra EXACTAMENTE lo que se comunica en el video — úsala como fuente principal del mensaje del anuncio.' : ''}
+- Si hay contexto del negocio, el copy DEBE ser 100% sobre ese negocio.${hasVisual ? '\n- Las imágenes muestran el contenido visual del anuncio — úsalas para entender el estilo.' : ''}
+- El tipo de negocio lo define el contexto textual, no las imágenes.
 
 Genera exactamente en JSON:
 {
@@ -1795,14 +1949,12 @@ Genera exactamente en JSON:
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
-Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
-linkDescriptions: detalles adicionales breves (ej: "Envío gratis", "Ver colección", "Disponible ahora").
-CTAs variados de esta lista: ${ctx.ctas}`
+Máximo 1 emoji por elemento. CTAs variados de esta lista: ${ctx.ctas}`
     });
 
     const completion = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      system: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.\n\n${ctx.focus}\n\nREGLAS ESTRICTAS:\n- TÍTULOS (headlines): ${len.headlineRule}\n- DESCRIPCIONES: ${len.descRule}\n- Todo en español\n- MÁXIMO 1 emoji por elemento. Menos es más.\n- NO uses frases genéricas. Sé MUY ESPECÍFICO sobre el producto/servicio mostrado.\n- Responde SOLO en JSON válido, sin markdown`,
+      system: `Eres un experto copywriter de Facebook/Instagram Ads.\n\n${ctx.focus}\n\nREGLAS:\n- TÍTULOS: ${len.headlineRule}\n- DESCRIPCIONES: ${len.descRule}\n- Todo en español\n- MÁXIMO 1 emoji por elemento\n- Si hay contexto del negocio, ÚSALO — NO inventes un tipo de negocio diferente por las imágenes\n- Responde SOLO en JSON válido, sin markdown`,
       messages: [{ role: 'user', content: msgContent }],
       temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
       max_tokens: 2000
@@ -1825,8 +1977,9 @@ CTAs variados de esta lista: ${ctx.ctas}`
       while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
     }
 
-    console.log(`Batch analysis done: ${base64Images.length} images analyzed`);
-    return res.json({ success: true, data: { ...parsed, method: 'vision-batch', mediaCount: base64Images.length } });
+    const method = transcripts.length > 0 && framesToSend.length > 0 ? 'whisper+vision' : transcripts.length > 0 ? 'whisper' : 'vision-batch';
+    console.log(`Batch done [${method}]: ${framesToSend.length} frames + ${transcripts.length} transcripts from ${itemsToProcess.length} items`);
+    return res.json({ success: true, data: { ...parsed, method, mediaCount: framesToSend.length, transcriptCount: transcripts.length } });
 
   } catch (error) {
     console.error('analyze-media-url-batch error:', error.message);

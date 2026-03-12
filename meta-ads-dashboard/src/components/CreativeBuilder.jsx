@@ -321,12 +321,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const analyzeFlexGroupWithMedia = async (groupIndex) => {
     const group = flexibleAdGroups[groupIndex];
     if (!group || group.mediaItems.length === 0) return;
-    // Collect thumbnail/image URLs for all media items (videos use their thumbnail)
-    const mediaUrls = group.mediaItems
-      .map(item => item.thumbnailUrl || item.url || '')
-      .filter(u => u.trim());
-    if (mediaUrls.length === 0) return;
-    updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA...` });
+    // Build mediaItems array: images use url, videos include sourceUrl for multi-frame extraction
+    const mediaItemsPayload = group.mediaItems.map(item => ({
+      type: item.type,
+      url: item.url || item.thumbnailUrl || '',
+      thumbnailUrl: item.thumbnailUrl || '',
+      sourceUrl: item.sourceUrl || '',  // set for library videos
+      name: item.name || ''
+    })).filter(item => item.url || item.thumbnailUrl || item.sourceUrl);
+    if (mediaItemsPayload.length === 0) return;
+    const hasVideos = mediaItemsPayload.some(i => i.type === 'video' && i.sourceUrl);
+    updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA${hasVideos ? ' (extrayendo frames de videos...)' : ''}...` });
     try {
       const metaService = new MetaAdsService(accessToken);
       const category = selectedTemplate?.category || '';
@@ -334,7 +339,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const templateName = selectedTemplate?.name || '';
       const destType = templateAdConfig.destinationConfig?.type || '';
       const result = await metaService.analyzeMediaUrlBatch(
-        mediaUrls, groupIndex, category, objective, templateName, destType, textLength, campaignContext
+        mediaItemsPayload, groupIndex, category, objective, templateName, destType, textLength,
+        campaignContext ? campaignContext : (campaignName ? `Campaña: ${campaignName}` : '')
       );
       if (result.success && result.data) {
         const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
@@ -2383,7 +2389,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                                         if (alreadyIn) {
                                           removeMediaFromFlexGroup(groupIndex, group.mediaItems.findIndex(m => m.type === 'video' && m.videoId === vid.id));
                                         } else {
-                                          addMediaToFlexGroup(groupIndex, { type: 'video', hash: '', url: thumbnail || '', videoId: vid.id, thumbnailUrl: thumbnail || '', name: vid.title || 'Video' });
+                                          addMediaToFlexGroup(groupIndex, { type: 'video', hash: '', url: thumbnail || '', videoId: vid.id, thumbnailUrl: thumbnail || '', sourceUrl: vid.source || '', name: vid.title || 'Video' });
                                         }
                                       }}
                                       className={`library-item ${alreadyIn ? 'selected' : ''}`}
