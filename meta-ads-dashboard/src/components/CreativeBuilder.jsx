@@ -1350,8 +1350,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     // Validar WhatsApp si es requerido (por plantilla o por destino seleccionado)
     const needsWhatsApp = templateRequirements.whatsapp || (destinationOptions && selectedDestination === 'WHATSAPP');
     if (needsWhatsApp) {
-      if (whatsappMode === 'per-ad') {
-        // Validar que cada ad tenga un número seleccionado
+      if (whatsappMode === 'per-ad' && adSetMode !== 'flexible') {
+        // Validar que cada ad tenga un número (solo en modos no-flexible; en flexible los números son por conjunto)
         const adsMissingNumber = ads.filter(ad => !ad.whatsappNumberId);
         if (adsMissingNumber.length > 0) {
           setError(`Selecciona un número de WhatsApp para cada anuncio (${adsMissingNumber.length} sin número)`);
@@ -2605,38 +2605,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 </div>
               )}
 
-              {/* Per-ad WhatsApp Number (only in per-ad whatsapp mode) */}
-              {whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1 && (
-                <div className="form-group">
-                  <label>Número de WhatsApp para este Ad Set *</label>
-                  <select
-                    value={ad.whatsappNumberId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const selected = whatsAppNumbers.find(n => String(n.id) === String(val));
-                      updateAd(adIndex, {
-                        whatsappNumberId: val,
-                        whatsappNumber: selected ? selected.display_phone_number.replace(/\D/g, '') : '',
-                        whatsappDisplayNumber: selected ? selected.display_phone_number : ''
-                      });
-                    }}
-                  >
-                    <option value="">Selecciona un número</option>
-                    {whatsAppNumbers.map(num => {
-                      const pageName = num.page_name
-                        ? ` - ${num.page_name}`
-                        : num.whatsapp_business_account_name
-                          ? ` - ${num.whatsapp_business_account_name}`
-                          : '';
-                      return (
-                        <option key={num.id} value={String(num.id)}>
-                          {num.display_phone_number} ({num.verified_name}{pageName})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
+              {/* Per-ad WhatsApp Number — removido: los números ahora se seleccionan por conjunto en la sección de Público */}
 
               {/* Media Source Tabs */}
               <div className="form-group">
