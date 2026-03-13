@@ -470,6 +470,30 @@ class MetaAdsService {
     }
   }
 
+  // Obtener plantillas de mensajes de WhatsApp de una cuenta WABA
+  async getWhatsAppMessageTemplates(whatsappBusinessAccountId) {
+    try {
+      console.log('Fetching WhatsApp message templates for WABA:', whatsappBusinessAccountId);
+      const response = await axios.get(
+        `${META_API_BASE_URL}/${whatsappBusinessAccountId}/message_templates`,
+        {
+          params: {
+            access_token: this.accessToken,
+            fields: 'id,name,status,category,language,components,quality_score',
+            limit: 100
+          }
+        }
+      );
+      const templates = response.data.data || [];
+      console.log('WhatsApp message templates:', templates.length);
+      // Solo devolver templates aprobados
+      return templates.filter(t => t.status === 'APPROVED');
+    } catch (error) {
+      console.error('Get WhatsApp message templates error:', error.response?.data?.error || error.message);
+      return [];
+    }
+  }
+
   // Obtener todos los números de WhatsApp Business de todos los businesses del usuario
   async getAllWhatsAppPhoneNumbers() {
     try {

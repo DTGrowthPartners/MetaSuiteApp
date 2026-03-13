@@ -614,6 +614,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [chatFormFields, setChatFormFields] = useState(['name', 'email']);
   const [showChatEditor, setShowChatEditor] = useState(false);
 
+  // Plantillas de mensajes de WhatsApp
+  const [waMessageTemplates, setWaMessageTemplates] = useState([]);
+  const [selectedWaTemplate, setSelectedWaTemplate] = useState(''); // '' = custom, o template ID
+  const [loadingWaTemplates, setLoadingWaTemplates] = useState(false);
+  const [waTemplateMode, setWaTemplateMode] = useState('custom'); // 'custom' o 'template'
+
   // Páginas de Facebook
   const [pages, setPages] = useState([]);
   const [selectedPage, setSelectedPage] = useState('');
@@ -997,6 +1003,36 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
     return () => { cancelled = true; };
   }, [selectedAccount]);
+
+  // Cargar plantillas de mensajes de WhatsApp cuando se selecciona un número
+  useEffect(() => {
+    let cancelled = false;
+    const loadWaTemplates = async () => {
+      if (!selectedWhatsAppNumber || !whatsAppNumbers.length) {
+        setWaMessageTemplates([]);
+        return;
+      }
+      const selectedNum = whatsAppNumbers.find(n => String(n.id) === String(selectedWhatsAppNumber));
+      const wabaId = selectedNum?.whatsapp_business_account_id;
+      if (!wabaId) return;
+
+      setLoadingWaTemplates(true);
+      try {
+        const metaService = new MetaAdsService(accessToken);
+        const templates = await metaService.getWhatsAppMessageTemplates(wabaId);
+        if (!cancelled) {
+          setWaMessageTemplates(templates);
+          console.log('WhatsApp message templates loaded:', templates.length);
+        }
+      } catch (err) {
+        console.error('Error loading WA templates:', err);
+      } finally {
+        if (!cancelled) setLoadingWaTemplates(false);
+      }
+    };
+    loadWaTemplates();
+    return () => { cancelled = true; };
+  }, [selectedWhatsAppNumber, whatsAppNumbers]);
 
   // Auto-fill linkUrl con el website de la página o perfil de Instagram
   useEffect(() => {
@@ -1454,6 +1490,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         // Chat editor (WhatsApp leads)
         chatGreeting: chatGreeting || null,
         chatFormFields: chatFormFields.length > 0 ? chatFormFields : null,
+        waTemplateMode: waTemplateMode,
+        selectedWaTemplateId: waTemplateMode === 'template' ? selectedWaTemplate : null,
+        selectedWaTemplate: waTemplateMode === 'template' && selectedWaTemplate
+          ? waMessageTemplates.find(t => t.id === selectedWaTemplate) || null
+          : null,
         // Legacy fields from first ad (for WhatsApp/Messenger compat)
         headlines: builtAds[0]?.headlines || [],
         descriptions: builtAds[0]?.descriptions || [],
@@ -2898,85 +2939,192 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
         </div>
 
-        {/* Editor de Chats (solo para campañas WhatsApp) */}
+        {/* Plantilla de Mensajes de WhatsApp */}
         {templateRequirements.whatsapp && (
           <>
             <div className="section-divider">
-              <span>Editor de Chats</span>
+              <span>Plantilla de Mensajes</span>
             </div>
 
             <div className="chat-editor-section">
-              <div className="toggle-inline" style={{ marginBottom: '12px' }}>
-                <div>
-                  <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Plantilla de Mensaje</h4>
-                  <p className="hint">
-                    Configura el mensaje que verán las personas cuando toquen tu anuncio
-                  </p>
-                </div>
+              {/* Toggle: Plantilla existente vs Personalizado */}
+              <div className="toggle-group" style={{ marginBottom: '16px' }}>
                 <button
                   type="button"
-                  className={`toggle-btn ${showChatEditor ? 'active' : ''}`}
-                  onClick={() => setShowChatEditor(!showChatEditor)}
+                  className={`toggle-btn ${waTemplateMode === 'template' ? 'active' : ''}`}
+                  onClick={() => setWaTemplateMode('template')}
                 >
-                  {showChatEditor ? 'Ocultar' : 'Editar'}
+                  Usar plantilla existente
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${waTemplateMode === 'custom' ? 'active' : ''}`}
+                  onClick={() => { setWaTemplateMode('custom'); setSelectedWaTemplate(''); }}
+                >
+                  Personalizado
                 </button>
               </div>
 
-              {/* Preview siempre visible */}
-              <div className="chat-preview">
-                <div className="chat-preview-label">Mensaje de bienvenida</div>
-                <div className="chat-preview-content mb-md">{chatGreeting}</div>
-                <div className="chat-preview-label">Detalles del formulario</div>
-                <div className="chat-preview-sublabel">Comparte tus datos de contacto</div>
-                <ol className="chat-preview-list">
-                  {chatFormFields.map((field, i) => {
-                    const fieldInfo = CHAT_FORM_FIELDS.find(f => f.value === field);
-                    return <li key={i}>{fieldInfo?.label || field}</li>;
-                  })}
-                </ol>
-              </div>
-
-              {/* Editor expandido */}
-              {showChatEditor && (
-                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div>
-                    <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
-                    <textarea
-                      value={chatGreeting}
-                      onChange={(e) => setChatGreeting(e.target.value)}
-                      rows={3}
-                      style={{ resize: 'vertical' }}
-                      placeholder="Te damos la bienvenida. Completa el formulario..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
-                    <div className="toggle-group">
-                      {CHAT_FORM_FIELDS.map(field => {
-                        const isSelected = chatFormFields.includes(field.value);
-                        return (
-                          <button
-                            key={field.value}
-                            type="button"
-                            className={`toggle-btn ${isSelected ? 'active' : ''}`}
-                            onClick={() => {
-                              setChatFormFields(prev =>
-                                isSelected
-                                  ? prev.filter(f => f !== field.value)
-                                  : [...prev, field.value]
-                              );
-                            }}
-                          >
-                            {field.label}
-                          </button>
-                        );
-                      })}
+              {waTemplateMode === 'template' ? (
+                <div>
+                  {loadingWaTemplates ? (
+                    <p className="text-muted" style={{ fontSize: '13px' }}>Cargando plantillas...</p>
+                  ) : waMessageTemplates.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center' }}>
+                      <p className="text-muted" style={{ fontSize: '13px' }}>
+                        {selectedWhatsAppNumber
+                          ? 'No se encontraron plantillas aprobadas para esta cuenta de WhatsApp.'
+                          : 'Selecciona un número de WhatsApp para cargar las plantillas.'}
+                      </p>
                     </div>
-                    <p className="hint mt-sm">
-                      Selecciona los campos que quieres pedir en el formulario de contacto
-                    </p>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedWaTemplate}
+                        onChange={(e) => setSelectedWaTemplate(e.target.value)}
+                        style={{ marginBottom: '12px' }}
+                      >
+                        <option value="">-- Selecciona una plantilla --</option>
+                        {waMessageTemplates.map(tpl => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name} ({tpl.language}) - {tpl.category}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Preview de la plantilla seleccionada */}
+                      {selectedWaTemplate && (() => {
+                        const tpl = waMessageTemplates.find(t => t.id === selectedWaTemplate);
+                        if (!tpl) return null;
+                        const header = tpl.components?.find(c => c.type === 'HEADER');
+                        const body = tpl.components?.find(c => c.type === 'BODY');
+                        const footer = tpl.components?.find(c => c.type === 'FOOTER');
+                        const buttons = tpl.components?.find(c => c.type === 'BUTTONS');
+                        return (
+                          <div className="chat-preview" style={{ marginTop: '8px' }}>
+                            <div style={{ marginBottom: '8px' }}>
+                              <span className="text-accent" style={{ fontSize: '11px', fontWeight: 600 }}>
+                                {tpl.category} · {tpl.language}
+                              </span>
+                            </div>
+                            {header && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <div className="chat-preview-label">Encabezado</div>
+                                <div className="chat-preview-content">
+                                  {header.format === 'TEXT' ? header.text : `[${header.format}]`}
+                                </div>
+                              </div>
+                            )}
+                            {body && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <div className="chat-preview-label">Cuerpo</div>
+                                <div className="chat-preview-content" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {body.text}
+                                </div>
+                              </div>
+                            )}
+                            {footer && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <div className="chat-preview-label">Pie</div>
+                                <div className="chat-preview-content text-muted" style={{ fontSize: '12px' }}>
+                                  {footer.text}
+                                </div>
+                              </div>
+                            )}
+                            {buttons && buttons.buttons?.length > 0 && (
+                              <div>
+                                <div className="chat-preview-label">Botones</div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                  {buttons.buttons.map((btn, i) => (
+                                    <span key={i} className="toggle-btn active" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                      {btn.text}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              ) : (
+                /* Modo personalizado — editor original */
+                <div>
+                  <div className="toggle-inline" style={{ marginBottom: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Mensaje Personalizado</h4>
+                      <p className="hint">
+                        Configura el mensaje que verán las personas cuando toquen tu anuncio
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${showChatEditor ? 'active' : ''}`}
+                      onClick={() => setShowChatEditor(!showChatEditor)}
+                    >
+                      {showChatEditor ? 'Ocultar' : 'Editar'}
+                    </button>
                   </div>
+
+                  {/* Preview siempre visible */}
+                  <div className="chat-preview">
+                    <div className="chat-preview-label">Mensaje de bienvenida</div>
+                    <div className="chat-preview-content mb-md">{chatGreeting}</div>
+                    <div className="chat-preview-label">Detalles del formulario</div>
+                    <div className="chat-preview-sublabel">Comparte tus datos de contacto</div>
+                    <ol className="chat-preview-list">
+                      {chatFormFields.map((field, i) => {
+                        const fieldInfo = CHAT_FORM_FIELDS.find(f => f.value === field);
+                        return <li key={i}>{fieldInfo?.label || field}</li>;
+                      })}
+                    </ol>
+                  </div>
+
+                  {/* Editor expandido */}
+                  {showChatEditor && (
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
+                        <textarea
+                          value={chatGreeting}
+                          onChange={(e) => setChatGreeting(e.target.value)}
+                          rows={3}
+                          style={{ resize: 'vertical' }}
+                          placeholder="Te damos la bienvenida. Completa el formulario..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
+                        <div className="toggle-group">
+                          {CHAT_FORM_FIELDS.map(field => {
+                            const isSelected = chatFormFields.includes(field.value);
+                            return (
+                              <button
+                                key={field.value}
+                                type="button"
+                                className={`toggle-btn ${isSelected ? 'active' : ''}`}
+                                onClick={() => {
+                                  setChatFormFields(prev =>
+                                    isSelected
+                                      ? prev.filter(f => f !== field.value)
+                                      : [...prev, field.value]
+                                  );
+                                }}
+                              >
+                                {field.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="hint mt-sm">
+                          Selecciona los campos que quieres pedir en el formulario de contacto
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
