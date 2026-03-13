@@ -2101,7 +2101,7 @@ class MetaAdsService {
       // 2. Crear AdSet (sin presupuesto - usa CBO de la campaña)
       console.log('Creating ad set (using campaign budget - CBO)...');
       const adSetResult = await this.createAdSet(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
+        name: adSetName || `${campaignName}`,
         campaignId: results.campaign.id,
         billingEvent,
         optimizationGoal,
@@ -2182,7 +2182,7 @@ class MetaAdsService {
       // 2. Crear AdSet con Dynamic Creative habilitado (permite 5+5+5 en 1 anuncio)
       console.log('Step 2/4: Creating ad set (Dynamic Creative)...');
       const adSetResult = await this.createAdSet(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
+        name: adSetName || `${campaignName}`,
         campaignId: results.campaign.id,
         billingEvent,
         optimizationGoal,
@@ -2326,7 +2326,7 @@ class MetaAdsService {
       // 2. Crear AdSet (sin presupuesto - usa CBO de la campaña)
       console.log('Creating ad set (using campaign budget - CBO)...');
       const adSetResult = await this.createAdSet(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
+        name: adSetName || `${campaignName}`,
         campaignId: results.campaign.id,
         // NO pasamos dailyBudget - se usa CBO
         billingEvent,
@@ -2889,7 +2889,7 @@ class MetaAdsService {
         imageUrl, imageHash, videoId, videoThumbnailUrl,
         headlines, descriptions, primaryTexts,
         ctas: [callToAction],
-        adName: campaignName + ' - Ad'
+        adName: '1'
       }];
     }
 
@@ -2951,7 +2951,7 @@ class MetaAdsService {
         console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (${useFlexible ? 'flexible' : 'standard'} creatives en 1 Ad Set)`);
 
         let adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-          name: `${campaignName} - Ad Set${audPrefix}`,
+          name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
           campaignId: results.campaign.id,
           targeting: currentAudience.targeting,
           optimizationGoal,
@@ -2969,7 +2969,7 @@ class MetaAdsService {
         if (!adSetResult.success && audWhatsappNumber) {
           console.warn(`AdSet${audPrefix}: falló con WhatsApp number, reintentando sin número...`);
           adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-            name: `${campaignName} - Ad Set${audPrefix}`,
+            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             targeting: currentAudience.targeting,
             optimizationGoal,
@@ -3029,7 +3029,7 @@ class MetaAdsService {
           if (texts.filter(t => t.text_type === 'primary_text').length === 0) texts.push({ text: 'Escríbenos por WhatsApp', text_type: 'primary_text' });
 
           const flexResult = await this.createFlexibleAd(adAccountId, {
-            name: `${campaignName} - Flexible Ad${audPrefix}${groupLabel}`,
+            name: `${gi + 1}`,
             adsetId: sharedAdSetId,
             pageId,
             igActorId,
@@ -3049,6 +3049,16 @@ class MetaAdsService {
         }
       }
 
+      // Determinar page_welcome_message: usar rawPwm si viene de plantilla, o construir desde greeting
+      const pwmString = pageWelcomeMessage?.rawPwm
+        ? (typeof pageWelcomeMessage.rawPwm === 'string' ? pageWelcomeMessage.rawPwm : JSON.stringify(pageWelcomeMessage.rawPwm))
+        : pageWelcomeMessage?.greeting
+          ? JSON.stringify({
+              type: 'VISUAL_EDITOR', version: 2, landing_screen_type: 'welcome_message', media_type: 'text',
+              text_format: { customer_action_type: 'autofill_message', message: { text: pageWelcomeMessage.greeting, autofill_message: { content: 'Hola, quiero más información.' } } }
+            })
+          : null;
+
       // ====== MODOS NO-FLEXIBLE: loop por cada ad ======
       if (!useFlexible)
       for (let i = 0; i < ads.length; i++) {
@@ -3064,7 +3074,7 @@ class MetaAdsService {
 
           const adTargeting = (adSetMode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
           let adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-            name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel}`,
+            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             targeting: adTargeting,
             optimizationGoal,
@@ -3082,7 +3092,7 @@ class MetaAdsService {
           if (!adSetResult.success && adWhatsappNumber) {
             console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number, reintentando sin número...`);
             adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-              name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel}`,
+              name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
               campaignId: results.campaign.id,
               targeting: adTargeting,
               optimizationGoal,
@@ -3131,7 +3141,7 @@ class MetaAdsService {
           console.log(`  Dynamic Creative 5+5+5: ${validTitles.length}t + ${validBodies.length}d + ${validCTAs.length}cta`);
 
           creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
-            name: `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`,
+            name: `${i + 1} - Creative`,
             pageId,
             imageHash: adImageHash,
             imageUrl: adImageUrl,
@@ -3150,7 +3160,7 @@ class MetaAdsService {
           if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
             console.warn(`Creative${adLabel}: igActorId rejected, retrying without IG...`);
             creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
-              name: `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`,
+              name: `${i + 1} - Creative`,
               pageId,
               imageHash: adImageHash,
               imageUrl: adImageUrl,
@@ -3200,6 +3210,7 @@ class MetaAdsService {
               } catch (te) { console.warn('WA standard: thumbnail fetch failed:', te.message); }
             }
             if (description.trim()) videoData.link_description = description;
+            if (pwmString) videoData.page_welcome_message = pwmString;
             objectStorySpec.video_data = videoData;
           } else {
             // WhatsApp image: NO incluir link en link_data (Meta interpreta link como CTA value.link
@@ -3215,6 +3226,7 @@ class MetaAdsService {
               linkData.picture = adImageUrl;
             }
             if (description.trim()) linkData.description = description;
+            if (pwmString) linkData.page_welcome_message = pwmString;
             objectStorySpec.link_data = linkData;
           }
 
@@ -3226,7 +3238,7 @@ class MetaAdsService {
           const normalizedId = this.normalizeAccountId(adAccountId);
           const formData = new URLSearchParams();
           formData.append('access_token', this.accessToken);
-          formData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative`);
+          formData.append('name', `${i + 1} - Creative`);
           formData.append('object_story_spec', JSON.stringify(objectStorySpec));
 
           // Advantage+ creative features — NO enhance_cta para WhatsApp
@@ -3263,7 +3275,7 @@ class MetaAdsService {
 
         // Crear Ad
         let adResult = await this.createAd(adAccountId, {
-          name: ad.adName || `${campaignName} - Ad${adLabel}`,
+          name: `${i + 1}`,
           adsetId: sharedAdSetId,
           creativeId: creativeResult.data.id,
           status: 'ACTIVE'
@@ -3281,7 +3293,7 @@ class MetaAdsService {
           const adAudienceLabel = (adSetMode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
           const adTargeting = (adSetMode === 'per-ad' && ad.audienceTargeting) ? ad.audienceTargeting : currentAudience.targeting;
           const fallbackAdSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-            name: `${campaignName} - Ad Set${adLabel}${adAudienceLabel} (std)`,
+            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             targeting: adTargeting,
             optimizationGoal,
@@ -3311,6 +3323,7 @@ class MetaAdsService {
 
           console.log(`  Fallback Standard Creative: "${headline}" | "${primaryText.substring(0, 60)}..." | CTA: ${whatsAppCta}`);
 
+          // Reutilizar pwmString del bloque principal
           const objectStorySpec = { page_id: pageId };
           if (adVideoId) {
             const videoData = {
@@ -3321,6 +3334,7 @@ class MetaAdsService {
             };
             if (adThumbnailUrl && adThumbnailUrl.startsWith('http')) videoData.image_url = adThumbnailUrl;
             if (description.trim()) videoData.link_description = description;
+            if (pwmString) videoData.page_welcome_message = pwmString;
             objectStorySpec.video_data = videoData;
           } else {
             // WhatsApp image: NO incluir link (WHATSAPP_MESSAGE no soporta link en CTA value)
@@ -3332,6 +3346,7 @@ class MetaAdsService {
             if (adImageHash) linkData.image_hash = adImageHash;
             else if (adImageUrl && adImageUrl.trim()) linkData.picture = adImageUrl;
             if (description.trim()) linkData.description = description;
+            if (pwmString) linkData.page_welcome_message = pwmString;
             objectStorySpec.link_data = linkData;
           }
           if (igActorId) objectStorySpec.instagram_user_id = igActorId;
@@ -3339,7 +3354,7 @@ class MetaAdsService {
           const normalizedId = this.normalizeAccountId(adAccountId);
           const fallbackFormData = new URLSearchParams();
           fallbackFormData.append('access_token', this.accessToken);
-          fallbackFormData.append('name', `${ad.adName || campaignName + ' - Ad' + adLabel} - Creative (std)`);
+          fallbackFormData.append('name', `${i + 1} - Creative`);
           fallbackFormData.append('object_story_spec', JSON.stringify(objectStorySpec));
           fallbackFormData.append('degrees_of_freedom_spec', JSON.stringify({
             creative_features_spec: {
@@ -3370,7 +3385,7 @@ class MetaAdsService {
 
           // 3. Crear Ad con el nuevo AdSet + Creative estándar
           adResult = await this.createAd(adAccountId, {
-            name: ad.adName || `${campaignName} - Ad${adLabel}`,
+            name: `${i + 1}`,
             adsetId: fallbackAdSetResult.data.id,
             creativeId: fallbackCreativeResult.data.id,
             status: 'ACTIVE'
@@ -3441,7 +3456,7 @@ class MetaAdsService {
       // 2. Crear AdSet para Messenger
       console.log('Step 2/4: Creating ad set for Messenger...');
       const adSetResult = await this.createAdSetForMessenger(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
+        name: adSetName || `${campaignName}`,
         campaignId: results.campaign.id,
         targeting,
         optimizationGoal,
@@ -3478,7 +3493,7 @@ class MetaAdsService {
       // 4. Crear Ad
       console.log('Step 4/4: Creating ad...');
       const adResult = await this.createAd(adAccountId, {
-        name: adName || `${campaignName} - Ad`,
+        name: `1`,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
         status: 'ACTIVE'
@@ -3712,7 +3727,7 @@ class MetaAdsService {
       // 2. Crear AdSet para Instagram Direct
       console.log('Step 2/4: Creating ad set for Instagram Direct...');
       const adSetResult = await this.createAdSetForInstagramDM(adAccountId, {
-        name: adSetName || `${campaignName} - Ad Set`,
+        name: adSetName || `${campaignName}`,
         campaignId: results.campaign.id,
         targeting,
         optimizationGoal,
@@ -3750,7 +3765,7 @@ class MetaAdsService {
       // 4. Crear Ad
       console.log('Step 4/4: Creating ad...');
       const adResult = await this.createAd(adAccountId, {
-        name: adName || `${campaignName} - Ad`,
+        name: `1`,
         adsetId: results.adSet.id,
         creativeId: results.creative.id,
         status: 'ACTIVE'
@@ -4045,7 +4060,7 @@ class MetaAdsService {
         const { resolvedThumbUrl, resolvedThumbHash } = await resolveThumbnail(ad, adIndex);
 
         const creativeParams = {
-          name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
+          name: `${adIndex + 1} - Creative`,
           pageId,
           imageUrl: !ad.videoId ? ad.imageUrl : null,
           imageHash: !ad.videoId ? ad.imageHash : null,
@@ -4081,7 +4096,7 @@ class MetaAdsService {
 
         // Crear Ad — el Creative ya tiene instagram_user_id
         let adResult = await this.createAd(adAccountId, {
-          name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
+          name: `${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
           status: 'ACTIVE'
@@ -4094,7 +4109,7 @@ class MetaAdsService {
 
           // Crear nuevo AdSet SIN isDynamicCreative
           const fallbackAdSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set ${adIndex + 1} (std)`,
+            name: `${campaignName}`,
             campaignId: fallbackContext.campaignId,
             billingEvent,
             optimizationGoal,
@@ -4138,7 +4153,7 @@ class MetaAdsService {
         const { resolvedThumbUrl } = await resolveThumbnail(ad, adIndex);
 
         const stdCreativeParams = {
-          name: `${ad.adName || campaignName + ' Ad ' + (adIndex + 1)} - Creative`,
+          name: `${adIndex + 1} - Creative`,
           pageId,
           imageUrl: !ad.videoId ? ad.imageUrl : null,
           imageHash: !ad.videoId ? ad.imageHash : null,
@@ -4172,7 +4187,7 @@ class MetaAdsService {
 
         // Crear Ad — el Creative ya tiene instagram_user_id
         let adResult = await this.createAd(adAccountId, {
-          name: ad.adName || `${campaignName} - Ad ${adIndex + 1}`,
+          name: `${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
           status: 'ACTIVE'
@@ -4211,7 +4226,7 @@ class MetaAdsService {
           console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set${audPrefix}`,
+            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             dailyBudget: !isCBO ? audDailyBudget : null,
             billingEvent,
@@ -4250,7 +4265,7 @@ class MetaAdsService {
             console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}${audPrefix}...`);
 
             const adSetResult = await this.createAdSet(adAccountId, {
-              name: `${campaignName} - Ad Set ${i + 1}${audPrefix}`,
+              name: `${campaignName}`,
               campaignId: results.campaign.id,
               dailyBudget: !isCBO ? audDailyBudget : null,
               billingEvent,
@@ -4288,7 +4303,7 @@ class MetaAdsService {
           console.log(`Mode: FLEXIBLE - 1 ADSET${audPrefix} → 1 Flexible Ad (${ads.length} contenidos combinados)`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set${audPrefix}`,
+            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             dailyBudget: !isCBO ? audDailyBudget : null,
             billingEvent,
@@ -4349,7 +4364,7 @@ class MetaAdsService {
             }
 
             const flexResult = await this.createFlexibleAd(adAccountId, {
-              name: `${campaignName} - Flexible Ad${audPrefix}${groupLabel}`,
+              name: `${gi + 1}`,
               adsetId: flexAdSetId,
               pageId,
               igActorId,
@@ -4383,7 +4398,7 @@ class MetaAdsService {
           console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}...`);
 
           const adSetResult = await this.createAdSet(adAccountId, {
-            name: `${campaignName} - Ad Set ${i + 1}${audienceLabel}`,
+            name: `${campaignName}`,
             campaignId: results.campaign.id,
             dailyBudget: !isCBO ? dailyBudget : null,
             billingEvent,

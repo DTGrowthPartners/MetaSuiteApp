@@ -1428,7 +1428,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
       // Build ads array for multi-ad
       const builtAds = ads.map((ad, i) => ({
-        adName: ad.adName?.trim() || `${fullCampaignName} - Ad ${i + 1}`,
+        adName: `${i + 1}`,
         imageUrl: ad.imageUrl?.trim() || null,
         imageHash: ad.imageHash || null,
         imageHash9x16: ad.imageHash9x16 || null,
@@ -3286,10 +3286,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           bidAmount: job.bidAmount || null,
           startTime: job.startDate || null,
           endTime: job.endDate || null,
-          pageWelcomeMessage: job.chatGreeting ? {
-            greeting: job.chatGreeting,
-            formFields: job.chatFormFields || []
-          } : null,
+          pageWelcomeMessage: job.selectedWaTemplateRawPwm
+            ? { rawPwm: job.selectedWaTemplateRawPwm }
+            : job.chatGreeting ? {
+              greeting: job.chatGreeting,
+              formFields: job.chatFormFields || []
+            } : null,
           multiAudiences: job.multiAudiences || [],
           flexibleAdGroups: job.flexibleAdGroups || []
         });
@@ -3371,7 +3373,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             // ========== MODO SINGLE (o DC bloqueado): 1 AdSet por público → N standard creatives (1-1-1) ==========
             const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
             const adSetResult = await metaService[adSetMethod](job.adAccountId, {
-              name: `${job.campaignName} - Ad Set${audPrefix}`,
+              name: `${currentAudience?.name || 'Principal'} · ${job.campaignName}`,
               campaignId: campaignResult.data.id,
               targeting: currentAudience.targeting,
               optimizationGoal,
@@ -3440,7 +3442,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             // ========== MODO FLEXIBLE: 1 AdSet por público → 1 Flexible Ad con TODO el contenido ==========
             const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
             const adSetResult = await metaService[adSetMethod](job.adAccountId, {
-              name: `${job.campaignName} - Ad Set${audPrefix}`,
+              name: `${currentAudience?.name || 'Principal'} · ${job.campaignName}`,
               campaignId: campaignResult.data.id,
               targeting: currentAudience.targeting,
               optimizationGoal,
@@ -3521,7 +3523,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               // Crear AdSet con isDynamicCreative: true
               const adSetMethod = isIgDM ? 'createAdSetForInstagramDM' : 'createAdSetForMessenger';
               const adSetResult = await metaService[adSetMethod](job.adAccountId, {
-                name: `${job.campaignName} - Ad Set${adLabel}${audienceLabel}`,
+                name: `${currentAudience?.name || 'Principal'} · ${job.campaignName}`,
                 campaignId: campaignResult.data.id,
                 targeting: adTargeting,
                 optimizationGoal,
