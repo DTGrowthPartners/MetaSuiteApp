@@ -3991,26 +3991,20 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Si aún no hay IG conectada al ad account
-      // En vez de hacer fallback silencioso a WEBSITE, intentar con el igActorId original del frontend
-      // Meta puede aceptar instagram_profile_id incluso si no está "conectada" via /instagram_accounts
-      if (!igConnected && destinationType === 'INSTAGRAM_PROFILE') {
-        if (igActorId) {
-          console.warn('⚠️ IG not connected to ad account via /instagram_accounts, but igActorId available from frontend. Trying anyway...');
-          // Mantener igActorId y destinationType — dejar que Meta decida si lo acepta
-        } else {
-          console.warn('⚠️ No IG connected and no igActorId available. Falling back to generic traffic.');
-          console.warn('💡 Para que aparezca como "Instagram", conecta tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
+      // Paso C: Si aún no hay IG conectada → fallback sin destination_type
+      if (!igConnected) {
+        igActorId = null;
+        if (destinationType === 'INSTAGRAM_PROFILE') {
+          console.warn('⚠️ Could not auto-connect IG. Falling back to generic traffic (link URL points to IG profile).');
+          console.warn('💡 Para que aparezca como "Instagram o Facebook", conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
           destinationType = null;
         }
-      } else if (!igConnected) {
-        igActorId = null;
       }
 
       // promoted_object según destino
-      if (destinationType === 'INSTAGRAM_PROFILE' && igActorId) {
+      if (destinationType === 'INSTAGRAM_PROFILE' && igConnected) {
         promotedObject = { page_id: pageId, instagram_profile_id: igActorId };
-        console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId} (igConnected: ${igConnected})`);
+        console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId}`);
       } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'].includes(destinationType)) {
         promotedObject = { page_id: pageId };
         console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
@@ -4245,7 +4239,7 @@ class MetaAdsService {
           const audPrefix = audiencesToProcess.length > 1 ? ` [${currentAudience.name}]` : '';
           console.log(`Mode: 1 ADSET${audPrefix} → ${ads.length} ADS (creatives estándar en 1 Ad Set)`);
 
-          let adSetResult = await this.createAdSet(adAccountId, {
+          const adSetResult = await this.createAdSet(adAccountId, {
             name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
             campaignId: results.campaign.id,
             dailyBudget: !isCBO ? audDailyBudget : null,
@@ -4258,27 +4252,6 @@ class MetaAdsService {
             destinationType,
             promotedObject
           });
-
-          // Fallback: si INSTAGRAM_PROFILE falla, reintentar sin destination_type (como WEBSITE con link de IG)
-          if (!adSetResult.success && destinationType === 'INSTAGRAM_PROFILE') {
-            console.warn(`AdSet${audPrefix}: INSTAGRAM_PROFILE failed, retrying without destination_type...`);
-            adSetResult = await this.createAdSet(adAccountId, {
-              name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
-              campaignId: results.campaign.id,
-              dailyBudget: !isCBO ? audDailyBudget : null,
-              billingEvent,
-              optimizationGoal,
-              targeting: currentAudience.targeting,
-              status: 'ACTIVE',
-              endTime: endDate,
-              isDynamicCreative: false,
-              destinationType: null,
-              promotedObject: null
-            });
-            if (adSetResult.success) {
-              console.warn(`AdSet${audPrefix}: Created as WEBSITE fallback. IG profile link will be used as URL.`);
-            }
-          }
 
           if (!adSetResult.success) {
             results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
@@ -4305,7 +4278,7 @@ class MetaAdsService {
           for (let i = 0; i < ads.length; i++) {
             console.log(`Creating adSet + dynamic creative + ad ${i + 1}/${ads.length}${audPrefix}...`);
 
-            let adSetResult = await this.createAdSet(adAccountId, {
+            const adSetResult = await this.createAdSet(adAccountId, {
               name: `${campaignName}`,
               campaignId: results.campaign.id,
               dailyBudget: !isCBO ? audDailyBudget : null,
@@ -4318,27 +4291,6 @@ class MetaAdsService {
               destinationType,
               promotedObject
             });
-
-            // Fallback: si INSTAGRAM_PROFILE falla, reintentar sin destination_type
-            if (!adSetResult.success && destinationType === 'INSTAGRAM_PROFILE') {
-              console.warn(`AdSet ${i + 1}${audPrefix}: INSTAGRAM_PROFILE failed, retrying without destination_type...`);
-              adSetResult = await this.createAdSet(adAccountId, {
-                name: `${campaignName}`,
-                campaignId: results.campaign.id,
-                dailyBudget: !isCBO ? audDailyBudget : null,
-                billingEvent,
-                optimizationGoal,
-                targeting: currentAudience.targeting,
-                status: 'ACTIVE',
-                endTime: endDate,
-                isDynamicCreative: true,
-                destinationType: null,
-                promotedObject: null
-              });
-              if (adSetResult.success) {
-                console.warn(`AdSet ${i + 1}${audPrefix}: Created as WEBSITE fallback.`);
-              }
-            }
 
             if (!adSetResult.success) {
               results.errors.push(`AdSet ${i + 1}${audPrefix}: ${adSetResult.error}`);
