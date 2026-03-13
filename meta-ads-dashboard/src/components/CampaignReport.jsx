@@ -20,13 +20,10 @@ function getConversations(insights) {
 // Extraer nombre de servicio del nombre de campaña (quita la ubicación y prefijos comunes)
 function extractServiceName(campaignName, locations = []) {
   let name = campaignName;
-  // Quitar ubicaciones del nombre
   for (const loc of locations) {
     name = name.replace(new RegExp(loc, 'gi'), '');
   }
-  // Quitar separadores comunes y limpiar
   name = name.replace(/[-–—|]/g, ' ').replace(/\s+/g, ' ').trim();
-  // Quitar prefijos como "EQ", "Tráfico", "Mensajes", etc.
   name = name.replace(/^(EQ|Equilibrio|Tráfico|Trafico|Mensajes|Campaña|Campaign)\s*/i, '').trim();
   return name || campaignName;
 }
@@ -46,6 +43,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [hasAccess, setHasAccess] = useState(null);
+  const [viewMode, setViewMode] = useState('yesterday'); // 'yesterday' | 'today'
 
   // Verificar acceso
   useEffect(() => {
@@ -141,10 +139,12 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
 
   const { campaigns = [], dateRange, name, businessName, locations = [], resultLabel = 'Mensajes' } = data;
 
-  // Filtrar campañas con gasto
+  // La key de insights según el modo
+  const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday';
+
+  // Filtrar campañas con gasto en el periodo seleccionado
   const campaignsWithSpend = campaigns.filter(c =>
-    parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
-    parseFloat(c.insightsToday?.spend || 0) > 0
+    parseFloat(c[insightsKey]?.spend || 0) > 0
   );
 
   // Agrupar por ubicación
@@ -166,25 +166,21 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     return idxA - idxB;
   });
 
-  // Calcular totales por campaña
+  // Métricas por campaña (solo del periodo seleccionado)
   function getCampaignMetrics(c) {
-    const spendY = parseFloat(c.insightsYesterday?.spend || 0);
-    const spendT = parseFloat(c.insightsToday?.spend || 0);
-    const msgsY = getConversations(c.insightsYesterday);
-    const msgsT = getConversations(c.insightsToday);
-    const totalSpend = spendY + spendT;
-    const totalMsgs = msgsY + msgsT;
-    const costPerMsg = totalMsgs > 0 ? totalSpend / totalMsgs : 0;
-    return { spendY, spendT, totalSpend, msgsY, msgsT, totalMsgs, costPerMsg };
+    const spend = parseFloat(c[insightsKey]?.spend || 0);
+    const msgs = getConversations(c[insightsKey]);
+    const costPerMsg = msgs > 0 ? spend / msgs : 0;
+    return { spend, msgs, costPerMsg };
   }
 
-  // Calcular totales por ubicación
+  // Totales por ubicación
   function getLocationTotals(campaignList) {
     let totalSpend = 0, totalMsgs = 0;
     for (const c of campaignList) {
       const m = getCampaignMetrics(c);
-      totalSpend += m.totalSpend;
-      totalMsgs += m.totalMsgs;
+      totalSpend += m.spend;
+      totalMsgs += m.msgs;
     }
     return { totalSpend, totalMsgs, costPerMsg: totalMsgs > 0 ? totalSpend / totalMsgs : 0 };
   }
@@ -192,13 +188,15 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   // Grand totals
   const grandTotals = getLocationTotals(campaignsWithSpend);
 
-  // Formatear fecha para mostrar
+  // Formatear fecha
   function formatDate(dateStr) {
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-');
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    return `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+    return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
   }
+
+  const currentDate = viewMode === 'yesterday' ? dateRange?.yesterday : dateRange?.today;
 
   return (
     <div className="report-page">
@@ -209,9 +207,6 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           <span className="report-business">{businessName}</span>
         </div>
         <div className="report-header-meta">
-          <div className="report-date-badge">
-            {formatDate(dateRange?.yesterday)} — {formatDate(dateRange?.today)}
-          </div>
           {lastUpdate && (
             <span className="report-updated">
               Actualizado: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
@@ -220,6 +215,26 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           )}
         </div>
       </header>
+
+      {/* Day Switch */}
+      <div className="report-day-switch-wrap">
+        <div className="report-day-switch">
+          <button
+            className={`report-day-btn ${viewMode === 'yesterday' ? 'report-day-btn--active' : ''}`}
+            onClick={() => setViewMode('yesterday')}
+          >
+            Ayer
+            <span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
+          </button>
+          <button
+            className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`}
+            onClick={() => setViewMode('today')}
+          >
+            Hoy
+            <span className="report-day-date">{formatDate(dateRange?.today)}</span>
+          </button>
+        </div>
+      </div>
 
       {/* Grand Total Summary */}
       <section className="report-grand-summary">
@@ -236,6 +251,13 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           <span className="report-grand-value">{grandTotals.costPerMsg > 0 ? formatCOP(grandTotals.costPerMsg) : '-'}</span>
         </div>
       </section>
+
+      {/* No data message */}
+      {campaignsWithSpend.length === 0 && (
+        <div className="report-no-data">
+          Sin datos para {viewMode === 'yesterday' ? 'ayer' : 'hoy'}
+        </div>
+      )}
 
       {/* Grouped Tables */}
       {sortedLocations.map(location => {
@@ -262,9 +284,9 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
                     return (
                       <tr key={c.id}>
                         <td className="report-td-service">{serviceName}</td>
-                        <td className="report-td-num">{m.totalMsgs || '-'}</td>
+                        <td className="report-td-num">{m.msgs || '-'}</td>
                         <td className="report-td-num">{m.costPerMsg > 0 ? formatCOP(m.costPerMsg) : '-'}</td>
-                        <td className="report-td-num">{formatCOP(m.totalSpend)}</td>
+                        <td className="report-td-num">{formatCOP(m.spend)}</td>
                       </tr>
                     );
                   })}
