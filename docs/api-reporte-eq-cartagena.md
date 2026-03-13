@@ -165,7 +165,7 @@ for c in campaigns:
 
 # Armar mensaje
 msg = f"""📊 *Reporte EQ Cartagena*
-📅 {fecha}
+📅 {fecha} (24 horas)
 
 {chr(10).join(lines)}
 
@@ -179,7 +179,7 @@ print(msg)
 ### Ejemplo de salida:
 ```
 📊 Reporte EQ Cartagena
-📅 2026-03-12
+📅 2026-03-12 (24 horas)
 
 • CARLOS - VENTAS WP Bocagrande: 15 mensajes | Costo: $7,287 | Gastado: $109,313
 • VENTAS similares: 12 mensajes | Costo: $16,420 | Gastado: $197,049
@@ -200,6 +200,8 @@ El bot debe ejecutar la consulta diariamente a las **7:00am hora Colombia (UTC-5
 ```cron
 0 12 * * * /path/to/script.py
 ```
+
+**Frecuencia: de lunes a lunes (todos los días, sin descanso).**
 
 ## Notas
 
