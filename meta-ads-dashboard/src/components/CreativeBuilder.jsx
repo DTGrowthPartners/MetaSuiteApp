@@ -2141,15 +2141,18 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             onChange={handleMultiFileUpload}
             style={{ display: 'none' }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)', fontSize: '16px', textAlign: 'center' }}>
+            Subir archivos a la Biblioteca de Meta
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"
               onClick={() => multiFileInputRef.current?.click()}
               disabled={!selectedAccount}
               className="toggle-btn active"
-              style={{ padding: '10px 18px', opacity: selectedAccount ? 1 : 0.5 }}
+              style={{ padding: '14px 32px', fontSize: '15px', opacity: selectedAccount ? 1 : 0.5 }}
             >
-              Subir archivos a biblioteca de Meta
+              Subir archivos
             </button>
             {multiUploadProgress && (
               <span className="text-accent" style={{ fontSize: '12px' }}>
