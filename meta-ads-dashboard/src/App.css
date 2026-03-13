@@ -857,6 +857,12 @@ body {
   color: #cbd5e1;
 }
 
+.report-result-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+}
+
 .report-table tbody tr:hover {
   background: rgba(99, 102, 241, 0.05);
 }
