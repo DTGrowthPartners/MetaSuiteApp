@@ -470,26 +470,60 @@ class MetaAdsService {
     }
   }
 
-  // Obtener plantillas de mensajes de WhatsApp de una cuenta WABA
-  async getWhatsAppMessageTemplates(whatsappBusinessAccountId) {
+  // Obtener plantillas de mensajes de bienvenida de WhatsApp desde los creativos existentes
+  async getWhatsAppWelcomeTemplates(adAccountId) {
     try {
-      console.log('Fetching WhatsApp message templates for WABA:', whatsappBusinessAccountId);
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      console.log('Fetching WhatsApp welcome templates from creatives for:', normalizedId);
       const response = await axios.get(
-        `${META_API_BASE_URL}/${whatsappBusinessAccountId}/message_templates`,
+        `${META_API_BASE_URL}/${normalizedId}/adcreatives`,
         {
           params: {
             access_token: this.accessToken,
-            fields: 'id,name,status,category,language,components,quality_score',
+            fields: 'id,name,object_story_spec',
             limit: 100
           }
         }
       );
-      const templates = response.data.data || [];
-      console.log('WhatsApp message templates:', templates.length, 'raw response:', response.data);
-      // Devolver todas las plantillas (mostrar estado en UI)
+      const creatives = response.data.data || [];
+      const templatesMap = {};
+
+      for (const creative of creatives) {
+        const oss = creative.object_story_spec || {};
+        for (const key of ['video_data', 'link_data', 'photo_data']) {
+          const media = oss[key];
+          if (!media?.page_welcome_message) continue;
+          try {
+            const pwm = typeof media.page_welcome_message === 'string'
+              ? JSON.parse(media.page_welcome_message)
+              : media.page_welcome_message;
+            const textFormat = pwm.text_format || {};
+            const msg = textFormat.message || {};
+            const greeting = msg.text || '';
+            const autofill = msg.autofill_message?.content || '';
+            const imageFormat = pwm.image_format || {};
+            const quickReplies = imageFormat.message?.quick_replies || [];
+            const uniqueKey = `${greeting}|${autofill}`;
+            if (!templatesMap[uniqueKey]) {
+              templatesMap[uniqueKey] = {
+                id: creative.id,
+                greeting,
+                autofill,
+                quickReplies: quickReplies.map(qr => qr.title).filter(Boolean),
+                landingType: pwm.landing_screen_type || 'welcome_message',
+                creativeName: creative.name || '',
+                rawPwm: media.page_welcome_message
+              };
+            }
+          } catch (e) { /* skip malformed */ }
+        }
+      }
+
+      const templates = Object.values(templatesMap);
+      console.log('WhatsApp welcome templates found:', templates.length, 'from', creatives.length, 'creatives');
       return templates;
     } catch (error) {
-      console.error('Get WhatsApp message templates error:', error.response?.data?.error || error.message);
+      console.error('Get WhatsApp welcome templates error:', error.response?.data?.error || error.message);
       return [];
     }
   }

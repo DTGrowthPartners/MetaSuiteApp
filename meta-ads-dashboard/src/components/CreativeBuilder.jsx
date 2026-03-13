@@ -1004,7 +1004,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     return () => { cancelled = true; };
   }, [selectedAccount]);
 
-  // Cargar plantillas de mensajes de WhatsApp a nivel de cuenta publicitaria (WABA)
+  // Cargar plantillas de bienvenida de WhatsApp desde creativos existentes
   useEffect(() => {
     let cancelled = false;
     const loadWaTemplates = async () => {
@@ -1015,28 +1015,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       setLoadingWaTemplates(true);
       try {
         const metaService = new MetaAdsService(accessToken);
-        // Obtener business de la cuenta publicitaria
-        const normalizedId = metaService.normalizeAccountId(selectedAccount);
-        const acctResp = await axios.get(`https://graph.facebook.com/v24.0/${normalizedId}`, {
-          params: { access_token: accessToken, fields: 'business{id,name}' }
-        });
-        const business = acctResp.data?.business;
-        if (!business || cancelled) { setLoadingWaTemplates(false); return; }
-
-        // Obtener WABAs del business
-        const wabaAccounts = await metaService.getWhatsAppBusinessAccounts(business.id);
-        if (cancelled) return;
-
-        // Cargar plantillas de todos los WABAs
-        let allTemplates = [];
-        for (const waba of wabaAccounts) {
-          const templates = await metaService.getWhatsAppMessageTemplates(waba.id);
-          if (cancelled) return;
-          allTemplates = allTemplates.concat(templates.map(t => ({ ...t, waba_name: waba.name, waba_id: waba.id })));
-        }
+        const templates = await metaService.getWhatsAppWelcomeTemplates(selectedAccount);
         if (!cancelled) {
-          setWaMessageTemplates(allTemplates);
-          console.log('WhatsApp message templates loaded:', allTemplates.length, 'from', wabaAccounts.length, 'WABAs');
+          setWaMessageTemplates(templates);
         }
       } catch (err) {
         console.error('Error loading WA templates:', err);
@@ -1044,7 +1025,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         if (!cancelled) setLoadingWaTemplates(false);
       }
     };
-    // Delay para no competir con otras cargas
     const timer = setTimeout(() => loadWaTemplates(), 2000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [selectedAccount]);
@@ -1506,9 +1486,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         chatGreeting: chatGreeting || null,
         chatFormFields: chatFormFields.length > 0 ? chatFormFields : null,
         waTemplateMode: waTemplateMode,
-        selectedWaTemplateId: waTemplateMode === 'template' ? selectedWaTemplate : null,
-        selectedWaTemplate: waTemplateMode === 'template' && selectedWaTemplate
-          ? waMessageTemplates.find(t => t.id === selectedWaTemplate) || null
+        selectedWaTemplateRawPwm: waTemplateMode === 'template' && selectedWaTemplate
+          ? (waMessageTemplates.find(t => t.id === selectedWaTemplate)?.rawPwm || null)
           : null,
         // Legacy fields from first ad (for WhatsApp/Messenger compat)
         headlines: builtAds[0]?.headlines || [],
@@ -2983,12 +2962,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               {waTemplateMode === 'template' ? (
                 <div>
                   {loadingWaTemplates ? (
-                    <p className="text-muted" style={{ fontSize: '13px' }}>Cargando plantillas...</p>
+                    <p className="text-muted" style={{ fontSize: '13px' }}>Cargando plantillas de campañas anteriores...</p>
                   ) : waMessageTemplates.length === 0 ? (
                     <div style={{ padding: '16px', textAlign: 'center' }}>
                       <p className="text-muted" style={{ fontSize: '13px' }}>
                         {selectedAccount
-                          ? 'No se encontraron plantillas aprobadas para esta cuenta publicitaria.'
+                          ? 'No se encontraron plantillas en campañas anteriores.'
                           : 'Selecciona una cuenta publicitaria para cargar las plantillas.'}
                       </p>
                     </div>
@@ -2996,13 +2975,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     <>
                       <select
                         value={selectedWaTemplate}
-                        onChange={(e) => setSelectedWaTemplate(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedWaTemplate(e.target.value);
+                          // Auto-fill greeting from selected template
+                          const tpl = waMessageTemplates.find(t => t.id === e.target.value);
+                          if (tpl) {
+                            setChatGreeting(tpl.greeting || '');
+                          }
+                        }}
                         style={{ marginBottom: '12px' }}
                       >
-                        <option value="">-- Selecciona una plantilla --</option>
+                        <option value="">-- Selecciona una plantilla ({waMessageTemplates.length} encontradas) --</option>
                         {waMessageTemplates.map(tpl => (
                           <option key={tpl.id} value={tpl.id}>
-                            {tpl.name} ({tpl.language}) - {tpl.category}
+                            {tpl.greeting ? tpl.greeting.substring(0, 60) + (tpl.greeting.length > 60 ? '...' : '') : 'Sin saludo'}
                           </option>
                         ))}
                       </select>
@@ -3011,53 +2997,37 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       {selectedWaTemplate && (() => {
                         const tpl = waMessageTemplates.find(t => t.id === selectedWaTemplate);
                         if (!tpl) return null;
-                        const header = tpl.components?.find(c => c.type === 'HEADER');
-                        const body = tpl.components?.find(c => c.type === 'BODY');
-                        const footer = tpl.components?.find(c => c.type === 'FOOTER');
-                        const buttons = tpl.components?.find(c => c.type === 'BUTTONS');
                         return (
                           <div className="chat-preview" style={{ marginTop: '8px' }}>
                             <div style={{ marginBottom: '8px' }}>
-                              <span className="text-accent" style={{ fontSize: '11px', fontWeight: 600 }}>
-                                {tpl.category} · {tpl.language}
-                              </span>
+                              <div className="chat-preview-label">Mensaje de bienvenida</div>
+                              <div className="chat-preview-content" style={{ whiteSpace: 'pre-wrap' }}>
+                                {tpl.greeting || '(Sin mensaje)'}
+                              </div>
                             </div>
-                            {header && (
+                            {tpl.autofill && (
                               <div style={{ marginBottom: '8px' }}>
-                                <div className="chat-preview-label">Encabezado</div>
-                                <div className="chat-preview-content">
-                                  {header.format === 'TEXT' ? header.text : `[${header.format}]`}
+                                <div className="chat-preview-label">Mensaje pre-llenado del usuario</div>
+                                <div className="chat-preview-content text-muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>
+                                  "{tpl.autofill}"
                                 </div>
                               </div>
                             )}
-                            {body && (
-                              <div style={{ marginBottom: '8px' }}>
-                                <div className="chat-preview-label">Cuerpo</div>
-                                <div className="chat-preview-content" style={{ whiteSpace: 'pre-wrap' }}>
-                                  {body.text}
-                                </div>
-                              </div>
-                            )}
-                            {footer && (
-                              <div style={{ marginBottom: '8px' }}>
-                                <div className="chat-preview-label">Pie</div>
-                                <div className="chat-preview-content text-muted" style={{ fontSize: '12px' }}>
-                                  {footer.text}
-                                </div>
-                              </div>
-                            )}
-                            {buttons && buttons.buttons?.length > 0 && (
+                            {tpl.quickReplies?.length > 0 && (
                               <div>
-                                <div className="chat-preview-label">Botones</div>
+                                <div className="chat-preview-label">Respuestas rápidas</div>
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                  {buttons.buttons.map((btn, i) => (
+                                  {tpl.quickReplies.map((qr, i) => (
                                     <span key={i} className="toggle-btn active" style={{ fontSize: '12px', padding: '4px 10px' }}>
-                                      {btn.text}
+                                      {qr}
                                     </span>
                                   ))}
                                 </div>
                               </div>
                             )}
+                            <p className="hint mt-sm" style={{ fontSize: '11px' }}>
+                              De: {tpl.creativeName?.substring(0, 50)}
+                            </p>
                           </div>
                         );
                       })()}
