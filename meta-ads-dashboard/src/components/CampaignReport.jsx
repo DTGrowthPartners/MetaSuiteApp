@@ -19,25 +19,17 @@ function getResult(insights, objective) {
     if (a.action_type === 'link_click') linkClicks = parseInt(a.value || 0);
     if (a.action_type === 'landing_page_view') lpv = parseInt(a.value || 0);
   }
-  if (!linkClicks && insights?.inline_link_clicks) linkClicks = parseInt(insights.inline_link_clicks);
 
-  // Usar el mayor entre conversations y firstReplies
   const msgs = Math.max(conversations, firstReplies);
-
-  // Decidir por objetivo de campaña
   const obj = (objective || '').toUpperCase();
-  if (obj.includes('ENGAGEMENT') || obj.includes('LEADS')) {
-    // Campañas de mensajes/leads
-    if (msgs > 0) return { count: msgs, label: 'Mensajes' };
-    if (leads > 0) return { count: leads, label: 'Leads' };
-  }
-  if (obj.includes('TRAFFIC') || obj.includes('CONVERSIONS') || obj.includes('SALES')) {
-    // Campañas de tráfico/web
-    if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
+
+  // Tráfico: mostrar visitas a la página (landing_page_view), NO link_clicks
+  if (obj.includes('TRAFFIC')) {
     if (lpv > 0) return { count: lpv, label: 'Visitas' };
+    if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
   }
 
-  // Fallback genérico por prioridad
+  // Todo lo demás: mensajes primero (WhatsApp/Messenger), luego leads, luego clicks
   if (msgs > 0) return { count: msgs, label: 'Mensajes' };
   if (leads > 0) return { count: leads, label: 'Leads' };
   if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
@@ -122,18 +114,6 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
 
   const { campaigns = [], dateRange, name, businessName, locations = [] } = data;
   const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday';
-
-  // DEBUG: ver datos crudos en consola
-  console.log('=== REPORT DEBUG ===');
-  console.log('Dates:', dateRange);
-  console.log('View:', viewMode, '→', insightsKey);
-  campaigns.forEach(c => {
-    const ins = c[insightsKey];
-    const spend = parseFloat(ins?.spend || 0);
-    if (spend > 0) {
-      console.log(`[${c.name}] objective=${c.objective} spend=${spend}`, 'actions:', ins?.actions, 'inline_link_clicks:', ins?.inline_link_clicks);
-    }
-  });
 
   // Campañas con gasto en el periodo
   const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
