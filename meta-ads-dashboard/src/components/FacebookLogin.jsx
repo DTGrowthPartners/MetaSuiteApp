@@ -55,7 +55,7 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
         setError('No se pudo iniciar sesión con Facebook. Por favor intenta nuevamente.');
       }
     }, {
-      scope: 'ads_read,ads_management,business_management,pages_show_list,whatsapp_basic',
+      scope: 'ads_read,ads_management,business_management,pages_show_list,whatsapp_basic,whatsapp_business_management',
       return_scopes: true
     });
   };

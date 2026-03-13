@@ -485,9 +485,9 @@ class MetaAdsService {
         }
       );
       const templates = response.data.data || [];
-      console.log('WhatsApp message templates:', templates.length);
-      // Solo devolver templates aprobados
-      return templates.filter(t => t.status === 'APPROVED');
+      console.log('WhatsApp message templates:', templates.length, 'raw response:', response.data);
+      // Devolver todas las plantillas (mostrar estado en UI)
+      return templates;
     } catch (error) {
       console.error('Get WhatsApp message templates error:', error.response?.data?.error || error.message);
       return [];
