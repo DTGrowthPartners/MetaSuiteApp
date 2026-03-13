@@ -2002,9 +2002,15 @@ const REPORT_ACCOUNTS = {
     // Métrica principal de resultado
     resultMetric: 'conversations', // mensajes
     resultLabel: 'Mensajes'
+  },
+  'acbfit': {
+    accountId: 'act_1214099615878120',
+    name: 'ACB Fit',
+    businessName: 'ACB Fit',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
   }
-  // Agregar más cuentas aquí:
-  // 'otra-cuenta': { accountId: 'act_XXX', name: 'Otra Cuenta', businessName: 'Business', locations: [...] }
 };
 
 // Cache de reportes (se actualiza cada hora o a las 7am)
