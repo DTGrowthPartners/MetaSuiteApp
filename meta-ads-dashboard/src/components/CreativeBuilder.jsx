@@ -3770,231 +3770,69 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   if (created && draftData) {
     const adWasCreated = draftData.totalAdsCreated > 0;
+    const destLabels = { WHATSAPP: 'WhatsApp', MESSENGER: 'Messenger', INSTAGRAM_DIRECT: 'Instagram DM', WEBSITE: 'Web', INSTAGRAM_PROFILE: 'Instagram' };
 
     return (
       <div className="draft-step">
-        <div className="success-section">
-          <div className="success-icon">OK</div>
-          <h2>{adWasCreated
-            ? `Campaña Creada con ${draftData.totalAdsCreated} Anuncio(s)`
-            : 'Campaña y Ad Set Creados'
-          }</h2>
-          <p>
+        <div className="success-section" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '8px' }}>
+            {adWasCreated ? String.fromCodePoint(0x1F389) : String.fromCodePoint(0x1F4CB)}
+          </div>
+          <h2 style={{ margin: '0 0 8px', fontSize: '22px' }}>
+            {adWasCreated ? 'Campaña Creada Exitosamente' : 'Campaña y Ad Set Creados'}
+          </h2>
+          <p className="text-muted" style={{ fontSize: '14px', margin: '0 0 24px' }}>
             {adWasCreated
-              ? `Se crearon ${draftData.totalAdSets || 1} Ad Set(s) y ${draftData.totalAdsCreated} anuncio(s) en Meta Ads Manager en estado PAUSADO.`
-              : 'Tu campaña y conjunto de anuncios han sido creados en Meta Ads Manager en estado PAUSADO.'
-            }
+              ? `${draftData.totalAdSets || 1} conjunto(s) + ${draftData.totalAdsCreated} anuncio(s) en estado pausado`
+              : 'Tu campaña ha sido creada en estado pausado'}
           </p>
 
-          <div className="draft-details">
-            <div className="draft-card">
-              <span className="card-icon">C</span>
-              <div>
-                <h4>Campaña</h4>
-                <p>{draftData.campaignName}</p>
-                <p className="hint">ID: {draftData.campaignId}</p>
-                <p className="hint">Objetivo: {draftData.objective || 'OUTCOME_TRAFFIC'}</p>
-                <p className="hint">Destino: {draftData.conversionLocation || 'WEBSITE'}</p>
-                {draftData.bidStrategy && draftData.bidStrategy !== 'LOWEST_COST_WITHOUT_CAP' && (
-                  <p className="hint">Puja: {draftData.bidStrategy}</p>
-                )}
-                {draftData.specialAdCategories?.length > 0 && (
-                  <p className="hint">Categorías: {draftData.specialAdCategories.join(', ')}</p>
-                )}
-                {draftData.startDate && <p className="hint">Inicio: {draftData.startDate}</p>}
-                {draftData.endDate && <p className="hint">Fin: {draftData.endDate}</p>}
-                <span className="status-badge paused">PAUSADO</span>
-              </div>
+          {/* Resumen compacto en grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', textAlign: 'left', marginBottom: '20px' }}>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: '3px solid var(--accent-color)' }}>
+              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Campaña</p>
+              <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{draftData.campaignName}</p>
+              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
+                {destLabels[draftData.conversionLocation] || draftData.conversionLocation} · ${formatCOP(draftData.dailyBudgetCOP)}/dia
+              </p>
             </div>
-
-            <div className="draft-card">
-              <span className="card-icon">AS</span>
-              <div>
-                <h4>Ad Set(s) ({draftData.totalAdSets || 1})</h4>
-                <p>Presupuesto: ${formatCOP(draftData.dailyBudgetCOP)} COP/día ({draftData.budgetLevel === 'adset' ? 'por Ad Set' : 'CBO'})</p>
-                {draftData.adSets?.length > 0 ? (
-                  draftData.adSets.map((adSet, i) => (
-                    <p key={i} className="hint">Ad Set {i + 1} ID: {adSet.id}</p>
-                  ))
-                ) : (
-                  <p className="hint">ID: {draftData.adSetId}</p>
-                )}
-                <p className="hint">
-                  {draftData.adSetMode === 'per-ad'
-                    ? 'Modo: 1 Ad Set por anuncio'
-                    : `Público: ${draftData.savedAudienceName || 'Colombia 18-65'}`}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: '3px solid #4ecdc4' }}>
+              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Conjuntos ({draftData.totalAdSets || 1})</p>
+              <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{draftData.savedAudienceName || 'Advantage+'}</p>
+              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
+                {draftData.pageName}{draftData.igUsername ? ` · @${draftData.igUsername}` : ''}
+              </p>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: `3px solid ${adWasCreated ? '#45b7d1' : '#f0ad4e'}` }}>
+              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Anuncios ({draftData.totalAdsCreated})</p>
+              {draftData.ads?.length > 0 ? (
+                <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
+                  {draftData.ads.map((ad, i) => `#${i + 1}`).join(', ')}
                 </p>
-                <span className="status-badge paused">PAUSADO</span>
-              </div>
-            </div>
-
-            {adWasCreated ? (
-              <div className="draft-card draft-card--success">
-                <span className="card-icon">Ad</span>
-                <div>
-                  <h4>Anuncios ({draftData.totalAdsCreated})</h4>
-                  {draftData.ads?.length > 0 ? (
-                    draftData.ads.map((ad, i) => (
-                      <p key={i} className="hint">
-                        Ad {i + 1}: {draftData.jobAds?.[i]?.adName || `Ad ${i + 1}`} (ID: {ad.id})
-                      </p>
-                    ))
-                  ) : (
-                    <p className="hint">ID: {draftData.adId}</p>
-                  )}
-                  <p className="hint">Página: {draftData.pageName}</p>
-                  {draftData.igUsername && (
-                    <p className="hint">Instagram: @{draftData.igUsername}</p>
-                  )}
-                  <span className="status-badge paused">PAUSADO</span>
-                </div>
-              </div>
-            ) : (
-              <div className="draft-card draft-card--pending">
-                <span className="card-icon">Ad</span>
-                <div>
-                  <h4>Anuncio (Pendiente)</h4>
-                  <p className="text-warning">Crear manualmente en Meta Ads Manager</p>
-                  <p className="hint">Página: {draftData.pageName}</p>
-                  <p className="hint">Destino: {draftData.linkUrl}</p>
-                  <span className="status-badge pending">PENDIENTE</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Contenido - diferente según si se creó el Ad o no */}
-          {adWasCreated ? (
-            // Ads fueron creados - mostrar resumen de todas las variaciones
-            <div className="generated-content-box generated-content--success">
-              <h3>
-                🎉 {draftData.totalAdsCreated > 1
-                  ? `¡${draftData.totalAdsCreated} Anuncios Creados!`
-                  : '¡Anuncio Creado Exitosamente!'}
-              </h3>
-              <p className="text-success" style={{ marginBottom: '15px', fontSize: '14px' }}>
-                {draftData.totalAdsCreated > 1
-                  ? `Se crearon ${draftData.totalAdsCreated} variaciones de anuncio. Meta optimizará y mostrará el de mejor rendimiento.`
-                  : 'Tu anuncio está listo. Solo necesitas activar la campaña cuando quieras que empiece a correr.'}
-              </p>
-
-              {/* Mostrar cada variación creada */}
-              {draftData.headlines?.filter(h => h?.trim()).map((headline, i) => {
-                if (i >= (draftData.totalAdsCreated || 1)) return null;
-                return (
-                  <div key={i} className="draft-variation-card">
-                    <p className="text-muted" style={{ fontSize: '12px', marginBottom: '5px' }}>Variación {i + 1}</p>
-                    <p><strong>Título:</strong> {headline}</p>
-                    <p><strong>Texto:</strong> {draftData.descriptions?.[i]?.substring(0, 80) || draftData.descriptions?.[0]?.substring(0, 80) || 'N/A'}...</p>
-                  </div>
-                );
-              })}
-
-              <div className="draft-variation-card" style={{ marginTop: '10px', marginBottom: 0, borderLeft: 'none' }}>
-                <p><strong>Destino:</strong> {draftData.linkUrl}</p>
-                <p><strong>CTA:</strong> {CTA_OPTIONS.find(c => c.value === draftData.ctas?.[0])?.label || draftData.ctas?.[0] || 'LEARN_MORE'}</p>
-                {draftData.igUsername && <p><strong>Instagram:</strong> @{draftData.igUsername}</p>}
-              </div>
-
-              {!draftData.imageUrl && (
-                <p className="text-warning mt-sm" style={{ fontSize: '13px' }}>
-                  Nota: Los anuncios usan la imagen de vista previa del link. Puedes editarlos en Meta Ads Manager para agregar una imagen personalizada.
-                </p>
-              )}
-            </div>
-          ) : (
-            // Ad NO fue creado - mostrar contenido para copiar
-            <div className="generated-content-box generated-content--pending">
-              <h3>
-                📋 Contenido para crear tu Anuncio
-              </h3>
-              <p className="text-warning" style={{ marginBottom: '15px', fontSize: '14px' }}>
-                Usa este contenido al crear el Anuncio en Meta Ads Manager. <strong>Click para copiar.</strong>
-              </p>
-
-              {draftData.imageUrl && (
-                <div className="copy-section mb-md">
-                  <label>URL de Imagen</label>
-                  <div className="copy-item copy-item--highlight" onClick={() => navigator.clipboard.writeText(draftData.imageUrl)} title="Click para copiar URL de imagen">
-                    {draftData.imageUrl}
-                  </div>
-                </div>
-              )}
-
-              {draftData.linkUrl && (
-                <div className="copy-section mb-md">
-                  <label>URL de Destino</label>
-                  <div className="copy-item" onClick={() => navigator.clipboard.writeText(draftData.linkUrl)} title="Click para copiar">
-                    {draftData.linkUrl}
-                  </div>
-                </div>
-              )}
-
-              {draftData.headlines?.length > 0 && (
-                <div className="copy-section mb-md">
-                  <label>Títulos ({draftData.headlines.length})</label>
-                  {draftData.headlines.map((h, i) => (
-                    <div key={i} className="copy-item" onClick={() => navigator.clipboard.writeText(h)} title="Click para copiar">
-                      {h}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {draftData.descriptions?.length > 0 && (
-                <div className="copy-section mb-md">
-                  <label>Descripciones ({draftData.descriptions.length})</label>
-                  {draftData.descriptions.map((d, i) => (
-                    <div key={i} className="copy-item" onClick={() => navigator.clipboard.writeText(d)} title="Click para copiar">
-                      {d}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {draftData.ctas?.length > 0 && (
-                <div className="copy-section">
-                  <label>CTAs Recomendados</label>
-                  <div className="toggle-group mt-sm">
-                    {[...new Set(draftData.ctas)].map((cta, i) => (
-                      <span key={i} className="chip">{CTA_OPTIONS.find(c => c.value === cta)?.label || cta}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="hint mt-md">
-                Tip: Haz click en cualquier texto para copiarlo al portapapeles
-              </p>
-            </div>
-          )}
-
-          <div className="next-steps">
-            <h3>{adWasCreated ? 'Próximos Pasos' : 'Próximos Pasos para Completar el Anuncio'}</h3>
-            <ol>
-              <li>Ve a <a href="https://business.facebook.com/adsmanager" target="_blank" rel="noopener noreferrer">Meta Ads Manager</a></li>
-              <li>Busca la campaña <strong>"{draftData.campaignName}"</strong></li>
-              {adWasCreated ? (
-                <>
-                  <li>Revisa que todo esté correcto</li>
-                  <li><strong>Activa la campaña</strong> cuando estés listo</li>
-                </>
               ) : (
-                <>
-                  <li>Entra al Ad Set y haz click en <strong>"Crear Anuncio"</strong></li>
-                  <li>Selecciona la página <strong>{draftData.pageName}</strong></li>
-                  <li>{draftData.imageUrl ? 'Descarga y sube la imagen desde la URL de arriba' : 'Sube una imagen para el anuncio'}</li>
-                  <li>Copia los títulos y descripciones de arriba</li>
-                  <li>Configura el CTA y la URL de destino</li>
-                  <li>Guarda y activa cuando estés listo</li>
-                </>
+                <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>Pendiente</p>
               )}
-            </ol>
+              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
+                {draftData.whatsappNumber ? `WA: ${draftData.whatsappNumber}` : draftData.linkUrl?.substring(0, 35) || ''}
+              </p>
+            </div>
           </div>
 
-          <button className="done-button" onClick={onComplete}>
-            Crear Otra Campaña
-          </button>
+          {/* Botones de acción */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
+            <a
+              href="https://business.facebook.com/adsmanager"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="toggle-btn active"
+              style={{ padding: '12px 24px', fontSize: '14px', textDecoration: 'none', display: 'inline-block' }}
+            >
+              Abrir en Ads Manager
+            </a>
+            <button className="done-button" onClick={onComplete} style={{ padding: '12px 24px', fontSize: '14px' }}>
+              Crear Otra Campaña
+            </button>
+          </div>
         </div>
       </div>
     );

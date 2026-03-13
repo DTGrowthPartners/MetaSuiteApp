@@ -1927,7 +1927,8 @@ class MetaAdsService {
     linkUrl,
     igActorId = null,
     isWhatsApp = false, // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
-    isInstagramDM = false // IG DM: SIEMPRE requiere link_urls con ig.me/m/{igActorId} (error 1885869 sin ellas)
+    isInstagramDM = false, // IG DM: SIEMPRE requiere link_urls con ig.me/m/{igActorId} (error 1885869 sin ellas)
+    pageWelcomeMessage = null // page_welcome_message string para WhatsApp/Messaging DC
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1991,6 +1992,13 @@ class MetaAdsService {
         assetFeedSpec.ad_formats = ['SINGLE_IMAGE'];
       }
 
+      // page_welcome_message para WhatsApp/Messaging DC
+      if (pageWelcomeMessage) {
+        assetFeedSpec.page_welcome_message = typeof pageWelcomeMessage === 'string'
+          ? pageWelcomeMessage : JSON.stringify(pageWelcomeMessage);
+        console.log('DC asset_feed_spec: adding page_welcome_message');
+      }
+
       const objectStorySpec = {
         page_id: pageId
       };
@@ -2008,7 +2016,8 @@ class MetaAdsService {
         imageHash9x16: imageHash9x16 || 'N/A',
         titles: titles.length, bodies: bodies.length,
         descriptions: descriptions.length, callToActionTypes,
-        igActorId: igActorId || 'none'
+        igActorId: igActorId || 'none',
+        hasPageWelcomeMessage: !!pageWelcomeMessage
       });
       console.log('objectStorySpec:', JSON.stringify(objectStorySpec));
       console.log('assetFeedSpec:', JSON.stringify(assetFeedSpec, null, 2));
@@ -3059,6 +3068,9 @@ class MetaAdsService {
             })
           : null;
 
+      console.log('WhatsApp pwmString:', pwmString ? `SET (${pwmString.substring(0, 80)}...)` : 'NULL');
+      console.log('WhatsApp pageWelcomeMessage input:', JSON.stringify(pageWelcomeMessage));
+
       // ====== MODOS NO-FLEXIBLE: loop por cada ad ======
       if (!useFlexible)
       for (let i = 0; i < ads.length; i++) {
@@ -3153,7 +3165,8 @@ class MetaAdsService {
             callToActionTypes: validCTAs,
             linkUrl: null,
             igActorId,
-            isWhatsApp: true
+            isWhatsApp: true,
+            pageWelcomeMessage: pwmString
           });
 
           // Si falla por igActorId, reintentar sin IG
@@ -3172,7 +3185,8 @@ class MetaAdsService {
               callToActionTypes: validCTAs,
               linkUrl: null,
               igActorId: null,
-              isWhatsApp: true
+              isWhatsApp: true,
+              pageWelcomeMessage: pwmString
             });
           }
         } else {
