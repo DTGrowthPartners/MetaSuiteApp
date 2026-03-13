@@ -2035,7 +2035,7 @@ function getReportDates() {
   return { yesterday, today, colombiaTime };
 }
 
-// Helper: obtener campañas + adsets con insights por rango de fechas
+// Helper: obtener campañas con insights por rango de fechas
 async function getReportData(accountId, token) {
   const { yesterday, today } = getReportDates();
   const normalizedId = normalizeAccountId(accountId);
@@ -2051,26 +2051,9 @@ async function getReportData(accountId, token) {
   });
   const campaigns = campaignsResp.data.data || [];
 
-  // Para cada campaña, obtener adsets con insights
-  const withAdSets = await Promise.all(campaigns.map(async (campaign) => {
-    // Obtener adsets de esta campaña
-    let adsets = [];
-    try {
-      const adsetResp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/adsets`, {
-        params: {
-          access_token: token,
-          fields: 'id,name,status,configured_status',
-          limit: 100
-        }
-      });
-      adsets = adsetResp.data.data || [];
-    } catch (e) {
-      console.error(`Error fetching adsets for campaign ${campaign.id}:`, e.message);
-    }
-
-    // Insights a nivel de campaña (para totales)
-    let campaignInsightsYesterday = {};
-    let campaignInsightsToday = {};
+  const withInsights = await Promise.all(campaigns.map(async (campaign) => {
+    let insightsYesterday = {};
+    let insightsToday = {};
     try {
       const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
         params: {
@@ -2079,7 +2062,7 @@ async function getReportData(accountId, token) {
           time_range: JSON.stringify({ since: yesterday, until: yesterday })
         }
       });
-      campaignInsightsYesterday = resp.data.data?.[0] || {};
+      insightsYesterday = resp.data.data?.[0] || {};
     } catch (e) {}
     try {
       const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
@@ -2089,51 +2072,13 @@ async function getReportData(accountId, token) {
           time_range: JSON.stringify({ since: today, until: today })
         }
       });
-      campaignInsightsToday = resp.data.data?.[0] || {};
+      insightsToday = resp.data.data?.[0] || {};
     } catch (e) {}
 
-    // Insights a nivel de adset (para desglose por servicio)
-    const adsetsWithInsights = await Promise.all(adsets.map(async (adset) => {
-      let insightsYesterday = {};
-      let insightsToday = {};
-      try {
-        const resp = await axios.get(`${META_API_BASE_URL}/${adset.id}/insights`, {
-          params: {
-            access_token: token,
-            fields: 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks',
-            time_range: JSON.stringify({ since: yesterday, until: yesterday })
-          }
-        });
-        insightsYesterday = resp.data.data?.[0] || {};
-      } catch (e) {}
-      try {
-        const resp = await axios.get(`${META_API_BASE_URL}/${adset.id}/insights`, {
-          params: {
-            access_token: token,
-            fields: 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks',
-            time_range: JSON.stringify({ since: today, until: today })
-          }
-        });
-        insightsToday = resp.data.data?.[0] || {};
-      } catch (e) {}
-
-      return {
-        ...adset,
-        insightsYesterday,
-        insightsToday
-      };
-    }));
-
-    return {
-      ...campaign,
-      insightsYesterday: campaignInsightsYesterday,
-      insightsToday: campaignInsightsToday,
-      adsets: adsetsWithInsights
-    };
+    return { ...campaign, insightsYesterday, insightsToday };
   }));
 
-  // Filtrar campañas con gasto o activas
-  const activeCampaigns = withAdSets.filter(c =>
+  const activeCampaigns = withInsights.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
     parseFloat(c.insightsToday?.spend || 0) > 0 ||
     c.status === 'ACTIVE'
