@@ -1004,25 +1004,39 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     return () => { cancelled = true; };
   }, [selectedAccount]);
 
-  // Cargar plantillas de mensajes de WhatsApp cuando se selecciona un número
+  // Cargar plantillas de mensajes de WhatsApp a nivel de cuenta publicitaria (WABA)
   useEffect(() => {
     let cancelled = false;
     const loadWaTemplates = async () => {
-      if (!selectedWhatsAppNumber || !whatsAppNumbers.length) {
+      if (!selectedAccount) {
         setWaMessageTemplates([]);
         return;
       }
-      const selectedNum = whatsAppNumbers.find(n => String(n.id) === String(selectedWhatsAppNumber));
-      const wabaId = selectedNum?.whatsapp_business_account_id;
-      if (!wabaId) return;
-
       setLoadingWaTemplates(true);
       try {
         const metaService = new MetaAdsService(accessToken);
-        const templates = await metaService.getWhatsAppMessageTemplates(wabaId);
+        // Obtener business de la cuenta publicitaria
+        const normalizedId = metaService.normalizeAccountId(selectedAccount);
+        const acctResp = await axios.get(`https://graph.facebook.com/v24.0/${normalizedId}`, {
+          params: { access_token: accessToken, fields: 'business{id,name}' }
+        });
+        const business = acctResp.data?.business;
+        if (!business || cancelled) { setLoadingWaTemplates(false); return; }
+
+        // Obtener WABAs del business
+        const wabaAccounts = await metaService.getWhatsAppBusinessAccounts(business.id);
+        if (cancelled) return;
+
+        // Cargar plantillas de todos los WABAs
+        let allTemplates = [];
+        for (const waba of wabaAccounts) {
+          const templates = await metaService.getWhatsAppMessageTemplates(waba.id);
+          if (cancelled) return;
+          allTemplates = allTemplates.concat(templates.map(t => ({ ...t, waba_name: waba.name, waba_id: waba.id })));
+        }
         if (!cancelled) {
-          setWaMessageTemplates(templates);
-          console.log('WhatsApp message templates loaded:', templates.length);
+          setWaMessageTemplates(allTemplates);
+          console.log('WhatsApp message templates loaded:', allTemplates.length, 'from', wabaAccounts.length, 'WABAs');
         }
       } catch (err) {
         console.error('Error loading WA templates:', err);
@@ -1030,9 +1044,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         if (!cancelled) setLoadingWaTemplates(false);
       }
     };
-    loadWaTemplates();
-    return () => { cancelled = true; };
-  }, [selectedWhatsAppNumber, whatsAppNumbers]);
+    // Delay para no competir con otras cargas
+    const timer = setTimeout(() => loadWaTemplates(), 2000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [selectedAccount]);
 
   // Auto-fill linkUrl con el website de la página o perfil de Instagram
   useEffect(() => {
@@ -2972,9 +2987,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   ) : waMessageTemplates.length === 0 ? (
                     <div style={{ padding: '16px', textAlign: 'center' }}>
                       <p className="text-muted" style={{ fontSize: '13px' }}>
-                        {selectedWhatsAppNumber
-                          ? 'No se encontraron plantillas aprobadas para esta cuenta de WhatsApp.'
-                          : 'Selecciona un número de WhatsApp para cargar las plantillas.'}
+                        {selectedAccount
+                          ? 'No se encontraron plantillas aprobadas para esta cuenta publicitaria.'
+                          : 'Selecciona una cuenta publicitaria para cargar las plantillas.'}
                       </p>
                     </div>
                   ) : (
