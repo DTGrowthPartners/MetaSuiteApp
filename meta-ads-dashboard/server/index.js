@@ -1987,6 +1987,179 @@ Máximo 1 emoji por elemento. CTAs variados de esta lista: ${ctx.ctas}`
   }
 });
 
+// ============================================
+// REPORT SYSTEM — Vistas públicas por cuenta
+// ============================================
+
+// Mapeo de slugs a cuentas publicitarias
+const REPORT_ACCOUNTS = {
+  'eq-cartagena': {
+    accountId: 'act_660842485358224',
+    name: 'EQ Cartagena',
+    businessName: 'Equilibrio Clinic'
+  }
+  // Agregar más cuentas aquí:
+  // 'otra-cuenta': { accountId: 'act_XXX', name: 'Otra Cuenta', businessName: 'Business' }
+};
+
+// Cache de reportes (se actualiza cada hora o a las 7am)
+const reportCache = {};
+
+// Helper: obtener fecha de ayer y hoy en formato YYYY-MM-DD (zona horaria Colombia UTC-5)
+function getReportDates() {
+  const now = new Date();
+  // Ajustar a Colombia (UTC-5)
+  const colombiaOffset = -5 * 60;
+  const colombiaTime = new Date(now.getTime() + (colombiaOffset - now.getTimezoneOffset()) * 60000);
+  const today = colombiaTime.toISOString().split('T')[0];
+  const yesterday = new Date(colombiaTime.getTime() - 86400000).toISOString().split('T')[0];
+  return { yesterday, today, colombiaTime };
+}
+
+// Helper: obtener campañas con insights por rango de fechas
+async function getReportData(accountId, token) {
+  const { yesterday, today } = getReportDates();
+  const normalizedId = normalizeAccountId(accountId);
+
+  // Obtener campañas activas y pausadas
+  const campaignsResp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
+    params: {
+      access_token: token,
+      fields: 'id,name,status,objective,daily_budget,lifetime_budget,configured_status',
+      filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE', 'PAUSED'] }]),
+      limit: 100
+    }
+  });
+  const campaigns = campaignsResp.data.data || [];
+
+  // Obtener insights para AYER y HOY (con time_range)
+  const withInsights = await Promise.all(campaigns.map(async (campaign) => {
+    // Insights de ayer
+    let insightsYesterday = {};
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
+        params: {
+          access_token: token,
+          fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type,inline_link_clicks',
+          time_range: JSON.stringify({ since: yesterday, until: yesterday })
+        }
+      });
+      insightsYesterday = resp.data.data?.[0] || {};
+    } catch (e) {}
+
+    // Insights de hoy
+    let insightsToday = {};
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
+        params: {
+          access_token: token,
+          fields: 'campaign_name,spend,impressions,reach,cpm,cpc,ctr,actions,cost_per_action_type,inline_link_clicks',
+          time_range: JSON.stringify({ since: today, until: today })
+        }
+      });
+      insightsToday = resp.data.data?.[0] || {};
+    } catch (e) {}
+
+    return {
+      ...campaign,
+      insightsYesterday,
+      insightsToday
+    };
+  }));
+
+  // Filtrar solo campañas que tienen gasto ayer u hoy (las activas reales)
+  const activeCampaigns = withInsights.filter(c =>
+    parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
+    parseFloat(c.insightsToday?.spend || 0) > 0 ||
+    c.status === 'ACTIVE'
+  );
+
+  return {
+    campaigns: activeCampaigns,
+    dateRange: { yesterday, today },
+    fetchedAt: new Date().toISOString(),
+    totalCampaigns: activeCampaigns.length
+  };
+}
+
+// Endpoint: obtener datos de reporte para una cuenta
+app.get('/api/report/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const accountConfig = REPORT_ACCOUNTS[slug];
+
+    if (!accountConfig) {
+      return res.status(404).json({ success: false, error: 'Cuenta no encontrada' });
+    }
+
+    // Usar token del servidor (.env) o del request
+    const token = getToken(req);
+    if (!token || token === 'TU_META_ACCESS_TOKEN_AQUI') {
+      return res.status(401).json({ success: false, error: 'Token no configurado en el servidor' });
+    }
+
+    // Verificar cache (válido por 1 hora)
+    const cached = reportCache[slug];
+    const oneHour = 60 * 60 * 1000;
+    if (cached && (Date.now() - cached.timestamp < oneHour)) {
+      return res.json({
+        success: true,
+        ...accountConfig,
+        ...cached.data,
+        cached: true
+      });
+    }
+
+    // Fetch fresh data
+    const data = await getReportData(accountConfig.accountId, token);
+    reportCache[slug] = { data, timestamp: Date.now() };
+
+    res.json({
+      success: true,
+      ...accountConfig,
+      ...data,
+      cached: false
+    });
+  } catch (error) {
+    console.error('Report error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Auto-refresh cache a las 7am Colombia (UTC-5 = 12:00 UTC)
+function scheduleReportRefresh() {
+  const refreshReports = async () => {
+    console.log('Auto-refreshing report cache...');
+    const token = ACCESS_TOKEN;
+    if (!token || token === 'TU_META_ACCESS_TOKEN_AQUI') return;
+
+    for (const [slug, config] of Object.entries(REPORT_ACCOUNTS)) {
+      try {
+        const data = await getReportData(config.accountId, token);
+        reportCache[slug] = { data, timestamp: Date.now() };
+        console.log(`Report cache refreshed: ${slug} (${data.totalCampaigns} campaigns)`);
+      } catch (err) {
+        console.error(`Report cache refresh failed for ${slug}:`, err.message);
+      }
+    }
+  };
+
+  // Calcular ms hasta las 7am Colombia (12:00 UTC)
+  const now = new Date();
+  const next7am = new Date(now);
+  next7am.setUTCHours(12, 0, 0, 0);
+  if (now >= next7am) next7am.setDate(next7am.getDate() + 1);
+  const msUntil7am = next7am.getTime() - now.getTime();
+
+  console.log(`Report auto-refresh scheduled in ${Math.round(msUntil7am / 60000)} minutes (7am Colombia)`);
+  setTimeout(() => {
+    refreshReports();
+    // Repetir cada 24 horas
+    setInterval(refreshReports, 24 * 60 * 60 * 1000);
+  }, msUntil7am);
+}
+scheduleReportRefresh();
+
 // Start server
 app.listen(PORT, () => {
   console.log(`

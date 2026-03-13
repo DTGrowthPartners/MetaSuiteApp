@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import CreativeBuilder from './components/CreativeBuilder';
 import AccountDashboard from './components/AccountDashboard';
+import CampaignReport from './components/CampaignReport';
 import MetaAdsService from './services/metaAdsApi';
 import './App.css';
 
@@ -105,6 +106,12 @@ function LoginScreen({ onLogin }) {
 // MAIN APP
 // ============================================
 function App() {
+  // Detectar si es una ruta de reporte (ej: /eq-cartagena)
+  const pathname = window.location.pathname;
+  const reportSlug = pathname !== '/' && !pathname.startsWith('/assets') && !pathname.startsWith('/api')
+    ? pathname.replace(/^\//, '').replace(/\/$/, '')
+    : null;
+
   const [accessToken, setAccessToken] = useState(() => {
     return localStorage.getItem('meta_access_token') || null;
   });
@@ -224,7 +231,9 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        {page === 'dashboard' ? (
+        {reportSlug ? (
+          <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} />
+        ) : page === 'dashboard' ? (
           <AccountDashboard
             adAccounts={adAccounts}
             onBack={() => { window.location.hash = ''; setPage('main'); }}
