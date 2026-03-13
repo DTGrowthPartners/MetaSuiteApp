@@ -1994,7 +1994,7 @@ Máximo 1 emoji por elemento. CTAs variados de esta lista: ${ctx.ctas}`
 // Mapeo de slugs a cuentas publicitarias
 const REPORT_ACCOUNTS = {
   'eq-cartagena': {
-    accountId: 'act_660842485358224',
+    accountId: 'act_1604918750004319',
     name: 'EQ Cartagena',
     businessName: 'Equilibrio Clinic'
   }
