@@ -4,67 +4,40 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpart
 
 function formatCOP(value) {
   const num = parseFloat(value || 0);
-  return num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return '$' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-function formatNumber(value) {
-  const num = parseInt(value || 0);
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return num.toLocaleString('es-CO');
-}
-
-function formatPercent(value) {
-  return parseFloat(value || 0).toFixed(2) + '%';
-}
-
-// Extraer acciones relevantes de los insights
-function getActions(insights) {
+// Extraer conversaciones (mensajes) de los insights
+function getConversations(insights) {
   const actions = insights?.actions || [];
-  const costPerAction = insights?.cost_per_action_type || [];
-  const result = {};
-
   for (const a of actions) {
-    if (a.action_type === 'link_click') result.clicks = parseInt(a.value || 0);
-    if (a.action_type === 'landing_page_view') result.landingPageViews = parseInt(a.value || 0);
-    if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') result.conversations = parseInt(a.value || 0);
-    if (a.action_type === 'onsite_conversion.messaging_first_reply') result.firstReplies = parseInt(a.value || 0);
-    if (a.action_type === 'lead') result.leads = parseInt(a.value || 0);
-    if (a.action_type === 'purchase') result.purchases = parseInt(a.value || 0);
-    if (a.action_type === 'post_engagement') result.engagement = parseInt(a.value || 0);
+    if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') return parseInt(a.value || 0);
+    if (a.action_type === 'onsite_conversion.messaging_first_reply') return parseInt(a.value || 0);
   }
-
-  for (const c of costPerAction) {
-    if (c.action_type === 'link_click') result.costPerClick = parseFloat(c.value || 0);
-    if (c.action_type === 'landing_page_view') result.costPerLPV = parseFloat(c.value || 0);
-    if (c.action_type === 'onsite_conversion.messaging_conversation_started_7d') result.costPerConversation = parseFloat(c.value || 0);
-    if (c.action_type === 'lead') result.costPerLead = parseFloat(c.value || 0);
-  }
-
-  // Fallback: inline_link_clicks
-  if (!result.clicks && insights?.inline_link_clicks) {
-    result.clicks = parseInt(insights.inline_link_clicks);
-  }
-
-  return result;
+  return 0;
 }
 
-// Sumar insights de múltiples campañas
-function sumInsights(campaigns, key) {
-  return campaigns.reduce((totals, c) => {
-    const insights = c[key] || {};
-    const actions = getActions(insights);
-    return {
-      spend: totals.spend + parseFloat(insights.spend || 0),
-      impressions: totals.impressions + parseInt(insights.impressions || 0),
-      reach: totals.reach + parseInt(insights.reach || 0),
-      clicks: totals.clicks + (actions.clicks || 0),
-      conversations: totals.conversations + (actions.conversations || 0),
-      leads: totals.leads + (actions.leads || 0),
-      landingPageViews: totals.landingPageViews + (actions.landingPageViews || 0),
-      engagement: totals.engagement + (actions.engagement || 0)
-    };
-  }, { spend: 0, impressions: 0, reach: 0, clicks: 0, conversations: 0, leads: 0, landingPageViews: 0, engagement: 0 });
+// Extraer nombre de servicio del nombre de campaña (quita la ubicación y prefijos comunes)
+function extractServiceName(campaignName, locations = []) {
+  let name = campaignName;
+  // Quitar ubicaciones del nombre
+  for (const loc of locations) {
+    name = name.replace(new RegExp(loc, 'gi'), '');
+  }
+  // Quitar separadores comunes y limpiar
+  name = name.replace(/[-–—|]/g, ' ').replace(/\s+/g, ' ').trim();
+  // Quitar prefijos como "EQ", "Tráfico", "Mensajes", etc.
+  name = name.replace(/^(EQ|Equilibrio|Tráfico|Trafico|Mensajes|Campaña|Campaign)\s*/i, '').trim();
+  return name || campaignName;
+}
+
+// Detectar ubicación de una campaña por su nombre
+function detectLocation(campaignName, locations = []) {
+  const nameLower = campaignName.toLowerCase();
+  for (const loc of locations) {
+    if (nameLower.includes(loc.toLowerCase())) return loc;
+  }
+  return 'Otros';
 }
 
 export default function CampaignReport({ slug, accessToken, adAccounts = [], loadingAccounts = false }) {
@@ -72,18 +45,16 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [hasAccess, setHasAccess] = useState(null); // null = checking, true/false
+  const [hasAccess, setHasAccess] = useState(null);
 
-  // Verificar si el usuario tiene acceso a la cuenta
+  // Verificar acceso
   useEffect(() => {
     if (loadingAccounts) return;
     if (!adAccounts || adAccounts.length === 0) {
       setHasAccess(false);
       return;
     }
-    // Buscar si el slug corresponde a alguna cuenta del usuario
-    // El servidor devuelve el accountId, y verificamos si el usuario lo tiene
-    setHasAccess(null); // se verificará después de cargar los datos
+    setHasAccess(null);
   }, [adAccounts, loadingAccounts, slug]);
 
   const fetchReport = useCallback(async () => {
@@ -96,7 +67,6 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
       const json = await resp.json();
       if (!json.success) throw new Error(json.error || 'Error cargando reporte');
 
-      // Verificar acceso: el usuario debe tener la cuenta publicitaria
       const reportAccountId = json.accountId;
       if (reportAccountId && adAccounts.length > 0) {
         const userHasAccount = adAccounts.some(a =>
@@ -108,7 +78,6 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           return;
         }
       } else {
-        // Si no hay cuentas aún o no hay accountId, permitir (se valida por token)
         setHasAccess(true);
       }
 
@@ -125,7 +94,6 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     if (!loadingAccounts && accessToken) {
       fetchReport();
     }
-    // Auto-refresh cada 30 minutos
     const interval = setInterval(() => {
       if (accessToken) fetchReport();
     }, 30 * 60 * 1000);
@@ -171,16 +139,66 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
 
   if (!data) return null;
 
-  const { campaigns = [], dateRange, name, businessName } = data;
-  const totalsYesterday = sumInsights(campaigns, 'insightsYesterday');
-  const totalsToday = sumInsights(campaigns, 'insightsToday');
+  const { campaigns = [], dateRange, name, businessName, locations = [], resultLabel = 'Mensajes' } = data;
 
-  // Campañas activas con gasto
-  const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
+  // Filtrar campañas con gasto
   const campaignsWithSpend = campaigns.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
     parseFloat(c.insightsToday?.spend || 0) > 0
   );
+
+  // Agrupar por ubicación
+  const grouped = {};
+  for (const c of campaignsWithSpend) {
+    const location = detectLocation(c.name, locations);
+    if (!grouped[location]) grouped[location] = [];
+    grouped[location].push(c);
+  }
+
+  // Ordenar: ubicaciones conocidas primero, "Otros" al final
+  const locationOrder = [...locations];
+  const sortedLocations = Object.keys(grouped).sort((a, b) => {
+    const idxA = locationOrder.indexOf(a);
+    const idxB = locationOrder.indexOf(b);
+    if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+    if (idxA === -1) return 1;
+    if (idxB === -1) return -1;
+    return idxA - idxB;
+  });
+
+  // Calcular totales por campaña
+  function getCampaignMetrics(c) {
+    const spendY = parseFloat(c.insightsYesterday?.spend || 0);
+    const spendT = parseFloat(c.insightsToday?.spend || 0);
+    const msgsY = getConversations(c.insightsYesterday);
+    const msgsT = getConversations(c.insightsToday);
+    const totalSpend = spendY + spendT;
+    const totalMsgs = msgsY + msgsT;
+    const costPerMsg = totalMsgs > 0 ? totalSpend / totalMsgs : 0;
+    return { spendY, spendT, totalSpend, msgsY, msgsT, totalMsgs, costPerMsg };
+  }
+
+  // Calcular totales por ubicación
+  function getLocationTotals(campaignList) {
+    let totalSpend = 0, totalMsgs = 0;
+    for (const c of campaignList) {
+      const m = getCampaignMetrics(c);
+      totalSpend += m.totalSpend;
+      totalMsgs += m.totalMsgs;
+    }
+    return { totalSpend, totalMsgs, costPerMsg: totalMsgs > 0 ? totalSpend / totalMsgs : 0 };
+  }
+
+  // Grand totals
+  const grandTotals = getLocationTotals(campaignsWithSpend);
+
+  // Formatear fecha para mostrar
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+  }
 
   return (
     <div className="report-page">
@@ -191,169 +209,97 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           <span className="report-business">{businessName}</span>
         </div>
         <div className="report-header-meta">
-          <div className="report-date-range">
-            <span className="report-date-label">Periodo</span>
-            <span className="report-date-value">{dateRange?.yesterday} — {dateRange?.today}</span>
+          <div className="report-date-badge">
+            {formatDate(dateRange?.yesterday)} — {formatDate(dateRange?.today)}
           </div>
           {lastUpdate && (
             <span className="report-updated">
-              Actualizado: {lastUpdate.toLocaleTimeString('es-CO')}
+              Actualizado: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
               {data.cached && ' (cache)'}
             </span>
           )}
         </div>
       </header>
 
-      {/* Summary Cards */}
-      <section className="report-summary">
-        <h2 className="report-section-title">Resumen General</h2>
-        <div className="report-cards">
-          <div className="report-card">
-            <span className="report-card-label">Campañas Activas</span>
-            <span className="report-card-value">{activeCampaigns.length}</span>
-            <span className="report-card-sub">{campaignsWithSpend.length} con gasto</span>
-          </div>
-          <div className="report-card">
-            <span className="report-card-label">Gasto Ayer</span>
-            <span className="report-card-value">${formatCOP(totalsYesterday.spend)}</span>
-            <span className="report-card-sub">COP</span>
-          </div>
-          <div className="report-card">
-            <span className="report-card-label">Gasto Hoy</span>
-            <span className="report-card-value">${formatCOP(totalsToday.spend)}</span>
-            <span className="report-card-sub">COP</span>
-          </div>
-          <div className="report-card">
-            <span className="report-card-label">Gasto Total</span>
-            <span className="report-card-value">${formatCOP(totalsYesterday.spend + totalsToday.spend)}</span>
-            <span className="report-card-sub">2 días</span>
-          </div>
+      {/* Grand Total Summary */}
+      <section className="report-grand-summary">
+        <div className="report-grand-card">
+          <span className="report-grand-label">Total {resultLabel}</span>
+          <span className="report-grand-value">{grandTotals.totalMsgs}</span>
         </div>
-
-        {/* Metrics Row */}
-        <div className="report-cards report-cards--metrics">
-          <div className="report-card report-card--small">
-            <span className="report-card-label">Impresiones</span>
-            <span className="report-card-value">{formatNumber(totalsYesterday.impressions + totalsToday.impressions)}</span>
-          </div>
-          <div className="report-card report-card--small">
-            <span className="report-card-label">Alcance</span>
-            <span className="report-card-value">{formatNumber(totalsYesterday.reach + totalsToday.reach)}</span>
-          </div>
-          <div className="report-card report-card--small">
-            <span className="report-card-label">Clicks</span>
-            <span className="report-card-value">{formatNumber(totalsYesterday.clicks + totalsToday.clicks)}</span>
-          </div>
-          {(totalsYesterday.conversations + totalsToday.conversations) > 0 && (
-            <div className="report-card report-card--small">
-              <span className="report-card-label">Conversaciones</span>
-              <span className="report-card-value">{formatNumber(totalsYesterday.conversations + totalsToday.conversations)}</span>
-            </div>
-          )}
-          {(totalsYesterday.leads + totalsToday.leads) > 0 && (
-            <div className="report-card report-card--small">
-              <span className="report-card-label">Leads</span>
-              <span className="report-card-value">{formatNumber(totalsYesterday.leads + totalsToday.leads)}</span>
-            </div>
-          )}
+        <div className="report-grand-card">
+          <span className="report-grand-label">Inversión Total</span>
+          <span className="report-grand-value">{formatCOP(grandTotals.totalSpend)}</span>
+        </div>
+        <div className="report-grand-card">
+          <span className="report-grand-label">Costo Promedio</span>
+          <span className="report-grand-value">{grandTotals.costPerMsg > 0 ? formatCOP(grandTotals.costPerMsg) : '-'}</span>
         </div>
       </section>
 
-      {/* Campaign Table */}
-      <section className="report-campaigns">
-        <h2 className="report-section-title">Campañas ({campaignsWithSpend.length})</h2>
-        <div className="report-table-wrap">
-          <table className="report-table">
-            <thead>
-              <tr>
-                <th className="report-th-name">Campaña</th>
-                <th>Estado</th>
-                <th className="report-th-num">Gasto Ayer</th>
-                <th className="report-th-num">Gasto Hoy</th>
-                <th className="report-th-num">Impresiones</th>
-                <th className="report-th-num">Alcance</th>
-                <th className="report-th-num">Clicks</th>
-                <th className="report-th-num">CTR</th>
-                <th className="report-th-num">CPC</th>
-                <th className="report-th-num">Resultado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaignsWithSpend.map(c => {
-                const yActions = getActions(c.insightsYesterday);
-                const tActions = getActions(c.insightsToday);
-                const totalClicks = (yActions.clicks || 0) + (tActions.clicks || 0);
-                const totalImpressions = parseInt(c.insightsYesterday?.impressions || 0) + parseInt(c.insightsToday?.impressions || 0);
-                const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0.00';
-                const totalSpend = parseFloat(c.insightsYesterday?.spend || 0) + parseFloat(c.insightsToday?.spend || 0);
-                const cpc = totalClicks > 0 ? (totalSpend / totalClicks).toFixed(0) : '-';
+      {/* Grouped Tables */}
+      {sortedLocations.map(location => {
+        const locationCampaigns = grouped[location];
+        const locTotals = getLocationTotals(locationCampaigns);
 
-                // Resultado principal (conversaciones > leads > clicks)
-                const totalConvos = (yActions.conversations || 0) + (tActions.conversations || 0);
-                const totalLeads = (yActions.leads || 0) + (tActions.leads || 0);
-                const totalLPV = (yActions.landingPageViews || 0) + (tActions.landingPageViews || 0);
-                let resultLabel = '';
-                let resultValue = '';
-                if (totalConvos > 0) { resultLabel = 'Convos'; resultValue = totalConvos; }
-                else if (totalLeads > 0) { resultLabel = 'Leads'; resultValue = totalLeads; }
-                else if (totalLPV > 0) { resultLabel = 'LPV'; resultValue = totalLPV; }
-                else if (totalClicks > 0) { resultLabel = 'Clicks'; resultValue = totalClicks; }
-
-                return (
-                  <tr key={c.id} className={c.status === 'PAUSED' ? 'report-row-paused' : ''}>
-                    <td className="report-td-name">{c.name}</td>
-                    <td>
-                      <span className={`report-status report-status--${c.status?.toLowerCase()}`}>
-                        {c.status === 'ACTIVE' ? 'Activa' : 'Pausada'}
-                      </span>
-                    </td>
-                    <td className="report-td-num">${formatCOP(c.insightsYesterday?.spend)}</td>
-                    <td className="report-td-num">${formatCOP(c.insightsToday?.spend)}</td>
-                    <td className="report-td-num">{formatNumber(totalImpressions)}</td>
-                    <td className="report-td-num">{formatNumber(parseInt(c.insightsYesterday?.reach || 0) + parseInt(c.insightsToday?.reach || 0))}</td>
-                    <td className="report-td-num">{totalClicks || '-'}</td>
-                    <td className="report-td-num">{ctr}%</td>
-                    <td className="report-td-num">{cpc !== '-' ? `$${formatCOP(cpc)}` : '-'}</td>
-                    <td className="report-td-num">
-                      {resultValue ? (
-                        <span className="report-result">
-                          <strong>{resultValue}</strong> <small>{resultLabel}</small>
-                        </span>
-                      ) : '-'}
-                    </td>
+        return (
+          <section key={location} className="report-location-group">
+            <h2 className="report-location-title">{location}</h2>
+            <div className="report-table-wrap">
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th className="report-th-service">Servicio</th>
+                    <th className="report-th-num">{resultLabel}</th>
+                    <th className="report-th-num">Costo/{resultLabel.toLowerCase().slice(0, 3)}</th>
+                    <th className="report-th-num">Gastado</th>
                   </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="report-totals-row">
-                <td className="report-td-name"><strong>TOTAL</strong></td>
-                <td></td>
-                <td className="report-td-num"><strong>${formatCOP(totalsYesterday.spend)}</strong></td>
-                <td className="report-td-num"><strong>${formatCOP(totalsToday.spend)}</strong></td>
-                <td className="report-td-num"><strong>{formatNumber(totalsYesterday.impressions + totalsToday.impressions)}</strong></td>
-                <td className="report-td-num"><strong>{formatNumber(totalsYesterday.reach + totalsToday.reach)}</strong></td>
-                <td className="report-td-num"><strong>{(totalsYesterday.clicks + totalsToday.clicks) || '-'}</strong></td>
-                <td className="report-td-num">
-                  <strong>
-                    {(totalsYesterday.impressions + totalsToday.impressions) > 0
-                      ? (((totalsYesterday.clicks + totalsToday.clicks) / (totalsYesterday.impressions + totalsToday.impressions)) * 100).toFixed(2) + '%'
-                      : '-'}
-                  </strong>
-                </td>
-                <td className="report-td-num">
-                  <strong>
-                    {(totalsYesterday.clicks + totalsToday.clicks) > 0
-                      ? `$${formatCOP(((totalsYesterday.spend + totalsToday.spend) / (totalsYesterday.clicks + totalsToday.clicks)).toFixed(0))}`
-                      : '-'}
-                  </strong>
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
+                </thead>
+                <tbody>
+                  {locationCampaigns.map(c => {
+                    const m = getCampaignMetrics(c);
+                    const serviceName = extractServiceName(c.name, locations);
+                    return (
+                      <tr key={c.id}>
+                        <td className="report-td-service">{serviceName}</td>
+                        <td className="report-td-num">{m.totalMsgs || '-'}</td>
+                        <td className="report-td-num">{m.costPerMsg > 0 ? formatCOP(m.costPerMsg) : '-'}</td>
+                        <td className="report-td-num">{formatCOP(m.totalSpend)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="report-location-totals">
+                    <td><strong>Total {location}</strong></td>
+                    <td className="report-td-num"><strong>{locTotals.totalMsgs || '-'}</strong></td>
+                    <td className="report-td-num"><strong>{locTotals.costPerMsg > 0 ? formatCOP(locTotals.costPerMsg) : '-'}</strong></td>
+                    <td className="report-td-num"><strong>{formatCOP(locTotals.totalSpend)}</strong></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        );
+      })}
+
+      {/* Grand Total Row */}
+      {sortedLocations.length > 1 && (
+        <section className="report-grand-total-section">
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <tbody>
+                <tr className="report-grand-total-row">
+                  <td className="report-th-service"><strong>TOTAL GENERAL</strong></td>
+                  <td className="report-td-num"><strong>{grandTotals.totalMsgs || '-'}</strong></td>
+                  <td className="report-td-num"><strong>{grandTotals.costPerMsg > 0 ? formatCOP(grandTotals.costPerMsg) : '-'}</strong></td>
+                  <td className="report-td-num"><strong>{formatCOP(grandTotals.totalSpend)}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="report-footer">

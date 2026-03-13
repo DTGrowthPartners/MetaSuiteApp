@@ -1996,23 +1996,42 @@ const REPORT_ACCOUNTS = {
   'eq-cartagena': {
     accountId: 'act_1604918750004319',
     name: 'EQ Cartagena',
-    businessName: 'Equilibrio Clinic'
+    businessName: 'Equilibrio Clinic',
+    // Ubicaciones para agrupar campañas (se busca en el nombre de la campaña)
+    locations: ['Castellana', 'Bocagrande'],
+    // Métrica principal de resultado
+    resultMetric: 'conversations', // mensajes
+    resultLabel: 'Mensajes'
   }
   // Agregar más cuentas aquí:
-  // 'otra-cuenta': { accountId: 'act_XXX', name: 'Otra Cuenta', businessName: 'Business' }
+  // 'otra-cuenta': { accountId: 'act_XXX', name: 'Otra Cuenta', businessName: 'Business', locations: [...] }
 };
 
 // Cache de reportes (se actualiza cada hora o a las 7am)
 const reportCache = {};
 
 // Helper: obtener fecha de ayer y hoy en formato YYYY-MM-DD (zona horaria Colombia UTC-5)
+// Corte a las 7am: antes de las 7am, "ayer" es anteayer y "hoy" es ayer real
 function getReportDates() {
   const now = new Date();
   // Ajustar a Colombia (UTC-5)
   const colombiaOffset = -5 * 60;
   const colombiaTime = new Date(now.getTime() + (colombiaOffset - now.getTimezoneOffset()) * 60000);
-  const today = colombiaTime.toISOString().split('T')[0];
-  const yesterday = new Date(colombiaTime.getTime() - 86400000).toISOString().split('T')[0];
+  const colombiaHour = colombiaTime.getHours();
+
+  let todayDate, yesterdayDate;
+  if (colombiaHour < 7) {
+    // Antes de 7am: "hoy" = ayer real, "ayer" = anteayer real
+    todayDate = new Date(colombiaTime.getTime() - 86400000);
+    yesterdayDate = new Date(colombiaTime.getTime() - 2 * 86400000);
+  } else {
+    // 7am o después: normal
+    todayDate = colombiaTime;
+    yesterdayDate = new Date(colombiaTime.getTime() - 86400000);
+  }
+
+  const today = todayDate.toISOString().split('T')[0];
+  const yesterday = yesterdayDate.toISOString().split('T')[0];
   return { yesterday, today, colombiaTime };
 }
 
