@@ -7,21 +7,38 @@ function formatCOP(value) {
   return '$' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-// Extraer resultado principal: conversaciones > leads > clicks > lpv
-function getResult(insights) {
+// Extraer resultado principal según objetivo de campaña
+function getResult(insights, objective) {
   const actions = insights?.actions || [];
-  let conversations = 0, leads = 0, linkClicks = 0, lpv = 0;
+  let conversations = 0, firstReplies = 0, leads = 0, linkClicks = 0, lpv = 0;
 
   for (const a of actions) {
-    if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversations += parseInt(a.value || 0);
-    else if (a.action_type === 'onsite_conversion.messaging_first_reply' && conversations === 0) conversations += parseInt(a.value || 0);
-    else if (a.action_type === 'lead') leads += parseInt(a.value || 0);
-    else if (a.action_type === 'link_click') linkClicks += parseInt(a.value || 0);
-    else if (a.action_type === 'landing_page_view') lpv += parseInt(a.value || 0);
+    if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversations = parseInt(a.value || 0);
+    if (a.action_type === 'onsite_conversion.messaging_first_reply') firstReplies = parseInt(a.value || 0);
+    if (a.action_type === 'lead') leads = parseInt(a.value || 0);
+    if (a.action_type === 'link_click') linkClicks = parseInt(a.value || 0);
+    if (a.action_type === 'landing_page_view') lpv = parseInt(a.value || 0);
   }
   if (!linkClicks && insights?.inline_link_clicks) linkClicks = parseInt(insights.inline_link_clicks);
 
-  if (conversations > 0) return { count: conversations, label: 'Mensajes' };
+  // Usar el mayor entre conversations y firstReplies
+  const msgs = Math.max(conversations, firstReplies);
+
+  // Decidir por objetivo de campaña
+  const obj = (objective || '').toUpperCase();
+  if (obj.includes('ENGAGEMENT') || obj.includes('LEADS')) {
+    // Campañas de mensajes/leads
+    if (msgs > 0) return { count: msgs, label: 'Mensajes' };
+    if (leads > 0) return { count: leads, label: 'Leads' };
+  }
+  if (obj.includes('TRAFFIC') || obj.includes('CONVERSIONS') || obj.includes('SALES')) {
+    // Campañas de tráfico/web
+    if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
+    if (lpv > 0) return { count: lpv, label: 'Visitas' };
+  }
+
+  // Fallback genérico por prioridad
+  if (msgs > 0) return { count: msgs, label: 'Mensajes' };
   if (leads > 0) return { count: leads, label: 'Leads' };
   if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
   if (lpv > 0) return { count: lpv, label: 'Visitas' };
@@ -106,6 +123,18 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   const { campaigns = [], dateRange, name, businessName, locations = [] } = data;
   const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday';
 
+  // DEBUG: ver datos crudos en consola
+  console.log('=== REPORT DEBUG ===');
+  console.log('Dates:', dateRange);
+  console.log('View:', viewMode, '→', insightsKey);
+  campaigns.forEach(c => {
+    const ins = c[insightsKey];
+    const spend = parseFloat(ins?.spend || 0);
+    if (spend > 0) {
+      console.log(`[${c.name}] objective=${c.objective} spend=${spend}`, 'actions:', ins?.actions, 'inline_link_clicks:', ins?.inline_link_clicks);
+    }
+  });
+
   // Campañas con gasto en el periodo
   const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
 
@@ -132,7 +161,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     for (const c of list) {
       const ins = c[insightsKey];
       spend += parseFloat(ins?.spend || 0);
-      const r = getResult(ins);
+      const r = getResult(ins, c.objective);
       if (!byLabel[r.label]) byLabel[r.label] = 0;
       byLabel[r.label] += r.count;
     }
@@ -225,7 +254,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
                   {list.map(c => {
                     const ins = c[insightsKey];
                     const spend = parseFloat(ins?.spend || 0);
-                    const r = getResult(ins);
+                    const r = getResult(ins, c.objective);
                     const costPer = r.count > 0 ? spend / r.count : 0;
                     return (
                       <tr key={c.id}>

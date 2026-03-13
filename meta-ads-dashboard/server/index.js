@@ -2136,6 +2136,74 @@ app.get('/api/report/:slug', async (req, res) => {
   }
 });
 
+// Debug endpoint: ver datos crudos del reporte
+app.get('/api/report-debug/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const accountConfig = REPORT_ACCOUNTS[slug];
+    if (!accountConfig) return res.status(404).json({ error: 'Not found' });
+
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ error: 'No token' });
+
+    const { yesterday, today, colombiaTime } = getReportDates();
+    const normalizedId = normalizeAccountId(accountConfig.accountId);
+
+    // Traer campañas
+    const campaignsResp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
+      params: {
+        access_token: token,
+        fields: 'id,name,status,objective',
+        filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE', 'PAUSED'] }]),
+        limit: 100
+      }
+    });
+    const campaigns = campaignsResp.data.data || [];
+
+    // Para cada campaña, traer insights crudos de ayer y hoy
+    const debug = await Promise.all(campaigns.slice(0, 10).map(async (c) => {
+      let yesterdayRaw = null, todayRaw = null;
+      try {
+        const r = await axios.get(`${META_API_BASE_URL}/${c.id}/insights`, {
+          params: {
+            access_token: token,
+            fields: 'spend,actions,cost_per_action_type,inline_link_clicks',
+            time_range: JSON.stringify({ since: yesterday, until: yesterday })
+          }
+        });
+        yesterdayRaw = r.data.data?.[0] || null;
+      } catch (e) { yesterdayRaw = { error: e.message }; }
+      try {
+        const r = await axios.get(`${META_API_BASE_URL}/${c.id}/insights`, {
+          params: {
+            access_token: token,
+            fields: 'spend,actions,cost_per_action_type,inline_link_clicks',
+            time_range: JSON.stringify({ since: today, until: today })
+          }
+        });
+        todayRaw = r.data.data?.[0] || null;
+      } catch (e) { todayRaw = { error: e.message }; }
+
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        objective: c.objective,
+        yesterday: yesterdayRaw,
+        today: todayRaw
+      };
+    }));
+
+    res.json({
+      dates: { yesterday, today, colombiaTime: colombiaTime.toISOString(), serverNow: new Date().toISOString() },
+      campaignCount: campaigns.length,
+      campaigns: debug
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, details: error.response?.data });
+  }
+});
+
 // Auto-refresh cache a las 7am Colombia (UTC-5 = 12:00 UTC)
 function scheduleReportRefresh() {
   const refreshReports = async () => {
