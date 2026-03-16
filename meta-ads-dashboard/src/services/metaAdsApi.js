@@ -2967,26 +2967,12 @@ class MetaAdsService {
           bidAmount: !isCBO ? bidAmount : undefined
         });
 
-        // Fallback: si falla con número de WhatsApp, reintentar sin él
+        // Si falla con número de WhatsApp, NO quitar el número (causa optimización por clicks)
         if (!adSetResult.success && audWhatsappNumber) {
-          console.warn(`AdSet${audPrefix}: falló con WhatsApp number, reintentando sin número...`);
-          adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-            name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
-            campaignId: results.campaign.id,
-            targeting: currentAudience.targeting,
-            optimizationGoal,
-            promotedObject: { page_id: pageId },
-            whatsappPhoneNumber: null,
-            dailyBudget: !isCBO ? audDailyBudget : null,
-            isDynamicCreative: false,
-            startTime,
-            endTime,
-            bidStrategy: !isCBO ? bidStrategy : undefined,
-            bidAmount: !isCBO ? bidAmount : undefined
-          });
-          if (adSetResult.success) {
-            console.warn(`AdSet${audPrefix}: creado SIN número de WhatsApp. Asignar manualmente en Ads Manager.`);
-          }
+          const firstError = adSetResult.error || '';
+          console.warn(`AdSet${audPrefix}: falló con WhatsApp number (${firstError}). El número debe estar asociado a la página.`);
+          results.errors.push(`AdSet${audPrefix}: ${firstError}. Verifica que el número de WhatsApp esté vinculado a la página en Meta Business.`);
+          continue;
         }
 
         if (!adSetResult.success) {
@@ -3080,27 +3066,14 @@ class MetaAdsService {
             bidAmount: !isCBO ? bidAmount : undefined
           });
 
-          // Fallback: si falla con número de WhatsApp, reintentar sin él
+          // Fallback: si falla con número de WhatsApp, NO quitar el número
+          // porque sin promoted_object.whatsapp_phone_number Meta optimiza por clicks en vez de conversaciones
           if (!adSetResult.success && adWhatsappNumber) {
             const firstError = adSetResult.error || '';
-            console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number (${firstError}), reintentando sin número...`);
-            adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
-              name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
-              campaignId: results.campaign.id,
-              targeting: adTargeting,
-              optimizationGoal,
-              promotedObject: { page_id: pageId },
-              whatsappPhoneNumber: null,
-              dailyBudget: !isCBO ? audDailyBudget : null,
-              isDynamicCreative: useDynamicCreative,
-              startTime,
-              endTime,
-              bidStrategy: !isCBO ? bidStrategy : undefined,
-              bidAmount: !isCBO ? bidAmount : undefined
-            });
-            if (adSetResult.success) {
-              console.warn(`AdSet${adLabel}${adAudienceLabel}: creado SIN número de WhatsApp. Asignar manualmente en Ads Manager.`);
-            }
+            // Solo reportar el error, no reintentar sin número
+            console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number (${firstError}). El número debe estar asociado a la página en Meta Business.`);
+            results.errors.push(`AdSet${adLabel}${adAudienceLabel}: ${firstError}. Verifica que el número de WhatsApp esté vinculado a la página en Meta Business.`);
+            continue;
           }
 
           if (!adSetResult.success) {
