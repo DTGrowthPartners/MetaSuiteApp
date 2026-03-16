@@ -7,7 +7,6 @@ import {
   SPECIAL_AD_CATEGORIES,
   BID_STRATEGIES,
   PLACEMENT_OPTIONS,
-  CHAT_FORM_FIELDS,
   getCategories,
   getTemplatesByCategory,
   getTemplateRequirements,
@@ -610,8 +609,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [excludedPlacements, setExcludedPlacements] = useState([]);
 
   // Editor de chats (WhatsApp leads)
-  const [chatGreeting, setChatGreeting] = useState('Te damos la bienvenida. Completa el siguiente formulario para registrarte.');
-  const [chatFormFields, setChatFormFields] = useState(['name', 'email']);
+  const [chatGreeting, setChatGreeting] = useState('¡Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte?');
+  const [chatAutoReply, setChatAutoReply] = useState('Hola, quiero más información.');
+  const [chatQuickReplies, setChatQuickReplies] = useState([]);
+  const [newQuickReply, setNewQuickReply] = useState('');
   const [showChatEditor, setShowChatEditor] = useState(false);
 
   // Plantillas de mensajes de WhatsApp
@@ -1482,9 +1483,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           ctas: g.ctas
         })) : [],
         multiAudiences: adSetMode !== 'per-ad' && multiAudiences.length > 0 ? multiAudiences : [],
-        // Chat editor (WhatsApp leads)
+        // Chat editor (WhatsApp message)
         chatGreeting: chatGreeting || null,
-        chatFormFields: chatFormFields.length > 0 ? chatFormFields : null,
+        chatAutoReply: chatAutoReply || 'Hola, quiero más información.',
+        chatQuickReplies: chatQuickReplies.length > 0 ? chatQuickReplies : null,
         waTemplateMode: waTemplateMode,
         selectedWaTemplateRawPwm: waTemplateMode === 'template' && selectedWaTemplate
           ? (waMessageTemplates.find(t => t.id === selectedWaTemplate)?.rawPwm || null)
@@ -3035,7 +3037,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   )}
                 </div>
               ) : (
-                /* Modo personalizado — editor original */
+                /* Modo personalizado — mensaje de bienvenida */
                 <div>
                   <div className="toggle-inline" style={{ marginBottom: '12px' }}>
                     <div>
@@ -3053,18 +3055,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     </button>
                   </div>
 
-                  {/* Preview siempre visible */}
+                  {/* Preview siempre visible — estilo mensaje */}
                   <div className="chat-preview">
                     <div className="chat-preview-label">Mensaje de bienvenida</div>
-                    <div className="chat-preview-content mb-md">{chatGreeting}</div>
-                    <div className="chat-preview-label">Detalles del formulario</div>
-                    <div className="chat-preview-sublabel">Comparte tus datos de contacto</div>
-                    <ol className="chat-preview-list">
-                      {chatFormFields.map((field, i) => {
-                        const fieldInfo = CHAT_FORM_FIELDS.find(f => f.value === field);
-                        return <li key={i}>{fieldInfo?.label || field}</li>;
-                      })}
-                    </ol>
+                    <div className="chat-preview-content mb-md" style={{ whiteSpace: 'pre-wrap' }}>{chatGreeting}</div>
+                    <div className="chat-preview-label">Respuesta automática del usuario</div>
+                    <div className="chat-preview-content text-muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>
+                      "{chatAutoReply}"
+                    </div>
+                    {chatQuickReplies.length > 0 && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div className="chat-preview-label">Respuestas rápidas</div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          {chatQuickReplies.map((qr, i) => (
+                            <span key={i} className="toggle-btn active" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                              {qr}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Editor expandido */}
@@ -3077,35 +3087,71 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           onChange={(e) => setChatGreeting(e.target.value)}
                           rows={3}
                           style={{ resize: 'vertical' }}
-                          placeholder="Te damos la bienvenida. Completa el formulario..."
+                          placeholder="¡Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte?"
                         />
                       </div>
 
                       <div>
-                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Campos del formulario</label>
-                        <div className="toggle-group">
-                          {CHAT_FORM_FIELDS.map(field => {
-                            const isSelected = chatFormFields.includes(field.value);
-                            return (
-                              <button
-                                key={field.value}
-                                type="button"
-                                className={`toggle-btn ${isSelected ? 'active' : ''}`}
-                                onClick={() => {
-                                  setChatFormFields(prev =>
-                                    isSelected
-                                      ? prev.filter(f => f !== field.value)
-                                      : [...prev, field.value]
-                                  );
-                                }}
-                              >
-                                {field.label}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje pre-llenado del usuario</label>
+                        <input
+                          type="text"
+                          value={chatAutoReply}
+                          onChange={(e) => setChatAutoReply(e.target.value)}
+                          placeholder="Hola, quiero más información."
+                        />
                         <p className="hint mt-sm">
-                          Selecciona los campos que quieres pedir en el formulario de contacto
+                          Este mensaje aparece pre-escrito cuando el usuario abre el chat
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Respuestas rápidas (opcional)</label>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <input
+                            type="text"
+                            value={newQuickReply}
+                            onChange={(e) => setNewQuickReply(e.target.value)}
+                            placeholder="Ej: Quiero agendar una cita"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newQuickReply.trim()) {
+                                e.preventDefault();
+                                setChatQuickReplies(prev => [...prev, newQuickReply.trim()]);
+                                setNewQuickReply('');
+                              }
+                            }}
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            className="toggle-btn active"
+                            onClick={() => {
+                              if (newQuickReply.trim()) {
+                                setChatQuickReplies(prev => [...prev, newQuickReply.trim()]);
+                                setNewQuickReply('');
+                              }
+                            }}
+                            style={{ padding: '6px 14px' }}
+                          >
+                            +
+                          </button>
+                        </div>
+                        {chatQuickReplies.length > 0 && (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {chatQuickReplies.map((qr, i) => (
+                              <span
+                                key={i}
+                                className="toggle-btn active"
+                                style={{ fontSize: '12px', padding: '4px 10px', cursor: 'pointer' }}
+                                onClick={() => setChatQuickReplies(prev => prev.filter((_, idx) => idx !== i))}
+                                title="Click para eliminar"
+                              >
+                                {qr} ✕
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="hint mt-sm">
+                          Botones que el usuario puede tocar para responder rápido. Click para eliminar.
                         </p>
                       </div>
                     </div>
@@ -3270,7 +3316,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             ? { rawPwm: job.selectedWaTemplateRawPwm }
             : job.chatGreeting ? {
               greeting: job.chatGreeting,
-              formFields: job.chatFormFields || []
+              autoReply: job.chatAutoReply || 'Hola, quiero más información.',
+              quickReplies: job.chatQuickReplies || []
             } : null,
           multiAudiences: job.multiAudiences || [],
           flexibleAdGroups: job.flexibleAdGroups || []

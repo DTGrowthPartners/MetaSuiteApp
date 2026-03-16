@@ -3064,10 +3064,26 @@ class MetaAdsService {
       const pwmString = pageWelcomeMessage?.rawPwm
         ? (typeof pageWelcomeMessage.rawPwm === 'string' ? pageWelcomeMessage.rawPwm : JSON.stringify(pageWelcomeMessage.rawPwm))
         : pageWelcomeMessage?.greeting
-          ? JSON.stringify({
-              type: 'VISUAL_EDITOR', version: 2, landing_screen_type: 'welcome_message', media_type: 'text',
-              text_format: { customer_action_type: 'autofill_message', message: { text: pageWelcomeMessage.greeting, autofill_message: { content: 'Hola, quiero más información.' } } }
-            })
+          ? (() => {
+              const pwmObj = {
+                type: 'VISUAL_EDITOR', version: 2, landing_screen_type: 'welcome_message', media_type: 'text',
+                text_format: {
+                  customer_action_type: 'autofill_message',
+                  message: {
+                    text: pageWelcomeMessage.greeting,
+                    autofill_message: { content: pageWelcomeMessage.autoReply || 'Hola, quiero más información.' }
+                  }
+                }
+              };
+              // Agregar quick replies si existen
+              if (pageWelcomeMessage.quickReplies?.length > 0) {
+                pwmObj.text_format.message.quick_replies = pageWelcomeMessage.quickReplies.map(qr => ({
+                  content_type: 'text',
+                  title: qr
+                }));
+              }
+              return JSON.stringify(pwmObj);
+            })()
           : null;
 
       console.log('WhatsApp pwmString:', pwmString ? `SET (${pwmString.substring(0, 80)}...)` : 'NULL');
