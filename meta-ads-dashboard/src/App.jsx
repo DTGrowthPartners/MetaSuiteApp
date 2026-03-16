@@ -3,6 +3,7 @@ import CreativeBuilder from './components/CreativeBuilder';
 import AccountDashboard from './components/AccountDashboard';
 import CampaignReport from './components/CampaignReport';
 import MetaAdsService from './services/metaAdsApi';
+import { LogOut, Loader2 } from 'lucide-react';
 import './App.css';
 
 // ============================================
@@ -79,7 +80,8 @@ function LoginScreen({ onLogin }) {
               <defs><linearGradient id="g1" x1="3" y1="3" x2="21" y2="21"><stop stopColor="#4A9FFF"/><stop offset="1" stopColor="#7C5CFC"/></linearGradient></defs>
             </svg>
           </div>
-          <h1 className="login-title">Meta Suite</h1>
+          <h1 className="login-title">MetaSuite</h1>
+          <span className="login-brand">by DT Growth Partners</span>
         </div>
         <p className="login-subtitle">Inicia sesión para administrar tus campañas publicitarias</p>
 
@@ -194,12 +196,21 @@ function App() {
       {/* Navigation Header */}
       <nav className="main-navigation">
         <div className="nav-brand">
-          <span className="nav-logo">📊</span>
-          <span className="nav-title">Meta Suite</span>
+          <span className="nav-logo-mark">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+              <defs><linearGradient id="nav-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#4A9FFF"/><stop offset="100%" stopColor="#7C5CFC"/></linearGradient></defs>
+              <rect width="32" height="32" rx="8" fill="url(#nav-g)"/>
+              <text x="16" y="22" textAnchor="middle" fill="white" fontFamily="Inter,system-ui,sans-serif" fontWeight="800" fontSize="18">M</text>
+            </svg>
+          </span>
+          <div className="nav-brand-text">
+            <span className="nav-title">MetaSuite</span>
+            <span className="nav-subtitle">by DT Growth Partners</span>
+          </div>
         </div>
         <div className="nav-info">
           {loadingAccounts ? (
-            <span className="account-count">Cargando...</span>
+            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</span>
           ) : accountsError ? (
             <span className="account-count account-count--error">Error</span>
           ) : (
@@ -223,7 +234,7 @@ function App() {
               className="nav-logout-btn"
               title="Cerrar sesión y cambiar cuenta"
             >
-              Salir
+              <LogOut size={15} />
             </button>
           </div>
         </div>

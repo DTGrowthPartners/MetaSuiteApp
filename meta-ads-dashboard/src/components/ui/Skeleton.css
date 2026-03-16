@@ -1,0 +1,81 @@
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-elevated) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-xs);
+}
+
+.skeleton--text {
+  height: 14px;
+  width: 100%;
+  border-radius: 4px;
+}
+
+.skeleton--rect {
+  border-radius: var(--radius-sm);
+}
+
+.skeleton--circle {
+  border-radius: 50%;
+}
+
+/* Spinner */
+.spinner-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.spinner-container svg {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+
+.spinner-container--sm svg { width: 14px; height: 14px; }
+.spinner-container--md svg { width: 20px; height: 20px; }
+.spinner-container--lg svg { width: 28px; height: 28px; }
+
+.spinner-container--sm { font-size: 12px; }
+.spinner-container--md { font-size: 14px; }
+.spinner-container--lg { font-size: 16px; }
+
+/* Progress log */
+.progress-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  animation: fadeInUp 0.3s var(--ease) both;
+}
+
+.progress-log-item-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.progress-log-item-icon--pending svg {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+
+.progress-log-item-icon--success svg {
+  color: var(--success);
+}
+
+.progress-log-item-icon--error svg {
+  color: var(--error);
+}
+
+.progress-log-item-icon--warning svg {
+  color: var(--warning);
+}

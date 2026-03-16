@@ -12,7 +12,35 @@ import {
   getTemplateRequirements,
   getCTALabel
 } from '../config/campaignTemplates';
+import {
+  ClipboardList, UserCircle, Target, DollarSign, Users, Film,
+  Megaphone, Globe, MessageCircle, ShoppingCart, Send,
+  Smartphone, Camera, Tag, Image, Video, GalleryHorizontal,
+  ChevronDown, Upload, Loader2, Check, AlertCircle, LogOut,
+  MessageSquare, Instagram, Phone, BarChart3, Plus, Trash2, X
+} from 'lucide-react';
+import CustomSelect from './ui/CustomSelect';
 import './CreativeBuilder.css';
+
+// Mapa de nombres de icono (string) a componentes Lucide
+const ICON_MAP = {
+  'megaphone': Megaphone,
+  'globe': Globe,
+  'clipboard-list': ClipboardList,
+  'dollar-sign': DollarSign,
+  'message-circle': MessageCircle,
+  'smartphone': Smartphone,
+  'camera': Camera,
+  'tag': Tag,
+  'image': Image,
+  'video': Video,
+  'gallery': GalleryHorizontal,
+  'shopping-cart': ShoppingCart,
+  'send': Send,
+  'message-square': MessageSquare,
+  'instagram': Instagram,
+  'phone': Phone,
+};
 
 // Prefijo dinámico según objetivo de campaña
 function getCampaignPrefix(objective) {
@@ -76,7 +104,7 @@ function TemplateSelector({ onSelectTemplate }) {
               className="template-card"
               onClick={() => onSelectTemplate(template)}
             >
-              <div className="template-icon">{template.icon}</div>
+              <div className="template-icon">{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={24} /> : template.icon; })()}</div>
               <div className="template-content">
                 <h3>{template.name}</h3>
                 <span className="template-category">{template.category}</span>
@@ -128,7 +156,7 @@ function TemplatePreview({ template, onClose }) {
         <button className="close-preview" onClick={onClose}>×</button>
 
         <div className="preview-header">
-          <span className="preview-icon">{template.icon}</span>
+          <span className="preview-icon">{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={28} /> : template.icon; })()}</span>
           <h2>{template.name}</h2>
           <span className="preview-category">{template.category}</span>
         </div>
@@ -1489,7 +1517,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
       {/* Template Badge */}
       <div className="selected-template-badge">
-        <span className="template-badge-icon">{selectedTemplate?.icon}</span>
+        <span className="template-badge-icon">{(() => { const IC = ICON_MAP[selectedTemplate?.icon]; return IC ? <IC size={16} /> : selectedTemplate?.icon; })()}</span>
         <div className="template-badge-info">
           <h3>{selectedTemplate?.name}</h3>
           <p>{selectedTemplate?.description}</p>
@@ -1533,7 +1561,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: CAMPAÑA ===================== */}
         <div className="section-card" id="section-campana">
-          <h4><span className="section-icon">📋</span> Campaña</h4>
+          <h4><span className="section-icon"><ClipboardList size={18} /></span> Campaña</h4>
 
         {/* Campaign Name */}
         <div className="form-group">
@@ -1554,18 +1582,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Ad Account Selection */}
         <div className="form-group">
           <label>Cuenta Publicitaria *</label>
-          <select
+          <CustomSelect
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
-            required
-          >
-            <option value="">Selecciona una cuenta</option>
-            {adAccounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} ({account.id})
-              </option>
-            ))}
-          </select>
+            placeholder="Selecciona una cuenta"
+            searchable
+            options={adAccounts.map(account => ({
+              value: account.id,
+              label: `${account.name} (${account.id})`
+            }))}
+          />
               {adAccounts.length === 0 && (
                 <p className="hint" style={{ color: 'var(--warning)' }}>No se encontraron cuentas publicitarias. Verifica los permisos de tu token.</p>
               )}
@@ -1575,26 +1601,22 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: IDENTIDAD ===================== */}
         <div className="section-card" id="section-identidad">
-          <h4><span className="section-icon">👤</span> Identidad</h4>
+          <h4><span className="section-icon"><UserCircle size={18} /></span> Identidad</h4>
 
         {/* Facebook Page Selection */}
         <div className="form-group">
           <label>Página de Facebook *</label>
-          <select
+          <CustomSelect
             value={selectedPage}
             onChange={(e) => setSelectedPage(e.target.value)}
+            placeholder="Selecciona una página"
+            loading={loadingPages}
             disabled={loadingPages}
-            required
-          >
-            <option value="">
-              {loadingPages ? 'Cargando páginas...' : 'Selecciona una página'}
-            </option>
-            {pages.map((page) => (
-              <option key={page.id} value={page.id}>
-                {page.name}
-              </option>
-            ))}
-          </select>
+            options={pages.map(page => ({
+              value: page.id,
+              label: page.name
+            }))}
+          />
           {pagesError && <p className="hint" style={{ color: 'var(--error)' }}>{pagesError}</p>}
           <p className="hint">La página desde la cual se publicará el anuncio</p>
         </div>
@@ -1602,17 +1624,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Instagram Account Selection - cargadas desde la cuenta publicitaria + página */}
         <div className="form-group">
           <label>Cuenta de Instagram</label>
-          <select
+          <CustomSelect
             value={selectedIgAccount}
             onChange={(e) => setSelectedIgAccount(e.target.value)}
-          >
-            <option value="">{igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Sin Instagram'}</option>
-            {igAccounts.map((ig) => (
-              <option key={ig.id} value={ig.id}>
-                @{ig.username}
-              </option>
-            ))}
-          </select>
+            placeholder={igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Sin Instagram'}
+            icon={Instagram}
+            options={igAccounts.map(ig => ({
+              value: ig.id,
+              label: `@${ig.username}`
+            }))}
+          />
           <p className="hint">
             {igAccounts.length === 0
               ? (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
@@ -1626,16 +1647,17 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {isWebsiteSales && (
           <div className="form-group">
             <label>Pixel de Meta *</label>
-            <select
+            <CustomSelect
               value={selectedPixel}
               onChange={(e) => setSelectedPixel(e.target.value)}
+              placeholder="Selecciona un pixel"
+              loading={loadingPixels}
               disabled={loadingPixels}
-            >
-              <option value="">{loadingPixels ? 'Cargando pixels...' : 'Selecciona un pixel'}</option>
-              {pixels.map((px) => (
-                <option key={px.id} value={px.id}>{px.name} ({px.id})</option>
-              ))}
-            </select>
+              options={pixels.map(px => ({
+                value: px.id,
+                label: `${px.name} (${px.id})`
+              }))}
+            />
             <p className="hint">Pixel usado para rastrear conversiones en el sitio web</p>
           </div>
         )}
@@ -1644,7 +1666,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: DESTINO ===================== */}
         <div className="section-card" id="section-destino">
-          <h4><span className="section-icon">🎯</span> Destino</h4>
+          <h4><span className="section-icon"><Target size={18} /></span> Destino</h4>
 
         {/* Destination Selector - Para plantillas con múltiples destinos */}
         {destinationOptions && destinationOptions.length > 1 && (
@@ -1673,7 +1695,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   }}
                   title={opt.description}
                 >
-                  {opt.icon} {opt.label}
+                  {(() => { const IC = ICON_MAP[opt.icon]; return IC ? <IC size={16} /> : opt.icon; })()} {opt.label}
                 </button>
               ))}
             </div>
@@ -1801,7 +1823,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* ===================== SECCIÓN: PÚBLICO ===================== */}
         {/* ===================== SECCIÓN: PRESUPUESTO Y CALENDARIO ===================== */}
         <div className="section-card" id="section-presupuesto">
-          <h4><span className="section-icon">💰</span> Presupuesto y Calendario</h4>
+          <h4><span className="section-icon"><DollarSign size={18} /></span> Presupuesto y Calendario</h4>
 
         {/* Budget Level Selector - siempre visible */}
         <div className="form-group">
@@ -1856,7 +1878,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>{/* fin section-card Presupuesto */}
 
         <div className="section-card" id="section-publico">
-          <h4><span className="section-icon">👥</span> Público por conjunto de anuncio</h4>
+          <h4><span className="section-icon"><Users size={18} /></span> Público por conjunto de anuncio</h4>
 
         {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
         <div className="form-group">
@@ -1875,27 +1897,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
           <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>Conjunto 1</label>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: '28px' }}>
-            <select
-              style={{ flex: 1 }}
+            <CustomSelect
+              className="flex-1"
               value={selectedAudience}
               onChange={(e) => setSelectedAudience(e.target.value)}
               disabled={!selectedAccount || loadingAudiences}
-            >
-              <option value="">
-                {loadingAudiences
-                  ? 'Cargando públicos...'
-                  : !selectedAccount
-                    ? 'Primero selecciona una cuenta'
-                    : allAudiences.length === 0
-                      ? 'No hay públicos disponibles'
-                      : 'Selecciona un público'}
-              </option>
-              {allAudiences.map((audience) => (
-                <option key={audience.id} value={audience.id}>
-                  {audience.audienceType === 'custom' ? '[Custom] ' : ''}{audience.name}
-                </option>
-              ))}
-            </select>
+              loading={loadingAudiences}
+              searchable
+              placeholder={
+                !selectedAccount ? 'Primero selecciona una cuenta'
+                : allAudiences.length === 0 ? 'No hay públicos disponibles'
+                : 'Selecciona un público'
+              }
+              options={allAudiences.map(audience => ({
+                value: audience.id,
+                label: `${audience.audienceType === 'custom' ? '[Custom] ' : ''}${audience.name}`
+              }))}
+            />
             {budgetLevel === 'adset' && (
               <input
                 type="number"
@@ -2045,7 +2063,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: ANUNCIOS ===================== */}
         <div className="section-card" id="section-anuncios">
-          <h4><span className="section-icon">🎬</span> Anuncios ({ads.length})</h4>
+          <h4><span className="section-icon"><Film size={18} /></span> Anuncios ({ads.length})</h4>
 
         {/* AdSet Mode Toggle */}
         <div className="form-group">

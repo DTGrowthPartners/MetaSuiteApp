@@ -5,11 +5,11 @@
 
 // Objetivos de campaña disponibles en Meta Ads
 export const CAMPAIGN_OBJECTIVES = {
-  OUTCOME_AWARENESS: { label: 'Reconocimiento', icon: '📢', description: 'Aumenta el reconocimiento de marca y alcanza más personas' },
-  OUTCOME_TRAFFIC: { label: 'Tráfico', icon: '🌐', description: 'Lleva personas a tu sitio web o evento' },
-  OUTCOME_LEADS: { label: 'Clientes potenciales', icon: '📋', description: 'Recopila información de personas interesadas' },
-  OUTCOME_SALES: { label: 'Ventas', icon: '💰', description: 'Encuentra personas que comprarán tus productos' },
-  OUTCOME_ENGAGEMENT: { label: 'Interacción', icon: '💬', description: 'Genera mensajes y conversaciones' }
+  OUTCOME_AWARENESS: { label: 'Reconocimiento', icon: 'megaphone', description: 'Aumenta el reconocimiento de marca y alcanza más personas' },
+  OUTCOME_TRAFFIC: { label: 'Tráfico', icon: 'globe', description: 'Lleva personas a tu sitio web o evento' },
+  OUTCOME_LEADS: { label: 'Clientes potenciales', icon: 'clipboard-list', description: 'Recopila información de personas interesadas' },
+  OUTCOME_SALES: { label: 'Ventas', icon: 'dollar-sign', description: 'Encuentra personas que comprarán tus productos' },
+  OUTCOME_ENGAGEMENT: { label: 'Interacción', icon: 'message-circle', description: 'Genera mensajes y conversaciones' }
 };
 
 // Metas de optimización por objetivo
@@ -74,9 +74,9 @@ export const PLACEMENT_OPTIONS = {
 
 // Formatos de anuncio
 export const AD_FORMATS = {
-  SINGLE_IMAGE: { label: 'Imagen única', icon: '🖼️' },
-  SINGLE_VIDEO: { label: 'Video único', icon: '🎬' },
-  CAROUSEL: { label: 'Carrusel', icon: '🎠', minCards: 2, maxCards: 10 }
+  SINGLE_IMAGE: { label: 'Imagen única', icon: 'image' },
+  SINGLE_VIDEO: { label: 'Video único', icon: 'video' },
+  CAROUSEL: { label: 'Carrusel', icon: 'gallery', minCards: 2, maxCards: 10 }
 };
 
 // Categorías de anuncios especiales (requerido por Meta para ciertas industrias)
@@ -153,7 +153,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'traffic_website',
     name: 'Tráfico a Sitio Web',
-    icon: '🌐',
+    icon: 'globe',
     category: 'Tráfico',
     description: 'Lleva visitantes a tu sitio web o landing page. Optimizado para vistas de página.',
     objective: 'OUTCOME_TRAFFIC',
@@ -236,7 +236,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'ventas_whatsapp',
     name: 'Ventas WhatsApp',
-    icon: '💰',
+    icon: 'shopping-cart',
     category: 'Ventas',
     description: 'Genera ventas directamente por WhatsApp. Meta optimiza para personas con alta intención de compra que inicien conversación.',
     objective: 'OUTCOME_SALES',
@@ -310,7 +310,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'leads_whatsapp',
     name: 'Leads por WhatsApp',
-    icon: '📋',
+    icon: 'clipboard-list',
     category: 'Clientes potenciales',
     description: 'Captura leads calificados a través de WhatsApp. Meta optimiza para personas que probablemente te escriban.',
     objective: 'OUTCOME_LEADS',
@@ -383,7 +383,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'sales_website',
     name: 'Conversiones Web',
-    icon: '💰',
+    icon: 'dollar-sign',
     category: 'Ventas',
     description: 'Genera ventas y conversiones en tu sitio web. Meta busca personas con alta intención de compra.',
     objective: 'OUTCOME_SALES',
@@ -456,7 +456,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'engagement_messages_wa',
     name: 'Mensajes WhatsApp',
-    icon: '💬',
+    icon: 'message-circle',
     category: 'Interacción',
     description: 'Maximiza conversaciones en WhatsApp. Meta optimiza para personas que probablemente inicien un chat.',
     objective: 'OUTCOME_ENGAGEMENT',
@@ -528,7 +528,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'traffic_instagram_profile',
     name: 'Tráfico a Perfil Instagram',
-    icon: '📲',
+    icon: 'instagram',
     category: 'Tráfico',
     description: 'Lleva personas a tu perfil de Instagram para ganar seguidores y visibilidad. Meta optimiza para visitas al perfil.',
     objective: 'OUTCOME_TRAFFIC',
@@ -602,7 +602,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'engagement_messages_ig',
     name: 'Mensajes Instagram',
-    icon: '📸',
+    icon: 'camera',
     category: 'Interacción',
     description: 'Genera mensajes directos en Instagram. Meta optimiza para personas que abran conversación en tus DMs.',
     objective: 'OUTCOME_ENGAGEMENT',
@@ -674,7 +674,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'ventas_instagram_direct',
     name: 'Ventas Instagram DM',
-    icon: '💰',
+    icon: 'tag',
     category: 'Ventas',
     description: 'Genera ventas directamente por DM de Instagram. Meta optimiza para personas con alta intención de compra que inicien conversación.',
     objective: 'OUTCOME_SALES',
@@ -748,7 +748,7 @@ export const CAMPAIGN_TEMPLATES = [
   {
     id: 'awareness_thruplay_messenger',
     name: 'Reconocimiento ThruPlay',
-    icon: '📢',
+    icon: 'megaphone',
     category: 'Reconocimiento',
     description: 'Maximiza reproducciones de video (ThruPlay) para reconocimiento de marca. Dirige a Messenger para iniciar conversaciones con personas interesadas.',
     objective: 'OUTCOME_AWARENESS',
@@ -757,10 +757,10 @@ export const CAMPAIGN_TEMPLATES = [
     adSetConfig: {
       conversionLocation: 'MESSENGER', // Default, pero el usuario puede elegir
       destinationOptions: [
-        { id: 'MESSENGER', label: 'Messenger', icon: '💭', description: 'Dirige a Messenger de Facebook' },
-        { id: 'INSTAGRAM_DIRECT', label: 'Instagram Direct', icon: '📸', description: 'Dirige a DMs de Instagram', requiresInstagram: true },
-        { id: 'WHATSAPP', label: 'WhatsApp', icon: '💬', description: 'Dirige a WhatsApp Business', requiresWhatsApp: true },
-        { id: 'WEBSITE', label: 'Sitio Web', icon: '🌐', description: 'Dirige a tu sitio web o landing page' }
+        { id: 'MESSENGER', label: 'Messenger', icon: 'message-square', description: 'Dirige a Messenger de Facebook' },
+        { id: 'INSTAGRAM_DIRECT', label: 'Instagram Direct', icon: 'instagram', description: 'Dirige a DMs de Instagram', requiresInstagram: true },
+        { id: 'WHATSAPP', label: 'WhatsApp', icon: 'phone', description: 'Dirige a WhatsApp Business', requiresWhatsApp: true },
+        { id: 'WEBSITE', label: 'Sitio Web', icon: 'globe', description: 'Dirige a tu sitio web o landing page' }
       ],
       optimizationGoal: 'THRUPLAY',
       billingEvent: 'IMPRESSIONS',

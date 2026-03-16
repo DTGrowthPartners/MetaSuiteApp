@@ -1,16 +1,17 @@
 import { useState, useMemo } from 'react';
+import { CheckCircle, XCircle, CreditCard, Clock, AlertTriangle, Lock, HelpCircle } from 'lucide-react';
 
 const ACCOUNT_STATUS_MAP = {
-  1: { label: 'Activa', color: '#22c55e', icon: '✅' },
-  2: { label: 'Deshabilitada', color: '#ef4444', icon: '🚫' },
-  3: { label: 'Sin liquidar (Pago pendiente)', color: '#f97316', icon: '💳' },
-  7: { label: 'Revision de riesgo pendiente', color: '#eab308', icon: '⏳' },
-  8: { label: 'Liquidacion pendiente', color: '#eab308', icon: '⏳' },
-  9: { label: 'En periodo de gracia', color: '#f97316', icon: '⚠️' },
-  100: { label: 'Cierre pendiente', color: '#ef4444', icon: '🔒' },
-  101: { label: 'Cerrada', color: '#6b7280', icon: '❌' },
-  201: { label: 'Cualquiera activa', color: '#22c55e', icon: '✅' },
-  202: { label: 'Cualquiera cerrada', color: '#6b7280', icon: '❌' },
+  1: { label: 'Activa', color: '#22c55e', IconComp: CheckCircle },
+  2: { label: 'Deshabilitada', color: '#ef4444', IconComp: XCircle },
+  3: { label: 'Sin liquidar (Pago pendiente)', color: '#f97316', IconComp: CreditCard },
+  7: { label: 'Revision de riesgo pendiente', color: '#eab308', IconComp: Clock },
+  8: { label: 'Liquidacion pendiente', color: '#eab308', IconComp: Clock },
+  9: { label: 'En periodo de gracia', color: '#f97316', IconComp: AlertTriangle },
+  100: { label: 'Cierre pendiente', color: '#ef4444', IconComp: Lock },
+  101: { label: 'Cerrada', color: '#6b7280', IconComp: XCircle },
+  201: { label: 'Cualquiera activa', color: '#22c55e', IconComp: CheckCircle },
+  202: { label: 'Cualquiera cerrada', color: '#6b7280', IconComp: XCircle },
 };
 
 const DISABLE_REASON_MAP = {
@@ -31,7 +32,7 @@ function AccountDashboard({ adAccounts, onBack }) {
 
   const accounts = useMemo(() => {
     return adAccounts.map(acc => {
-      const status = ACCOUNT_STATUS_MAP[acc.account_status] || { label: `Desconocido (${acc.account_status})`, color: '#6b7280', icon: '❓' };
+      const status = ACCOUNT_STATUS_MAP[acc.account_status] || { label: `Desconocido (${acc.account_status})`, color: '#6b7280', IconComp: HelpCircle };
       const disableReason = DISABLE_REASON_MAP[acc.disable_reason] || (acc.disable_reason ? `Codigo ${acc.disable_reason}` : 'N/A');
       const hasIssue = acc.account_status !== 1;
       const isPaymentIssue = acc.account_status === 3 || acc.disable_reason === 3;
@@ -157,7 +158,7 @@ function AccountDashboard({ adAccounts, onBack }) {
               fontSize: 13,
               color: acc.statusInfo.color
             }}>
-              <span>{acc.statusInfo.icon}</span>
+              <span>{acc.statusInfo.IconComp && <acc.statusInfo.IconComp size={14} />}</span>
               <span>{acc.statusInfo.label}</span>
             </div>
           </div>

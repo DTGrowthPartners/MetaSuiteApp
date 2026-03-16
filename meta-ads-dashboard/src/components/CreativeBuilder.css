@@ -376,8 +376,15 @@
   box-shadow: none;
 }
 
+.form-group input:hover:not(:focus):not(:disabled),
+.form-group select:hover:not(:focus):not(:disabled),
+.form-group textarea:hover:not(:focus):not(:disabled) {
+  border-color: var(--border-light);
+}
+
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-subtle);
@@ -1572,10 +1579,23 @@
 }
 
 .template-icon {
-  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
   position: relative;
   z-index: 1;
+  background: var(--accent-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  transition: all var(--duration) var(--ease);
+}
+
+.template-card:hover .template-icon {
+  background: var(--accent-glow);
+  transform: scale(1.05);
 }
 
 .template-content {
@@ -2076,6 +2096,7 @@
 }
 .section-card:hover {
   border-color: var(--border-light);
+  box-shadow: 0 0 20px rgba(74, 159, 255, 0.04);
 }
 .section-card h4 {
   color: var(--text-primary);
@@ -2089,8 +2110,10 @@
   gap: 8px;
 }
 .section-card h4 .section-icon {
-  font-size: 16px;
-  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+  opacity: 0.85;
 }
 
 /* ============================================
