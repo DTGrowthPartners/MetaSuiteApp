@@ -3008,6 +3008,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         addLog(`WhatsApp: ${job.whatsappNumber}`);
         if (job.whatsappNumberId) {
           addLog(`WhatsApp Business ID: ${job.whatsappNumberId}`);
+        } else {
+          addLog(`⚠️ Número de WhatsApp ingresado manualmente (no detectado en la cuenta). Si no está vinculado a la página en Meta Business, la optimización puede cambiar a "clicks al enlace" en vez de "conversaciones".`);
         }
         addLog(`Creando campaña para WhatsApp (${totalAds} anuncio(s), presupuesto ${budgetLevelLabel})...`);
 

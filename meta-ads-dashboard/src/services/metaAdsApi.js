@@ -3389,6 +3389,26 @@ class MetaAdsService {
       const totalCreated = results.ads.length;
       console.log(`WhatsApp campaign done: 1 Campaign + ${results.adSets.length} AdSets + ${results.creatives.length} Creatives + ${totalCreated} Ads (${audiencesToProcess.length} públicos)`);
 
+      // Verificación final: leer todos los AdSets y confirmar que tienen optimization_goal correcto
+      if (results.adSets.length > 0 && optimizationGoal === 'CONVERSATIONS') {
+        try {
+          const adSetChecks = await Promise.all(results.adSets.map(async (adSet) => {
+            const resp = await axios.get(`${META_API_BASE_URL}/${adSet.id}`, {
+              params: { access_token: this.accessToken, fields: 'id,optimization_goal' }
+            });
+            return { id: adSet.id, actual: resp.data?.optimization_goal };
+          }));
+          const wrongGoals = adSetChecks.filter(c => c.actual && c.actual !== 'CONVERSATIONS');
+          if (wrongGoals.length > 0) {
+            const actualGoal = wrongGoals[0].actual;
+            console.error(`⚠️ Meta cambió optimization_goal: ${wrongGoals.length} AdSets tienen ${actualGoal} en vez de CONVERSATIONS`);
+            results.errors.push(`Meta cambió la optimización a "${actualGoal}" en vez de "Conversaciones". El número de WhatsApp no está vinculado correctamente a la página en Meta Business. La campaña fue creada pero debes corregir esto en Ads Manager o vincular el número.`);
+          }
+        } catch (checkErr) {
+          console.warn('Error verificando optimization_goal:', checkErr.message);
+        }
+      }
+
       return { success: totalCreated > 0, ...results };
 
     } catch (error) {
