@@ -3625,29 +3625,34 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <h2>Creando Campaña...</h2>
+      <div className="creating-header">
+        <div className="creating-spinner">
+          <Loader2 size={28} />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
+          <p className="text-muted" style={{ margin: '2px 0 0', fontSize: '13px' }}>Enviando a Meta Ads...</p>
+        </div>
+      </div>
 
       <div className="campaign-type-badge">
         {job.conversionLocation === 'WHATSAPP' ? (
-          <><span>💬</span> Campaña de WhatsApp - Optimizada para Conversaciones</>
+          <><MessageCircle size={16} /> Campaña de WhatsApp - Conversaciones</>
         ) : job.conversionLocation === 'MESSENGER' ? (
-          <><span>💭</span> Campaña de Messenger - Optimizada para Conversaciones</>
+          <><MessageSquare size={16} /> Campaña de Messenger - Conversaciones</>
         ) : job.conversionLocation === 'CALLS' ? (
-          <><span>📞</span> Campaña de Llamadas - Optimizada para Llamadas</>
+          <><Phone size={16} /> Campaña de Llamadas</>
         ) : (
-          <><span>🌐</span> {job.templateName || 'Campaña de Tráfico Web'} - {job.optimizationGoal || 'Landing Page Views'}</>
+          <><Globe size={16} /> {job.templateName || 'Campaña de Tráfico Web'} - {job.optimizationGoal || 'Landing Page Views'}</>
         )}
-      </div>
-
-      <div style={{ textAlign: 'center', padding: '40px 0' }}>
-        <span className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }}></span>
-        <p className="text-muted" style={{ marginTop: '16px' }}>Enviando a Meta Ads...</p>
       </div>
 
       {/* Logs */}
       {logs.length > 0 && (
         <div className="logs-section">
-          <h4>Progreso:</h4>
+          <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Loader2 size={14} className="creating-log-spinner" /> Progreso
+          </h4>
           {logs.map((log, i) => (
             <p key={i} className="log-line">{log}</p>
           ))}

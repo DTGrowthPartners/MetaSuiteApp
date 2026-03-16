@@ -8,15 +8,15 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 11px 14px;
+  padding: 9px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all var(--duration) var(--ease);
-  min-height: 42px;
+  min-height: 38px;
 }
 
 .custom-select-trigger:hover {
@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-xs);
   cursor: pointer;
   transition: all 0.15s var(--ease);
