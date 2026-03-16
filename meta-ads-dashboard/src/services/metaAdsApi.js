@@ -2900,7 +2900,7 @@ class MetaAdsService {
     // Meta acepta el AdSet+Creative pero rechaza el Ad. Forzar standard creative para estos objetivos.
     // FLEXIBLE mode: no usa isDynamicCreative, usa creative_asset_groups_spec en /ads
     const useFlexible = adSetMode === 'flexible';
-    const dcBlockedObjectives = ['OUTCOME_SALES', 'OUTCOME_ENGAGEMENT'];
+    const dcBlockedObjectives = ['OUTCOME_SALES', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS'];
     const useDynamicCreative = !useFlexible && adSetMode !== 'single' && !dcBlockedObjectives.includes(objective);
     if (!useFlexible && adSetMode !== 'single' && dcBlockedObjectives.includes(objective)) {
       console.warn(`WhatsApp + ${objective}: DC not supported (error 1885392). Using standard creatives instead.`);
@@ -3082,7 +3082,8 @@ class MetaAdsService {
 
           // Fallback: si falla con número de WhatsApp, reintentar sin él
           if (!adSetResult.success && adWhatsappNumber) {
-            console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number, reintentando sin número...`);
+            const firstError = adSetResult.error || '';
+            console.warn(`AdSet${adLabel}${adAudienceLabel}: falló con WhatsApp number (${firstError}), reintentando sin número...`);
             adSetResult = await this.createAdSetForWhatsApp(adAccountId, {
               name: `${currentAudience?.name || 'Principal'} · ${campaignName}`,
               campaignId: results.campaign.id,
