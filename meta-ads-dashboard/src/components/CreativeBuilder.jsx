@@ -608,18 +608,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   );
   const [excludedPlacements, setExcludedPlacements] = useState([]);
 
-  // Editor de chats (WhatsApp leads)
-  const [chatGreeting, setChatGreeting] = useState('¡Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte?');
-  const [chatAutoReply, setChatAutoReply] = useState('Hola, quiero más información.');
-  const [chatQuickReplies, setChatQuickReplies] = useState([]);
-  const [newQuickReply, setNewQuickReply] = useState('');
-  const [showChatEditor, setShowChatEditor] = useState(false);
-
-  // Plantillas de mensajes de WhatsApp
-  const [waMessageTemplates, setWaMessageTemplates] = useState([]);
-  const [selectedWaTemplate, setSelectedWaTemplate] = useState(''); // '' = custom, o template ID
-  const [loadingWaTemplates, setLoadingWaTemplates] = useState(false);
-  const [waTemplateMode, setWaTemplateMode] = useState('custom'); // 'custom' o 'template'
 
   // Páginas de Facebook
   const [pages, setPages] = useState([]);
@@ -1006,30 +994,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   }, [selectedAccount]);
 
   // Cargar plantillas de bienvenida de WhatsApp de la cuenta seleccionada
-  useEffect(() => {
-    let cancelled = false;
-    const loadWaTemplates = async () => {
-      if (!selectedAccount || !accessToken) return;
-      setLoadingWaTemplates(true);
-      setWaMessageTemplates([]);
-      setSelectedWaTemplate('');
-      try {
-        const metaService = new MetaAdsService(accessToken);
-        const templates = await metaService.getWhatsAppWelcomeTemplates(selectedAccount);
-        if (!cancelled) {
-          setWaMessageTemplates(templates);
-          console.log('WhatsApp welcome templates loaded:', templates.length, 'from account', selectedAccount);
-        }
-      } catch (err) {
-        console.error('Error loading WA templates:', err);
-      } finally {
-        if (!cancelled) setLoadingWaTemplates(false);
-      }
-    };
-    const timer = setTimeout(() => loadWaTemplates(), 1000);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [selectedAccount, accessToken]);
-
   // Auto-fill linkUrl con el website de la página o perfil de Instagram
   useEffect(() => {
     const conversionLocation = templateAdSetConfig?.conversionLocation;
@@ -1483,14 +1447,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           ctas: g.ctas
         })) : [],
         multiAudiences: adSetMode !== 'per-ad' && multiAudiences.length > 0 ? multiAudiences : [],
-        // Chat editor (WhatsApp message)
-        chatGreeting: chatGreeting || null,
-        chatAutoReply: chatAutoReply || 'Hola, quiero más información.',
-        chatQuickReplies: chatQuickReplies.length > 0 ? chatQuickReplies : null,
-        waTemplateMode: waTemplateMode,
-        selectedWaTemplateRawPwm: waTemplateMode === 'template' && selectedWaTemplate
-          ? (waMessageTemplates.find(t => t.id === selectedWaTemplate)?.rawPwm || null)
-          : null,
         // Legacy fields from first ad (for WhatsApp/Messenger compat)
         headlines: builtAds[0]?.headlines || [],
         descriptions: builtAds[0]?.descriptions || [],
@@ -2935,232 +2891,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           )}
         </div>
 
-        {/* Plantilla de Mensajes de WhatsApp */}
-        {templateRequirements.whatsapp && (
-          <>
-            <div className="section-divider">
-              <span>Plantilla de Mensajes</span>
-            </div>
-
-            <div className="chat-editor-section">
-              {/* Toggle: Plantilla existente vs Personalizado */}
-              <div className="toggle-group" style={{ marginBottom: '16px' }}>
-                <button
-                  type="button"
-                  className={`toggle-btn ${waTemplateMode === 'template' ? 'active' : ''}`}
-                  onClick={() => setWaTemplateMode('template')}
-                >
-                  Usar plantilla existente
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-btn ${waTemplateMode === 'custom' ? 'active' : ''}`}
-                  onClick={() => { setWaTemplateMode('custom'); setSelectedWaTemplate(''); }}
-                >
-                  Personalizado
-                </button>
-              </div>
-
-              {waTemplateMode === 'template' ? (
-                <div>
-                  {loadingWaTemplates ? (
-                    <p className="text-muted" style={{ fontSize: '13px' }}>Cargando plantillas de campañas anteriores...</p>
-                  ) : waMessageTemplates.length === 0 ? (
-                    <div style={{ padding: '16px', textAlign: 'center' }}>
-                      <p className="text-muted" style={{ fontSize: '13px' }}>
-                        {selectedAccount
-                          ? 'No se encontraron plantillas en campañas anteriores.'
-                          : 'Selecciona una cuenta publicitaria para cargar las plantillas.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        value={selectedWaTemplate}
-                        onChange={(e) => {
-                          setSelectedWaTemplate(e.target.value);
-                          // Auto-fill greeting from selected template
-                          const tpl = waMessageTemplates.find(t => t.id === e.target.value);
-                          if (tpl) {
-                            setChatGreeting(tpl.greeting || '');
-                          }
-                        }}
-                        style={{ marginBottom: '12px' }}
-                      >
-                        <option value="">-- Selecciona una plantilla ({waMessageTemplates.length} encontradas) --</option>
-                        {waMessageTemplates.map(tpl => (
-                          <option key={tpl.id} value={tpl.id}>
-                            [{tpl.adAccountName?.substring(0, 15)}] {tpl.greeting ? tpl.greeting.substring(0, 50) + (tpl.greeting.length > 50 ? '...' : '') : 'Sin saludo'}
-                          </option>
-                        ))}
-                      </select>
-
-                      {/* Preview de la plantilla seleccionada */}
-                      {selectedWaTemplate && (() => {
-                        const tpl = waMessageTemplates.find(t => t.id === selectedWaTemplate);
-                        if (!tpl) return null;
-                        return (
-                          <div className="chat-preview" style={{ marginTop: '8px' }}>
-                            <div style={{ marginBottom: '8px' }}>
-                              <div className="chat-preview-label">Mensaje de bienvenida</div>
-                              <div className="chat-preview-content" style={{ whiteSpace: 'pre-wrap' }}>
-                                {tpl.greeting || '(Sin mensaje)'}
-                              </div>
-                            </div>
-                            {tpl.autofill && (
-                              <div style={{ marginBottom: '8px' }}>
-                                <div className="chat-preview-label">Mensaje pre-llenado del usuario</div>
-                                <div className="chat-preview-content text-muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>
-                                  "{tpl.autofill}"
-                                </div>
-                              </div>
-                            )}
-                            {tpl.quickReplies?.length > 0 && (
-                              <div>
-                                <div className="chat-preview-label">Respuestas rápidas</div>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                  {tpl.quickReplies.map((qr, i) => (
-                                    <span key={i} className="toggle-btn active" style={{ fontSize: '12px', padding: '4px 10px' }}>
-                                      {qr}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            <p className="hint mt-sm" style={{ fontSize: '11px' }}>
-                              De: {tpl.creativeName?.substring(0, 50)}
-                            </p>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  )}
-                </div>
-              ) : (
-                /* Modo personalizado — mensaje de bienvenida */
-                <div>
-                  <div className="toggle-inline" style={{ marginBottom: '12px' }}>
-                    <div>
-                      <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Mensaje Personalizado</h4>
-                      <p className="hint">
-                        Configura el mensaje que verán las personas cuando toquen tu anuncio
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${showChatEditor ? 'active' : ''}`}
-                      onClick={() => setShowChatEditor(!showChatEditor)}
-                    >
-                      {showChatEditor ? 'Ocultar' : 'Editar'}
-                    </button>
-                  </div>
-
-                  {/* Preview siempre visible — estilo mensaje */}
-                  <div className="chat-preview">
-                    <div className="chat-preview-label">Mensaje de bienvenida</div>
-                    <div className="chat-preview-content mb-md" style={{ whiteSpace: 'pre-wrap' }}>{chatGreeting}</div>
-                    <div className="chat-preview-label">Respuesta automática del usuario</div>
-                    <div className="chat-preview-content text-muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>
-                      "{chatAutoReply}"
-                    </div>
-                    {chatQuickReplies.length > 0 && (
-                      <div style={{ marginTop: '10px' }}>
-                        <div className="chat-preview-label">Respuestas rápidas</div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                          {chatQuickReplies.map((qr, i) => (
-                            <span key={i} className="toggle-btn active" style={{ fontSize: '12px', padding: '4px 10px' }}>
-                              {qr}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Editor expandido */}
-                  {showChatEditor && (
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div>
-                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje de bienvenida</label>
-                        <textarea
-                          value={chatGreeting}
-                          onChange={(e) => setChatGreeting(e.target.value)}
-                          rows={3}
-                          style={{ resize: 'vertical' }}
-                          placeholder="¡Hola! 👋 Gracias por tu interés. ¿En qué podemos ayudarte?"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Mensaje pre-llenado del usuario</label>
-                        <input
-                          type="text"
-                          value={chatAutoReply}
-                          onChange={(e) => setChatAutoReply(e.target.value)}
-                          placeholder="Hola, quiero más información."
-                        />
-                        <p className="hint mt-sm">
-                          Este mensaje aparece pre-escrito cuando el usuario abre el chat
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="text-muted" style={{ fontSize: '13px', marginBottom: '6px', display: 'block' }}>Respuestas rápidas (opcional)</label>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                          <input
-                            type="text"
-                            value={newQuickReply}
-                            onChange={(e) => setNewQuickReply(e.target.value)}
-                            placeholder="Ej: Quiero agendar una cita"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && newQuickReply.trim()) {
-                                e.preventDefault();
-                                setChatQuickReplies(prev => [...prev, newQuickReply.trim()]);
-                                setNewQuickReply('');
-                              }
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          <button
-                            type="button"
-                            className="toggle-btn active"
-                            onClick={() => {
-                              if (newQuickReply.trim()) {
-                                setChatQuickReplies(prev => [...prev, newQuickReply.trim()]);
-                                setNewQuickReply('');
-                              }
-                            }}
-                            style={{ padding: '6px 14px' }}
-                          >
-                            +
-                          </button>
-                        </div>
-                        {chatQuickReplies.length > 0 && (
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {chatQuickReplies.map((qr, i) => (
-                              <span
-                                key={i}
-                                className="toggle-btn active"
-                                style={{ fontSize: '12px', padding: '4px 10px', cursor: 'pointer' }}
-                                onClick={() => setChatQuickReplies(prev => prev.filter((_, idx) => idx !== i))}
-                                title="Click para eliminar"
-                              >
-                                {qr} ✕
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <p className="hint mt-sm">
-                          Botones que el usuario puede tocar para responder rápido. Click para eliminar.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        )}
 
         </div>{/* fin section-card Anuncios */}
 
@@ -3279,9 +3009,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         if (job.whatsappNumberId) {
           addLog(`WhatsApp Business ID: ${job.whatsappNumberId}`);
         }
-        if (job.chatGreeting) {
-          addLog(`Chat: "${job.chatGreeting.substring(0, 50)}..."`);
-        }
         addLog(`Creando campaña para WhatsApp (${totalAds} anuncio(s), presupuesto ${budgetLevelLabel})...`);
 
         result = await metaService.createCampaignForWhatsApp(job.adAccountId, {
@@ -3312,13 +3039,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           bidAmount: job.bidAmount || null,
           startTime: job.startDate || null,
           endTime: job.endDate || null,
-          pageWelcomeMessage: job.selectedWaTemplateRawPwm
-            ? { rawPwm: job.selectedWaTemplateRawPwm }
-            : job.chatGreeting ? {
-              greeting: job.chatGreeting,
-              autoReply: job.chatAutoReply || 'Hola, quiero más información.',
-              quickReplies: job.chatQuickReplies || []
-            } : null,
+          pageWelcomeMessage: null,
           multiAudiences: job.multiAudiences || [],
           flexibleAdGroups: job.flexibleAdGroups || []
         });
@@ -3777,8 +3498,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           startDate: job.startDate || null,
           endDate: job.endDate || null,
           specialAdCategories: job.specialAdCategories || [],
-          advantageAudience: job.advantageAudience,
-          chatGreeting: job.chatGreeting || null
+          advantageAudience: job.advantageAudience
         });
         setCreated(true);
       } else {

@@ -1930,7 +1930,6 @@ class MetaAdsService {
     igActorId = null,
     isWhatsApp = false, // WhatsApp: minimal asset_feed_spec sin link_urls ni ad_formats
     isInstagramDM = false, // IG DM: SIEMPRE requiere link_urls con ig.me/m/{igActorId} (error 1885869 sin ellas)
-    pageWelcomeMessage = null // page_welcome_message string para WhatsApp/Messaging DC
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -1994,13 +1993,6 @@ class MetaAdsService {
         assetFeedSpec.ad_formats = ['SINGLE_IMAGE'];
       }
 
-      // page_welcome_message para WhatsApp/Messaging DC
-      if (pageWelcomeMessage) {
-        assetFeedSpec.page_welcome_message = typeof pageWelcomeMessage === 'string'
-          ? pageWelcomeMessage : JSON.stringify(pageWelcomeMessage);
-        console.log('DC asset_feed_spec: adding page_welcome_message');
-      }
-
       const objectStorySpec = {
         page_id: pageId
       };
@@ -2019,7 +2011,7 @@ class MetaAdsService {
         titles: titles.length, bodies: bodies.length,
         descriptions: descriptions.length, callToActionTypes,
         igActorId: igActorId || 'none',
-        hasPageWelcomeMessage: !!pageWelcomeMessage
+        igActorIdPresent: !!igActorId
       });
       console.log('objectStorySpec:', JSON.stringify(objectStorySpec));
       console.log('assetFeedSpec:', JSON.stringify(assetFeedSpec, null, 2));
@@ -2888,7 +2880,6 @@ class MetaAdsService {
     startTime = null,
     endTime = null,
     linkUrl = null,
-    pageWelcomeMessage = null, // Plantilla de mensaje de bienvenida para WhatsApp
     multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
     flexibleAdGroups = []
   }) {
@@ -3060,35 +3051,6 @@ class MetaAdsService {
         }
       }
 
-      // Determinar page_welcome_message: usar rawPwm si viene de plantilla, o construir desde greeting
-      const pwmString = pageWelcomeMessage?.rawPwm
-        ? (typeof pageWelcomeMessage.rawPwm === 'string' ? pageWelcomeMessage.rawPwm : JSON.stringify(pageWelcomeMessage.rawPwm))
-        : pageWelcomeMessage?.greeting
-          ? (() => {
-              const pwmObj = {
-                type: 'VISUAL_EDITOR', version: 2, landing_screen_type: 'welcome_message', media_type: 'text',
-                text_format: {
-                  customer_action_type: 'autofill_message',
-                  message: {
-                    text: pageWelcomeMessage.greeting,
-                    autofill_message: { content: pageWelcomeMessage.autoReply || 'Hola, quiero más información.' }
-                  }
-                }
-              };
-              // Agregar quick replies si existen
-              if (pageWelcomeMessage.quickReplies?.length > 0) {
-                pwmObj.text_format.message.quick_replies = pageWelcomeMessage.quickReplies.map(qr => ({
-                  content_type: 'text',
-                  title: qr
-                }));
-              }
-              return JSON.stringify(pwmObj);
-            })()
-          : null;
-
-      console.log('WhatsApp pwmString:', pwmString ? `SET (${pwmString.substring(0, 80)}...)` : 'NULL');
-      console.log('WhatsApp pageWelcomeMessage input:', JSON.stringify(pageWelcomeMessage));
-
       // ====== MODOS NO-FLEXIBLE: loop por cada ad ======
       if (!useFlexible)
       for (let i = 0; i < ads.length; i++) {
@@ -3183,8 +3145,7 @@ class MetaAdsService {
             callToActionTypes: validCTAs,
             linkUrl: null,
             igActorId,
-            isWhatsApp: true,
-            pageWelcomeMessage: pwmString
+            isWhatsApp: true
           });
 
           // Si falla por igActorId, reintentar sin IG
@@ -3203,8 +3164,7 @@ class MetaAdsService {
               callToActionTypes: validCTAs,
               linkUrl: null,
               igActorId: null,
-              isWhatsApp: true,
-              pageWelcomeMessage: pwmString
+              isWhatsApp: true
             });
           }
         } else {
@@ -3242,7 +3202,6 @@ class MetaAdsService {
               } catch (te) { console.warn('WA standard: thumbnail fetch failed:', te.message); }
             }
             if (description.trim()) videoData.link_description = description;
-            if (pwmString) videoData.page_welcome_message = pwmString;
             objectStorySpec.video_data = videoData;
           } else {
             // WhatsApp image: NO incluir link en link_data (Meta interpreta link como CTA value.link
@@ -3258,7 +3217,6 @@ class MetaAdsService {
               linkData.picture = adImageUrl;
             }
             if (description.trim()) linkData.description = description;
-            if (pwmString) linkData.page_welcome_message = pwmString;
             objectStorySpec.link_data = linkData;
           }
 
@@ -3355,7 +3313,6 @@ class MetaAdsService {
 
           console.log(`  Fallback Standard Creative: "${headline}" | "${primaryText.substring(0, 60)}..." | CTA: ${whatsAppCta}`);
 
-          // Reutilizar pwmString del bloque principal
           const objectStorySpec = { page_id: pageId };
           if (adVideoId) {
             const videoData = {
@@ -3366,7 +3323,6 @@ class MetaAdsService {
             };
             if (adThumbnailUrl && adThumbnailUrl.startsWith('http')) videoData.image_url = adThumbnailUrl;
             if (description.trim()) videoData.link_description = description;
-            if (pwmString) videoData.page_welcome_message = pwmString;
             objectStorySpec.video_data = videoData;
           } else {
             // WhatsApp image: NO incluir link (WHATSAPP_MESSAGE no soporta link en CTA value)
@@ -3378,7 +3334,6 @@ class MetaAdsService {
             if (adImageHash) linkData.image_hash = adImageHash;
             else if (adImageUrl && adImageUrl.trim()) linkData.picture = adImageUrl;
             if (description.trim()) linkData.description = description;
-            if (pwmString) linkData.page_welcome_message = pwmString;
             objectStorySpec.link_data = linkData;
           }
           if (igActorId) objectStorySpec.instagram_user_id = igActorId;
