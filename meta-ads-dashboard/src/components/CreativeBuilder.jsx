@@ -1004,39 +1004,20 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     return () => { cancelled = true; };
   }, [selectedAccount]);
 
-  // Cargar plantillas de bienvenida de WhatsApp desde creativos de TODAS las cuentas
+  // Cargar plantillas de bienvenida de WhatsApp de la cuenta seleccionada
   useEffect(() => {
     let cancelled = false;
-    const loadAllWaTemplates = async () => {
-      if (!adAccounts || adAccounts.length === 0) return;
+    const loadWaTemplates = async () => {
+      if (!selectedAccount || !accessToken) return;
       setLoadingWaTemplates(true);
+      setWaMessageTemplates([]);
+      setSelectedWaTemplate('');
       try {
         const metaService = new MetaAdsService(accessToken);
-        let allTemplates = [];
-        for (const account of adAccounts) {
-          if (cancelled) return;
-          try {
-            const templates = await metaService.getWhatsAppWelcomeTemplates(account.id);
-            const withAccount = templates.map(t => ({
-              ...t,
-              adAccountId: account.id,
-              adAccountName: account.name || account.id
-            }));
-            allTemplates = allTemplates.concat(withAccount);
-          } catch (err) {
-            // Silently skip failed accounts
-          }
-        }
+        const templates = await metaService.getWhatsAppWelcomeTemplates(selectedAccount);
         if (!cancelled) {
-          // Deduplicar por greeting
-          const unique = {};
-          for (const t of allTemplates) {
-            const key = `${t.greeting}|${t.autofill}`;
-            if (!unique[key]) unique[key] = t;
-          }
-          const dedupedTemplates = Object.values(unique);
-          setWaMessageTemplates(dedupedTemplates);
-          console.log('WhatsApp welcome templates loaded:', dedupedTemplates.length, 'unique from', adAccounts.length, 'accounts');
+          setWaMessageTemplates(templates);
+          console.log('WhatsApp welcome templates loaded:', templates.length, 'from account', selectedAccount);
         }
       } catch (err) {
         console.error('Error loading WA templates:', err);
@@ -1044,10 +1025,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         if (!cancelled) setLoadingWaTemplates(false);
       }
     };
-    // Delay para que las otras cargas terminen primero
-    const timer = setTimeout(() => loadAllWaTemplates(), 3000);
+    const timer = setTimeout(() => loadWaTemplates(), 1000);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [adAccounts]);
+  }, [selectedAccount, accessToken]);
 
   // Auto-fill linkUrl con el website de la página o perfil de Instagram
   useEffect(() => {

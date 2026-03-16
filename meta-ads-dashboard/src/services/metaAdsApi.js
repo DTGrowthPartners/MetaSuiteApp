@@ -1627,8 +1627,8 @@ class MetaAdsService {
       // Obtener primera descripción si existe
       const firstDescription = texts.find(t => t.text_type === 'description')?.text || '';
 
-      if (videos.length > 0) {
-        // Video: usar video_data
+      if (videos.length > 0 && images.length === 0) {
+        // SOLO videos (sin imágenes): usar video_data
         objectStorySpec.video_data = {
           video_id: videos[0].video_id,
           message: firstPrimaryText,
@@ -1667,7 +1667,9 @@ class MetaAdsService {
           objectStorySpec.video_data.link_description = firstDescription;
         }
       } else {
-        // Imagen: usar link_data
+        // Imágenes (o mezcla de imágenes + videos): usar link_data con la primera imagen
+        // Meta exige que el primer asset del grupo coincida con object_story_spec
+        // Como images va antes que videos en creative_asset_groups_spec, usamos link_data
         objectStorySpec.link_data = {
           link: resolvedLink,
           message: firstPrimaryText,
