@@ -313,7 +313,7 @@ export const CAMPAIGN_TEMPLATES = [
     icon: '📋',
     category: 'Clientes potenciales',
     description: 'Captura leads calificados a través de WhatsApp. Meta optimiza para personas que probablemente te escriban.',
-    objective: 'OUTCOME_ENGAGEMENT',
+    objective: 'OUTCOME_LEADS',
     specialAdCategories: [],
     buyingType: 'AUCTION',
     adSetConfig: {
