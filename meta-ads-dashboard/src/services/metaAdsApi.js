@@ -2543,6 +2543,26 @@ class MetaAdsService {
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
+
+      // Verificar que Meta respetó el optimization_goal solicitado
+      if (response.data?.id && optimizationGoal === 'CONVERSATIONS') {
+        try {
+          const checkResp = await axios.get(`${META_API_BASE_URL}/${response.data.id}`, {
+            params: { access_token: this.accessToken, fields: 'optimization_goal' }
+          });
+          const actualGoal = checkResp.data?.optimization_goal;
+          if (actualGoal && actualGoal !== 'CONVERSATIONS') {
+            console.warn(`⚠️ AdSet ${response.data.id}: solicitado CONVERSATIONS pero Meta asignó ${actualGoal}. El número de WhatsApp puede no estar vinculado a la página.`);
+            return {
+              success: false,
+              error: `Meta cambió la optimización a "${actualGoal}" en vez de "CONVERSATIONS". Esto ocurre cuando el número de WhatsApp no está vinculado a la página en Meta Business. Vincula el número e intenta de nuevo.`
+            };
+          }
+        } catch (checkErr) {
+          console.warn('No se pudo verificar optimization_goal:', checkErr.message);
+        }
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
       const errData = error.response?.data?.error;
