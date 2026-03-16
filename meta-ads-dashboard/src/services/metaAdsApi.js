@@ -2900,6 +2900,7 @@ class MetaAdsService {
     startTime = null,
     endTime = null,
     linkUrl = null,
+    audienceName = null, // Nombre del público seleccionado
     multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
     flexibleAdGroups = []
   }) {
@@ -2948,7 +2949,7 @@ class MetaAdsService {
 
       // 2. Crear AdSet(s) + Creative(s) + Ad(s) según adSetMode
       // Construir array de públicos a procesar
-      const primaryAud = { name: 'Principal', targeting };
+      const primaryAud = { name: audienceName || 'Principal', targeting };
       const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
         ? [primaryAud, ...multiAudiences.map(a => ({
             name: a.name,
@@ -3807,6 +3808,7 @@ class MetaAdsService {
     whatsappNumber = null, // Número de WhatsApp (ej: "573005410171")
     adSetMode = 'single', // 'single' | 'per-ad'
     ads = [],
+    audienceName = null, // Nombre del público seleccionado
     multiAudiences = [], // Múltiples públicos: replicar AdSets por cada público
     budgetLevel = 'campaign', // 'campaign' (CBO) o 'adset'
     flexibleAdGroups = []
@@ -4203,7 +4205,7 @@ class MetaAdsService {
       };
 
       // Construir array de públicos a procesar (principal + adicionales)
-      const primaryAud = { name: 'Principal', targeting };
+      const primaryAud = { name: audienceName || 'Principal', targeting };
       const audiencesToProcess = (adSetMode !== 'per-ad' && multiAudiences.length > 0)
         ? [primaryAud, ...multiAudiences.map(a => ({
             name: a.name,

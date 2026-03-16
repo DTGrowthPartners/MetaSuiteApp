@@ -1673,15 +1673,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <div className="form-group">
             <label>Destino del anuncio *</label>
             <p className="hint mb-sm">Elige a dónde se dirigirán las personas al interactuar con tu anuncio</p>
-            <div className="budget-level-selector">
+            <div className="toggle-group">
               {destinationOptions.map(opt => (
                 <button
                   key={opt.id}
                   type="button"
-                  className={`budget-btn ${selectedDestination === opt.id ? 'active' : ''}`}
+                  className={`toggle-btn ${selectedDestination === opt.id ? 'active' : ''}`}
                   onClick={() => {
                     setSelectedDestination(opt.id);
-                    // Actualizar CTAs de todos los ads cuando cambia el destino
                     const newCta = opt.id === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
                       : opt.id === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
                       : opt.id === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
@@ -1695,7 +1694,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   }}
                   title={opt.description}
                 >
-                  {(() => { const IC = ICON_MAP[opt.icon]; return IC ? <IC size={16} /> : opt.icon; })()} {opt.label}
+                  {(() => { const IC = ICON_MAP[opt.icon]; return IC ? <IC size={14} /> : opt.icon; })()} {opt.label}
                 </button>
               ))}
             </div>
@@ -3060,6 +3059,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           startTime: job.startDate || null,
           endTime: job.endDate || null,
           pageWelcomeMessage: null,
+          audienceName: job.savedAudienceName || null,
           multiAudiences: job.multiAudiences || [],
           flexibleAdGroups: job.flexibleAdGroups || []
         });
@@ -3447,6 +3447,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           whatsappNumber: job.whatsappNumber || null,
           budgetLevel: job.budgetLevel || 'campaign',
           adSetMode: job.adSetMode || 'single',
+          audienceName: job.savedAudienceName || null,
           multiAudiences: job.multiAudiences || [],
           flexibleAdGroups: job.flexibleAdGroups || [],
           ads: job.ads || [{
@@ -3541,63 +3542,80 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
     return (
       <div className="draft-step">
-        <div className="success-section" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '8px' }}>
-            {adWasCreated ? String.fromCodePoint(0x1F389) : String.fromCodePoint(0x1F4CB)}
-          </div>
-          <h2 style={{ margin: '0 0 8px', fontSize: '22px' }}>
-            {adWasCreated ? 'Campaña Creada Exitosamente' : 'Campaña y Ad Set Creados'}
-          </h2>
-          <p className="text-muted" style={{ fontSize: '14px', margin: '0 0 24px' }}>
-            {adWasCreated
-              ? `${draftData.totalAdSets || 1} conjunto(s) + ${draftData.totalAdsCreated} anuncio(s) en estado pausado`
-              : 'Tu campaña ha sido creada en estado pausado'}
-          </p>
-
-          {/* Resumen compacto en grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', textAlign: 'left', marginBottom: '20px' }}>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: '3px solid var(--accent-color)' }}>
-              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Campaña</p>
-              <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{draftData.campaignName}</p>
-              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
-                {destLabels[draftData.conversionLocation] || draftData.conversionLocation} · ${formatCOP(draftData.dailyBudgetCOP)}/dia
-              </p>
+        <div className="success-view">
+          {/* Header con icono */}
+          <div className="success-view-header">
+            <div className="success-view-icon">
+              <Check size={32} strokeWidth={3} />
             </div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: '3px solid #4ecdc4' }}>
-              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Conjuntos ({draftData.totalAdSets || 1})</p>
-              <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{draftData.savedAudienceName || 'Advantage+'}</p>
-              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
-                {draftData.pageName}{draftData.igUsername ? ` · @${draftData.igUsername}` : ''}
-              </p>
-            </div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '14px', borderLeft: `3px solid ${adWasCreated ? '#45b7d1' : '#f0ad4e'}` }}>
-              <p className="text-muted" style={{ fontSize: '11px', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Anuncios ({draftData.totalAdsCreated})</p>
-              {draftData.ads?.length > 0 ? (
-                <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
-                  {draftData.ads.map((ad, i) => `#${i + 1}`).join(', ')}
-                </p>
-              ) : (
-                <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>Pendiente</p>
-              )}
-              <p className="text-muted" style={{ fontSize: '12px', margin: 0 }}>
-                {draftData.whatsappNumber ? `WA: ${draftData.whatsappNumber}` : draftData.linkUrl?.substring(0, 35) || ''}
-              </p>
-            </div>
+            <h2 className="success-view-title">
+              {adWasCreated ? 'Campaña Creada' : 'Campaña y Ad Set Creados'}
+            </h2>
+            <p className="success-view-subtitle">
+              {adWasCreated
+                ? `${draftData.totalAdSets || 1} conjunto(s) + ${draftData.totalAdsCreated} anuncio(s) en estado pausado`
+                : 'Tu campaña ha sido creada en estado pausado'}
+            </p>
           </div>
 
-          {/* Botones de acción */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
+          {/* Cards de resumen */}
+          <div className="success-view-cards">
+            <div className="success-view-card">
+              <div className="success-view-card-icon" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                <ClipboardList size={18} />
+              </div>
+              <div className="success-view-card-body">
+                <span className="success-view-card-label">Campaña</span>
+                <span className="success-view-card-value">{draftData.campaignName}</span>
+                <span className="success-view-card-meta">
+                  {destLabels[draftData.conversionLocation] || draftData.conversionLocation} · ${formatCOP(draftData.dailyBudgetCOP)}/dia
+                </span>
+              </div>
+            </div>
+
+            <div className="success-view-card">
+              <div className="success-view-card-icon" style={{ background: 'rgba(52, 211, 153, 0.1)', color: 'var(--success)' }}>
+                <Users size={18} />
+              </div>
+              <div className="success-view-card-body">
+                <span className="success-view-card-label">Conjuntos ({draftData.totalAdSets || 1})</span>
+                <span className="success-view-card-value">{draftData.savedAudienceName || 'Advantage+'}</span>
+                <span className="success-view-card-meta">
+                  {draftData.pageName}{draftData.igUsername ? ` · @${draftData.igUsername}` : ''}
+                </span>
+              </div>
+            </div>
+
+            <div className="success-view-card">
+              <div className="success-view-card-icon" style={{ background: adWasCreated ? 'rgba(69, 183, 209, 0.1)' : 'var(--warning-bg)', color: adWasCreated ? '#45b7d1' : 'var(--warning)' }}>
+                <Film size={18} />
+              </div>
+              <div className="success-view-card-body">
+                <span className="success-view-card-label">Anuncios ({draftData.totalAdsCreated})</span>
+                <span className="success-view-card-value">
+                  {draftData.ads?.length > 0
+                    ? draftData.ads.map((ad, i) => `#${i + 1}`).join(', ')
+                    : 'Pendiente'}
+                </span>
+                <span className="success-view-card-meta">
+                  {draftData.whatsappNumber ? `WA: ${draftData.whatsappNumber}` : draftData.linkUrl?.substring(0, 40) || ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botones */}
+          <div className="success-view-actions">
             <a
               href="https://business.facebook.com/adsmanager"
               target="_blank"
               rel="noopener noreferrer"
-              className="toggle-btn active"
-              style={{ padding: '12px 24px', fontSize: '14px', textDecoration: 'none', display: 'inline-block' }}
+              className="success-view-btn-secondary"
             >
-              Abrir en Ads Manager
+              <Globe size={16} /> Abrir Ads Manager
             </a>
-            <button className="done-button" onClick={onComplete} style={{ padding: '12px 24px', fontSize: '14px' }}>
-              Crear Otra Campaña
+            <button className="success-view-btn-primary" onClick={onComplete}>
+              <Plus size={16} /> Crear Otra Campaña
             </button>
           </div>
         </div>
