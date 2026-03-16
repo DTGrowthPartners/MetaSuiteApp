@@ -117,7 +117,7 @@ export default function CustomSelect({
   }
 
   return (
-    <div className={`custom-select ${className}`} ref={containerRef}>
+    <div className={`custom-select ${isOpen ? 'custom-select--open' : ''} ${className}`} ref={containerRef}>
       <div
         className={`custom-select-trigger ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
