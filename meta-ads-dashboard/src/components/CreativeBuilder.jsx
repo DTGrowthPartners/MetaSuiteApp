@@ -50,7 +50,12 @@ function getCampaignPrefix(objective) {
   return '🟦 DTGP - ';
 }
 
-// Las plantillas ahora se importan desde campaignTemplates.js
+// Color por objetivo (misma nomenclatura que los prefijos 🟨🟥🟦)
+function getObjectiveColor(objective) {
+  if (objective === 'OUTCOME_LEADS') return '#f0b429'; // amarillo
+  if (objective === 'OUTCOME_SALES' || objective === 'OUTCOME_ENGAGEMENT') return '#e53e3e'; // rojo
+  return '#4A9FFF'; // azul — TRAFFIC, AWARENESS, etc.
+}
 
 // ============================================
 // TEMPLATE SELECTOR COMPONENT - Selección de plantilla
@@ -98,13 +103,15 @@ function TemplateSelector({ onSelectTemplate }) {
           const suggestedBudget = template.adSetConfig?.suggestedBudget || template.suggestedBudget || 20000;
           const ctaList = template.creativeContent?.ctas || template.ctas || [];
 
+          const objColor = getObjectiveColor(template.objective);
           return (
             <div
               key={template.id}
               className="template-card"
+              style={{ borderTop: `3px solid ${objColor}` }}
               onClick={() => onSelectTemplate(template)}
             >
-              <div className="template-icon">{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={24} /> : template.icon; })()}</div>
+              <div className="template-icon" style={{ background: `${objColor}20`, color: objColor }}>{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={24} /> : template.icon; })()}</div>
               <div className="template-content">
                 <h3>{template.name}</h3>
                 <span className="template-category">{template.category}</span>

@@ -33,14 +33,14 @@ function ParticleBackground() {
     window.addEventListener('resize', resize);
 
     const particles = [];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 120; i++) {
       particles.push({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 1.5 + 0.5,
-        opacity: Math.random() * 0.4 + 0.08
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        r: Math.random() * 2 + 0.3,
+        opacity: Math.random() * 0.5 + 0.05
       });
     }
 
