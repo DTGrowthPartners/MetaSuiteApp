@@ -1065,7 +1065,8 @@ class MetaAdsService {
       const response = await axios.get(`${META_API_BASE_URL}/me/accounts`, {
         params: {
           access_token: this.accessToken,
-          fields: 'id,name,access_token,website,instagram_business_account{id,username},business{id}'
+          fields: 'id,name,access_token,website,instagram_business_account{id,username},business{id}',
+          limit: 100
         }
       });
       console.log('Pages response:', response.data);
@@ -1073,6 +1074,33 @@ class MetaAdsService {
     } catch (error) {
       const errorMsg = error.response?.data?.error?.message || error.message;
       console.error('getPages error:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  // Obtener páginas de un Business específico (owned + client pages)
+  async getBusinessPages(businessId) {
+    try {
+      const fields = 'id,name,access_token,website,instagram_business_account{id,username},business{id}';
+      const [ownedResp, clientResp] = await Promise.all([
+        axios.get(`${META_API_BASE_URL}/${businessId}/owned_pages`, {
+          params: { access_token: this.accessToken, fields, limit: 100 }
+        }).catch(() => ({ data: { data: [] } })),
+        axios.get(`${META_API_BASE_URL}/${businessId}/client_pages`, {
+          params: { access_token: this.accessToken, fields, limit: 100 }
+        }).catch(() => ({ data: { data: [] } }))
+      ]);
+      const owned = ownedResp.data?.data || [];
+      const client = clientResp.data?.data || [];
+      // Dedup by id
+      const map = new Map();
+      [...owned, ...client].forEach(p => map.set(p.id, p));
+      const allPages = Array.from(map.values());
+      console.log(`Business ${businessId} pages: ${owned.length} owned, ${client.length} client, ${allPages.length} total`);
+      return { success: true, data: allPages };
+    } catch (error) {
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      console.error('getBusinessPages error:', errorMsg);
       return { success: false, error: errorMsg };
     }
   }

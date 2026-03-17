@@ -942,23 +942,51 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     loadPages();
   }, []);
 
-  // Filtrar páginas por negocio de la cuenta seleccionada
+  // Cargar páginas del Business cuando cambia la cuenta seleccionada
   const accountBusinessId = (() => {
     const accountData = adAccounts.find(a => a.id === selectedAccount);
     return accountData?.business_id || accountData?.business?.id || null;
   })();
-  const filteredPages = accountBusinessId
-    ? pages.filter(p => p.business?.id === accountBusinessId)
-    : [];
-  // Si no hay páginas del negocio, mostrar todas como fallback
-  const displayPages = filteredPages.length > 0 ? filteredPages : pages;
 
-  // Auto-seleccionar página de Facebook según la cuenta publicitaria seleccionada
+  const [businessPages, setBusinessPages] = useState([]);
+  const [loadingBusinessPages, setLoadingBusinessPages] = useState(false);
+
   useEffect(() => {
-    if (!pages.length || !selectedAccount) { setSelectedPage(''); return; }
-    const matchingPage = filteredPages.length > 0 ? filteredPages[0] : null;
-    setSelectedPage(matchingPage ? matchingPage.id : '');
-  }, [selectedAccount, pages.length, accountBusinessId]);
+    if (!selectedAccount || !accountBusinessId) {
+      setBusinessPages([]);
+      setSelectedPage('');
+      return;
+    }
+    const loadBusinessPages = async () => {
+      setLoadingBusinessPages(true);
+      try {
+        const metaService = new MetaAdsService(accessToken);
+        const result = await metaService.getBusinessPages(accountBusinessId);
+        if (result.success && result.data?.length > 0) {
+          setBusinessPages(result.data);
+          setSelectedPage(result.data[0].id);
+        } else {
+          // Fallback: filtrar de /me/accounts
+          const filtered = pages.filter(p => p.business?.id === accountBusinessId);
+          if (filtered.length > 0) {
+            setBusinessPages(filtered);
+            setSelectedPage(filtered[0].id);
+          } else {
+            setBusinessPages(pages);
+            setSelectedPage(pages[0]?.id || '');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading business pages:', err);
+        setBusinessPages(pages);
+      } finally {
+        setLoadingBusinessPages(false);
+      }
+    };
+    loadBusinessPages();
+  }, [selectedAccount, accountBusinessId]);
+
+  const displayPages = businessPages;
 
   // Cargar números de WhatsApp Business del business de la cuenta publicitaria seleccionada
   useEffect(() => {
@@ -1625,8 +1653,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             value={selectedPage}
             onChange={(e) => setSelectedPage(e.target.value)}
             placeholder={!selectedAccount ? 'Selecciona una cuenta publicitaria primero' : 'Selecciona una página'}
-            loading={loadingPages}
-            disabled={loadingPages || !selectedAccount}
+            loading={loadingPages || loadingBusinessPages}
+            disabled={loadingPages || loadingBusinessPages || !selectedAccount}
             options={displayPages.map(page => ({
               value: page.id,
               label: page.name
