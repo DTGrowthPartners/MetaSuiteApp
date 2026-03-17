@@ -2010,6 +2010,14 @@ const REPORT_ACCOUNTS = {
     locations: [],
     resultMetric: 'conversations',
     resultLabel: 'Mensajes'
+  },
+  'dtgp': {
+    accountId: 'act_781485172384812',
+    name: 'DTGP Cartagena',
+    businessName: 'DT Growth Partners',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
   }
 };
 
