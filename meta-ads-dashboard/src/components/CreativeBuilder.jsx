@@ -952,39 +952,41 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [loadingBusinessPages, setLoadingBusinessPages] = useState(false);
 
   useEffect(() => {
-    if (!selectedAccount || !accountBusinessId) {
+    if (!selectedAccount) {
       setBusinessPages([]);
       setSelectedPage('');
       return;
     }
-    const loadBusinessPages = async () => {
+    const loadAccountPages = async () => {
       setLoadingBusinessPages(true);
       try {
         const metaService = new MetaAdsService(accessToken);
-        const result = await metaService.getBusinessPages(accountBusinessId);
+        const result = await metaService.getAdAccountPages(selectedAccount);
         if (result.success && result.data?.length > 0) {
           setBusinessPages(result.data);
           setSelectedPage(result.data[0].id);
         } else {
-          // Fallback: filtrar de /me/accounts
-          const filtered = pages.filter(p => p.business?.id === accountBusinessId);
+          // Fallback: filtrar de /me/accounts por business
+          const filtered = accountBusinessId
+            ? pages.filter(p => p.business?.id === accountBusinessId)
+            : [];
           if (filtered.length > 0) {
             setBusinessPages(filtered);
             setSelectedPage(filtered[0].id);
-          } else {
+          } else if (pages.length > 0) {
             setBusinessPages(pages);
-            setSelectedPage(pages[0]?.id || '');
+            setSelectedPage(pages[0].id);
           }
         }
       } catch (err) {
-        console.error('Error loading business pages:', err);
+        console.error('Error loading account pages:', err);
         setBusinessPages(pages);
       } finally {
         setLoadingBusinessPages(false);
       }
     };
-    loadBusinessPages();
-  }, [selectedAccount, accountBusinessId]);
+    loadAccountPages();
+  }, [selectedAccount]);
 
   const displayPages = businessPages;
 

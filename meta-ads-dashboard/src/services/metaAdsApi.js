@@ -1078,31 +1078,50 @@ class MetaAdsService {
     }
   }
 
-  // Obtener páginas de un Business específico (owned + client pages)
-  async getBusinessPages(businessId) {
+  // Obtener páginas que pueden publicar anuncios en una cuenta publicitaria
+  async getAdAccountPages(adAccountId) {
+    const normalizedId = adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`;
+    const fields = 'id,name,access_token,website,instagram_business_account{id,username},business{id}';
     try {
-      const fields = 'id,name,access_token,website,instagram_business_account{id,username},business{id}';
-      const [ownedResp, clientResp] = await Promise.all([
-        axios.get(`${META_API_BASE_URL}/${businessId}/owned_pages`, {
-          params: { access_token: this.accessToken, fields, limit: 100 }
-        }).catch(() => ({ data: { data: [] } })),
-        axios.get(`${META_API_BASE_URL}/${businessId}/client_pages`, {
-          params: { access_token: this.accessToken, fields, limit: 100 }
-        }).catch(() => ({ data: { data: [] } }))
-      ]);
-      const owned = ownedResp.data?.data || [];
-      const client = clientResp.data?.data || [];
-      // Dedup by id
-      const map = new Map();
-      [...owned, ...client].forEach(p => map.set(p.id, p));
-      const allPages = Array.from(map.values());
-      console.log(`Business ${businessId} pages: ${owned.length} owned, ${client.length} client, ${allPages.length} total`);
-      return { success: true, data: allPages };
-    } catch (error) {
-      const errorMsg = error.response?.data?.error?.message || error.message;
-      console.error('getBusinessPages error:', errorMsg);
-      return { success: false, error: errorMsg };
+      // promote_pages: páginas autorizadas para publicar en esta cuenta
+      const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/promote_pages`, {
+        params: { access_token: this.accessToken, fields, limit: 100 }
+      });
+      const promotePages = resp.data?.data || [];
+      console.log(`Ad account ${normalizedId} promote_pages: ${promotePages.length}`);
+      if (promotePages.length > 0) {
+        return { success: true, data: promotePages };
+      }
+    } catch (err) {
+      console.warn('promote_pages failed, trying fallback:', err.response?.data?.error?.message || err.message);
     }
+
+    // Fallback: buscar en /me/accounts y filtrar por business
+    try {
+      const accountData = await axios.get(`${META_API_BASE_URL}/${normalizedId}`, {
+        params: { access_token: this.accessToken, fields: 'business{id}' }
+      });
+      const businessId = accountData.data?.business?.id;
+      if (businessId) {
+        const [ownedResp, clientResp] = await Promise.all([
+          axios.get(`${META_API_BASE_URL}/${businessId}/owned_pages`, {
+            params: { access_token: this.accessToken, fields, limit: 100 }
+          }).catch(() => ({ data: { data: [] } })),
+          axios.get(`${META_API_BASE_URL}/${businessId}/client_pages`, {
+            params: { access_token: this.accessToken, fields, limit: 100 }
+          }).catch(() => ({ data: { data: [] } }))
+        ]);
+        const map = new Map();
+        [...(ownedResp.data?.data || []), ...(clientResp.data?.data || [])].forEach(p => map.set(p.id, p));
+        const allPages = Array.from(map.values());
+        console.log(`Business ${businessId} pages: ${allPages.length} total`);
+        if (allPages.length > 0) return { success: true, data: allPages };
+      }
+    } catch (err) {
+      console.warn('Business pages fallback failed:', err.message);
+    }
+
+    return { success: true, data: [] };
   }
 
   // Obtener números de WhatsApp desde una página específica
