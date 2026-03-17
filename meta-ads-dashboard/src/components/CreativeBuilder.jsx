@@ -942,18 +942,23 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     loadPages();
   }, []);
 
+  // Filtrar páginas por negocio de la cuenta seleccionada
+  const accountBusinessId = (() => {
+    const accountData = adAccounts.find(a => a.id === selectedAccount);
+    return accountData?.business_id || accountData?.business?.id || null;
+  })();
+  const filteredPages = accountBusinessId
+    ? pages.filter(p => p.business?.id === accountBusinessId)
+    : [];
+  // Si no hay páginas del negocio, mostrar todas como fallback
+  const displayPages = filteredPages.length > 0 ? filteredPages : pages;
+
   // Auto-seleccionar página de Facebook según la cuenta publicitaria seleccionada
   useEffect(() => {
-    if (!pages.length) return;
-    const accountData = adAccounts.find(a => a.id === selectedAccount);
-    const businessId = accountData?.business_id || accountData?.business?.id || null;
-    // Buscar página del mismo negocio
-    const matchingPage = businessId
-      ? pages.find(p => p.business?.id === businessId)
-      : null;
-    // Si hay match usar esa; si no, usar la primera
-    setSelectedPage(matchingPage ? matchingPage.id : pages[0].id);
-  }, [selectedAccount, pages]);
+    if (!pages.length || !selectedAccount) { setSelectedPage(''); return; }
+    const matchingPage = filteredPages.length > 0 ? filteredPages[0] : null;
+    setSelectedPage(matchingPage ? matchingPage.id : '');
+  }, [selectedAccount, pages.length, accountBusinessId]);
 
   // Cargar números de WhatsApp Business del business de la cuenta publicitaria seleccionada
   useEffect(() => {
@@ -1619,10 +1624,10 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <CustomSelect
             value={selectedPage}
             onChange={(e) => setSelectedPage(e.target.value)}
-            placeholder="Selecciona una página"
+            placeholder={!selectedAccount ? 'Selecciona una cuenta publicitaria primero' : 'Selecciona una página'}
             loading={loadingPages}
-            disabled={loadingPages}
-            options={pages.map(page => ({
+            disabled={loadingPages || !selectedAccount}
+            options={displayPages.map(page => ({
               value: page.id,
               label: page.name
             }))}
