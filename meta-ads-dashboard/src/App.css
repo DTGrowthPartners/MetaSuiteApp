@@ -178,15 +178,11 @@ body {
   gap: 10px;
 }
 
-.nav-logo-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.nav-logo-img {
+  height: 28px;
+  width: auto;
   flex-shrink: 0;
-}
-
-.nav-logo-mark svg {
-  filter: drop-shadow(0 2px 8px rgba(74, 159, 255, 0.3));
+  filter: drop-shadow(0 2px 8px rgba(74, 159, 255, 0.2));
 }
 
 .nav-brand-text {

@@ -302,16 +302,9 @@ function App() {
       {/* Navigation Header */}
       <nav className="main-navigation">
         <div className="nav-brand">
-          <span className="nav-logo-mark">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <defs><linearGradient id="nav-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#4A9FFF"/><stop offset="100%" stopColor="#7C5CFC"/></linearGradient></defs>
-              <rect width="32" height="32" rx="8" fill="url(#nav-g)"/>
-              <text x="16" y="22" textAnchor="middle" fill="white" fontFamily="Inter,system-ui,sans-serif" fontWeight="800" fontSize="18">M</text>
-            </svg>
-          </span>
+          <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" className="nav-logo-img" />
           <div className="nav-brand-text">
             <span className="nav-title">MetaSuite</span>
-            <span className="nav-subtitle">by DT Growth Partners</span>
           </div>
         </div>
         <div className="nav-info">
