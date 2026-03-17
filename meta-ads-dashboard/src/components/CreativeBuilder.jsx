@@ -2591,21 +2591,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       >
                         Múltiples Anuncios por conjunto
                       </button>
-                      {selectedLibraryMedia.length > 1 && (
-                        <button
-                          type="button"
-                          className="toggle-btn active"
-                          onClick={() => handleApplyLibrarySelection(adIndex)}
-                          style={{ marginLeft: 'auto', borderColor: 'var(--success)', color: 'var(--success)', background: 'rgba(52, 211, 153, 0.15)' }}
-                        >
-                          Aplicar ({selectedLibraryMedia.length})
-                        </button>
-                      )}
                     </div>
                     <p className="hint mb-sm" style={{ fontSize: '10px' }}>
                       {libraryMode === 'single'
                         ? 'Haz click para seleccionar el contenido de este ad.'
-                        : 'Selecciona varios y haz click en "Aplicar" para crear 1 ad por cada uno.'}
+                        : 'Selecciona varios y haz click en "Generar anuncios" para crear 1 ad por cada uno.'}
                     </p>
                     {loadingMedia ? (
                       <p className="text-muted" style={{ textAlign: 'center', fontSize: '13px' }}>Cargando biblioteca...</p>
@@ -2711,6 +2701,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                           </>
                         )}
                       </>
+                    )}
+
+                    {/* Botón sticky de generar anuncios */}
+                    {libraryMode === 'per-ad' && selectedLibraryMedia.length > 1 && (
+                      <div style={{
+                        position: 'sticky',
+                        bottom: 0,
+                        zIndex: 10,
+                        padding: '12px 0 4px',
+                        background: 'linear-gradient(transparent, var(--bg-card) 30%)'
+                      }}>
+                        <button
+                          type="button"
+                          className="submit-button"
+                          onClick={() => handleApplyLibrarySelection(adIndex)}
+                          style={{ width: '100%', padding: '12px 20px', fontSize: '14px' }}
+                        >
+                          Generar anuncios ({selectedLibraryMedia.length})
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
