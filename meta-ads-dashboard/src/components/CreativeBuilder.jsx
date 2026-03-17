@@ -64,7 +64,10 @@ function TemplateSelector({ onSelectTemplate }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   const categories = getCategories();
-  const filteredTemplates = getTemplatesByCategory(selectedCategory);
+  const colorOrder = { OUTCOME_LEADS: 0, OUTCOME_TRAFFIC: 1, OUTCOME_AWARENESS: 1, OUTCOME_SALES: 2, OUTCOME_ENGAGEMENT: 2 };
+  const filteredTemplates = getTemplatesByCategory(selectedCategory)
+    .slice()
+    .sort((a, b) => (colorOrder[a.objective] ?? 1) - (colorOrder[b.objective] ?? 1));
 
   // Función para obtener badges de requisitos
   const getRequirementBadges = (template) => {
