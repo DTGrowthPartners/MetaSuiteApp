@@ -7,13 +7,11 @@ import { LogOut, Loader2 } from 'lucide-react';
 import './App.css';
 
 // ============================================
-// SPLASH SCREEN - Animated loading
+// PARTICLE BACKGROUND - Reusable canvas
 // ============================================
-function SplashScreen({ onFinish }) {
-  const [phase, setPhase] = useState('enter'); // enter → hold → exit
+function ParticleBackground() {
   const canvasRef = useRef(null);
 
-  // Particle animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -21,21 +19,28 @@ function SplashScreen({ onFinish }) {
     const dpr = window.devicePixelRatio || 1;
     let w = window.innerWidth;
     let h = window.innerHeight;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    ctx.scale(dpr, dpr);
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
+
+    const resize = () => {
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    };
+    resize();
+    window.addEventListener('resize', resize);
 
     const particles = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 50; i++) {
       particles.push({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.8,
-        vy: (Math.random() - 0.5) * 0.8,
-        r: Math.random() * 2 + 0.5,
-        opacity: Math.random() * 0.5 + 0.1
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: Math.random() * 1.5 + 0.5,
+        opacity: Math.random() * 0.4 + 0.08
       });
     }
 
@@ -54,17 +59,16 @@ function SplashScreen({ onFinish }) {
         ctx.fillStyle = `rgba(74, 159, 255, ${p.opacity})`;
         ctx.fill();
       });
-      // Draw connections
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
+          if (dist < 140) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(74, 159, 255, ${0.08 * (1 - dist / 120)})`;
+            ctx.strokeStyle = `rgba(74, 159, 255, ${0.06 * (1 - dist / 140)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -73,10 +77,18 @@ function SplashScreen({ onFinish }) {
       rafId = requestAnimationFrame(draw);
     };
     draw();
-    return () => cancelAnimationFrame(rafId);
+    return () => { cancelAnimationFrame(rafId); window.removeEventListener('resize', resize); };
   }, []);
 
-  // Timing
+  return <canvas ref={canvasRef} className="particle-bg" />;
+}
+
+// ============================================
+// SPLASH SCREEN - Animated loading
+// ============================================
+function SplashScreen({ onFinish }) {
+  const [phase, setPhase] = useState('enter');
+
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('hold'), 100);
     const t2 = setTimeout(() => setPhase('exit'), 2200);
@@ -86,7 +98,7 @@ function SplashScreen({ onFinish }) {
 
   return (
     <div className={`splash-screen splash-${phase}`}>
-      <canvas ref={canvasRef} className="splash-particles" />
+      <ParticleBackground />
       <div className="splash-content">
         <div className="splash-logo-wrapper">
           <div className="splash-glow" />
@@ -299,6 +311,7 @@ function App() {
 
   return (
     <div className="app">
+      <ParticleBackground />
       {/* Navigation Header */}
       <nav className="main-navigation">
         <div className="nav-brand">
