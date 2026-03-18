@@ -44,9 +44,9 @@ const SOURCES = [
     label: 'Video',
     icon: Video,
     color: '#FF6B35',
-    sourceType: 'video',
+    sourceType: 'page', // Video usa la página como source
     maxDays: 365,
-    noSource: true, // No requiere seleccionar fuente — Meta usa todos los videos de la cuenta
+    needsPage: true,
     events: [
       { value: 'video_watched_3s', label: 'Personas que vieron al menos 3 segundos' },
       { value: 'video_watched_10s', label: 'Personas que vieron al menos 10 segundos' },
@@ -251,8 +251,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
 
   const handleCreate = async () => {
     if (!audienceName.trim()) { setError('Ingresa un nombre para el público'); return; }
-    if (selectedSource.id === 'video' && selectedVideos.length === 0) { setError('Selecciona al menos un video'); return; }
-    if (selectedSource.id !== 'video' && !sourceId) { setError('Selecciona una fuente'); return; }
+    if (!sourceId) { setError('Selecciona una fuente'); return; }
     if (!selectedEvent) { setError('Selecciona un evento'); return; }
 
     setCreating(true);
@@ -264,7 +263,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
       createResult = await metaService.createVideoAudience(selectedAccount, {
         name: audienceName.trim(),
         description: audienceDescription.trim() || null,
-        videoIds: selectedVideos.map(v => v.id),
+        sourceId,
         event: selectedEvent,
         retentionDays
       });
@@ -445,62 +444,17 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                   label: p.name || p.id
                 }))}
               />
-            ) : selectedSource.id === 'video' ? (
+            ) : selectedSource.needsPage ? (
               <>
-                <p className="hint" style={{ marginBottom: '8px' }}>Selecciona los videos que quieres incluir en el público</p>
-                {loadingVideos ? (
-                  <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: '6px' }} /> Cargando videos...
-                  </div>
-                ) : adVideos.length === 0 ? (
-                  <p className="hint">No se encontraron videos en esta cuenta</p>
-                ) : (
-                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '4px' }}>
-                    {adVideos.map(video => {
-                      const isSelected = selectedVideos.some(v => v.id === video.id);
-                      return (
-                        <div
-                          key={video.id}
-                          onClick={() => {
-                            setSelectedVideos(prev => isSelected
-                              ? prev.filter(v => v.id !== video.id)
-                              : [...prev, video]
-                            );
-                          }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '10px',
-                            padding: '8px', cursor: 'pointer', borderRadius: '4px',
-                            background: isSelected ? 'rgba(59,130,246,0.12)' : 'transparent',
-                            borderBottom: '1px solid rgba(255,255,255,0.03)'
-                          }}
-                        >
-                          <div style={{
-                            width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0,
-                            border: isSelected ? 'none' : '2px solid var(--text-muted)',
-                            background: isSelected ? 'var(--accent)' : 'transparent',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}>
-                            {isSelected && <Check size={12} style={{ color: '#fff' }} />}
-                          </div>
-                          {video.thumbnail && (
-                            <img src={video.thumbnail} alt="" style={{ width: 40, height: 40, borderRadius: '4px', objectFit: 'cover', flexShrink: 0 }} />
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '12px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {video.title}
-                            </div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>ID: {video.id}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {selectedVideos.length > 0 && (
-                  <p className="hint mt-sm" style={{ color: 'var(--accent)' }}>
-                    {selectedVideos.length} video{selectedVideos.length > 1 ? 's' : ''} seleccionado{selectedVideos.length > 1 ? 's' : ''}
-                  </p>
-                )}
+                <p className="hint" style={{ marginBottom: '4px' }}>Incluye todos los videos publicados desde esta página</p>
+                <CustomSelect
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  loading={loadingSource}
+                  searchable
+                  placeholder={accountPages.length === 0 ? 'No se encontraron páginas' : 'Selecciona página de Facebook'}
+                  options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
+                />
               </>
             ) : selectedSource.id === 'leads' ? (
               <>
@@ -613,7 +567,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
             type="button"
             className="submit-button"
             onClick={handleCreate}
-            disabled={creating || (selectedSource?.id === 'video' ? selectedVideos.length === 0 : !sourceId) || !selectedEvent || !audienceName.trim()}
+            disabled={creating || !sourceId || !selectedEvent || !audienceName.trim()}
             style={{ marginTop: '16px' }}
           >
             {creating ? (

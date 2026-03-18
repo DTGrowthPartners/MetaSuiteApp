@@ -961,19 +961,17 @@ class MetaAdsService {
   }
 
   // Crear Custom Audience de Video
-  async createVideoAudience(adAccountId, { name, description, videoIds, event, retentionDays }) {
+  async createVideoAudience(adAccountId, { name, description, sourceId, event, retentionDays }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
       const retentionSeconds = retentionDays * 86400;
 
-      // Cada video es un event_source con type: "video"
-      const eventSources = videoIds.map(id => ({ type: 'video', id }));
-
+      // Video usa page como event_source (cubre todos los videos de la página)
       const rule = {
         inclusions: {
           operator: 'or',
           rules: [{
-            event_sources: eventSources,
+            event_sources: [{ type: 'page', id: sourceId }],
             retention_seconds: retentionSeconds,
             filter: {
               operator: 'and',
@@ -988,7 +986,7 @@ class MetaAdsService {
         }
       };
 
-      console.log('Creating video audience:', { name, videoIds, event, retentionDays });
+      console.log('Creating video audience:', { name, sourceId, event, retentionDays });
       console.log('Video Rule JSON:', JSON.stringify(rule));
 
       const params = new URLSearchParams();
