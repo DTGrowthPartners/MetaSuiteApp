@@ -933,21 +933,15 @@ class MetaAdsService {
         }
       };
 
+      const ruleStr = JSON.stringify(rule);
       console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
-      console.log('Rule JSON:', JSON.stringify(rule, null, 2));
+      console.log('Rule JSON:', ruleStr);
 
-      // Enviar como JSON con Content-Type: application/json
-      const body = {
-        name,
-        subtype: 'ENGAGEMENT',
-        rule,
-        access_token: this.accessToken
-      };
-      if (description) body.description = description;
-
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, body, {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // Meta requiere rule como string JSON, no como objeto
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`,
+        `name=${encodeURIComponent(name)}&subtype=ENGAGEMENT&rule=${encodeURIComponent(ruleStr)}&prefill=1&access_token=${this.accessToken}${description ? '&description=' + encodeURIComponent(description) : ''}`,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
@@ -981,20 +975,14 @@ class MetaAdsService {
         }
       };
 
+      const ruleStr = JSON.stringify(rule);
       console.log('Creating video audience:', { name, sourceId, sourceType, event, retentionDays });
-      console.log('Video Rule JSON:', JSON.stringify(rule, null, 2));
+      console.log('Video Rule JSON:', ruleStr);
 
-      const body = {
-        name,
-        subtype: 'ENGAGEMENT',
-        rule,
-        access_token: this.accessToken
-      };
-      if (description) body.description = description;
-
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, body, {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`,
+        `name=${encodeURIComponent(name)}&subtype=ENGAGEMENT&rule=${encodeURIComponent(ruleStr)}&prefill=1&access_token=${this.accessToken}${description ? '&description=' + encodeURIComponent(description) : ''}`,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
