@@ -46,7 +46,7 @@ const SOURCES = [
     color: '#FF6B35',
     sourceType: 'video',
     maxDays: 365,
-    needsVideoSource: true,
+    noSource: true, // No requiere seleccionar fuente — Meta usa todos los videos de la cuenta
     events: [
       { value: 'video_watched_3s', label: 'Personas que vieron al menos 3 segundos' },
       { value: 'video_watched_10s', label: 'Personas que vieron al menos 10 segundos' },
@@ -219,7 +219,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
 
   const handleCreate = async () => {
     if (!audienceName.trim()) { setError('Ingresa un nombre para el público'); return; }
-    if (!sourceId) { setError('Selecciona una fuente'); return; }
+    if (!selectedSource.noSource && !sourceId) { setError('Selecciona una fuente'); return; }
     if (!selectedEvent) { setError('Selecciona un evento'); return; }
 
     setCreating(true);
@@ -231,8 +231,6 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
       createResult = await metaService.createVideoAudience(selectedAccount, {
         name: audienceName.trim(),
         description: audienceDescription.trim() || null,
-        sourceId,
-        sourceType: selectedVideoSource === 'ig' ? 'ig_business' : 'page',
         event: selectedEvent,
         retentionDays
       });
@@ -412,50 +410,10 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                   label: p.name || p.id
                 }))}
               />
-            ) : selectedSource.id === 'video' ? (
-              <>
-                <div className="toggle-group" style={{ marginBottom: '10px' }}>
-                  <button type="button" className={`toggle-btn ${selectedVideoSource === 'page' ? 'active' : ''}`} onClick={() => { setSelectedVideoSource('page'); setSourceId(''); }}>
-                    <Globe size={14} style={{ marginRight: '4px' }} /> Página de Facebook
-                  </button>
-                  <button type="button" className={`toggle-btn ${selectedVideoSource === 'ig' ? 'active' : ''}`} onClick={() => { setSelectedVideoSource('ig'); setSourceId(''); }}>
-                    <Instagram size={14} style={{ marginRight: '4px' }} /> Instagram
-                  </button>
-                </div>
-                {selectedVideoSource === 'page' ? (
-                  <CustomSelect
-                    value={sourceId}
-                    onChange={(e) => setSourceId(e.target.value)}
-                    loading={loadingSource}
-                    searchable
-                    placeholder="Selecciona página de Facebook"
-                    options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
-                  />
-                ) : (
-                  <>
-                    <CustomSelect
-                      value={selectedPageForIg}
-                      onChange={(e) => { setSelectedPageForIg(e.target.value); setSourceId(''); setIgAccounts([]); }}
-                      loading={loadingSource}
-                      searchable
-                      placeholder="Primero selecciona la página de Facebook"
-                      options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
-                    />
-                    {selectedPageForIg && (
-                      <div style={{ marginTop: '8px' }}>
-                        <CustomSelect
-                          value={sourceId}
-                          onChange={(e) => setSourceId(e.target.value)}
-                          loading={loadingIg}
-                          searchable
-                          placeholder={loadingIg ? 'Cargando...' : igAccounts.length === 0 ? 'No se encontraron cuentas de IG' : 'Selecciona cuenta de Instagram'}
-                          options={igAccounts.map(ig => ({ value: ig.id, label: ig.username ? `@${ig.username}` : ig.id }))}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
+            ) : selectedSource.noSource ? (
+              <p className="hint" style={{ padding: '8px 0' }}>
+                Meta incluirá automáticamente todos los videos publicados en la cuenta publicitaria.
+              </p>
             ) : selectedSource.id === 'leads' ? (
               <>
                 <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Página del formulario</label>
