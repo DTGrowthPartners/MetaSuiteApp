@@ -940,9 +940,9 @@ class MetaAdsService {
       const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, {
         params: {
           name,
+          subtype: 'ENGAGEMENT',
           rule: ruleStr,
           prefill: 1,
-          customer_file_source: 'USER_PROVIDED_ONLY',
           access_token: this.accessToken,
           ...(description ? { description } : {})
         }
