@@ -992,15 +992,17 @@ class MetaAdsService {
       const ruleStr = JSON.stringify(rule);
       console.log('Video Rule JSON:', ruleStr);
 
+      // Intentar con subtype VIDEO en v21.0
       const params = new URLSearchParams();
       params.append('name', name);
+      params.append('subtype', 'VIDEO');
       params.append('rule', ruleStr);
       params.append('prefill', 'true');
       params.append('access_token', this.accessToken);
       if (description) params.append('description', description);
 
       const resp = await axios.post(
-        `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
+        `https://graph.facebook.com/v21.0/${normalizedId}/customaudiences`,
         params.toString(),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
