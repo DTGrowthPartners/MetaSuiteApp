@@ -937,16 +937,15 @@ class MetaAdsService {
       console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
       console.log('Rule JSON:', ruleStr);
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, {
-        params: {
-          name,
-          subtype: 'ENGAGEMENT',
-          rule: ruleStr,
-          prefill: 1,
-          access_token: this.accessToken,
-          ...(description ? { description } : {})
-        }
-      });
+      // Enviar como FormData (multipart) — igual que curl -F de la documentación de Meta
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('rule', ruleStr);
+      formData.append('prefill', '1');
+      formData.append('access_token', this.accessToken);
+      if (description) formData.append('description', description);
+
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
