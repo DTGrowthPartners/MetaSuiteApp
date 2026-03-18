@@ -933,15 +933,15 @@ class MetaAdsService {
         }
       };
 
-      const params = {
-        name,
-        rule: JSON.stringify(rule),
-        prefill: 1,
-        access_token: this.accessToken
-      };
-      if (description) params.description = description;
+      const formData = new URLSearchParams();
+      formData.append('name', name);
+      formData.append('subtype', 'ENGAGEMENT');
+      formData.append('rule', JSON.stringify(rule));
+      formData.append('prefill', '1');
+      formData.append('access_token', this.accessToken);
+      if (description) formData.append('description', description);
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, { params });
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
       return { success: true, data: resp.data };
     } catch (error) {
       const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
@@ -969,16 +969,15 @@ class MetaAdsService {
         }
       };
 
-      const params = {
-        name,
-        subtype: 'ENGAGEMENT',
-        rule: JSON.stringify(rule),
-        prefill: 1,
-        access_token: this.accessToken
-      };
-      if (description) params.description = description;
+      const formData = new URLSearchParams();
+      formData.append('name', name);
+      formData.append('subtype', 'ENGAGEMENT');
+      formData.append('rule', JSON.stringify(rule));
+      formData.append('prefill', '1');
+      formData.append('access_token', this.accessToken);
+      if (description) formData.append('description', description);
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, { params });
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
       return { success: true, data: resp.data };
     } catch (error) {
       const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
