@@ -909,6 +909,99 @@ class MetaAdsService {
     }
   }
 
+  // ============================================
+  // CREAR PÚBLICOS PERSONALIZADOS (CUSTOM AUDIENCES)
+  // ============================================
+
+  // Crear Custom Audience de Engagement (Instagram, Facebook Page, Leads)
+  async createEngagementAudience(adAccountId, { name, description, sourceType, sourceId, event, retentionDays }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      const retentionSeconds = retentionDays * 86400;
+
+      const rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ id: sourceId, type: sourceType }],
+            retention_seconds: retentionSeconds,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: event }]
+            }
+          }]
+        }
+      };
+
+      const params = {
+        name,
+        rule: JSON.stringify(rule),
+        prefill: 1,
+        access_token: this.accessToken
+      };
+      if (description) params.description = description;
+
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, { params });
+      return { success: true, data: resp.data };
+    } catch (error) {
+      const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
+      return { success: false, error: errMsg };
+    }
+  }
+
+  // Crear Custom Audience de Video
+  async createVideoAudience(adAccountId, { name, description, sourceId, sourceType, event, retentionDays }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      const retentionSeconds = retentionDays * 86400;
+
+      const rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ id: sourceId, type: sourceType || 'video' }],
+            retention_seconds: retentionSeconds,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: event }]
+            }
+          }]
+        }
+      };
+
+      const params = {
+        name,
+        subtype: 'ENGAGEMENT',
+        rule: JSON.stringify(rule),
+        prefill: 1,
+        access_token: this.accessToken
+      };
+      if (description) params.description = description;
+
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, { params });
+      return { success: true, data: resp.data };
+    } catch (error) {
+      const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
+      return { success: false, error: errMsg };
+    }
+  }
+
+  // Obtener formularios de leads de una página
+  async getLeadForms(pageId) {
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/${pageId}/leadgen_forms`, {
+        params: {
+          access_token: this.accessToken,
+          fields: 'id,name,status,created_time',
+          limit: 50
+        }
+      });
+      return { success: true, data: resp.data.data || [] };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
   // Buscar intereses para targeting (Advantage+ detailed targeting)
   async searchInterests(query) {
     try {

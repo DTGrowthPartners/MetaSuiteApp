@@ -1,0 +1,512 @@
+import { useState, useEffect } from 'react';
+import MetaAdsService from '../services/metaAdsApi';
+import CustomSelect from './ui/CustomSelect';
+import {
+  Users, Instagram, MessageSquare, Video, ClipboardList,
+  ArrowLeft, Check, Loader2, AlertCircle, Globe
+} from 'lucide-react';
+
+// Fuentes de engagement
+const SOURCES = [
+  {
+    id: 'instagram',
+    label: 'Cuenta de Instagram',
+    icon: Instagram,
+    color: '#E4405F',
+    sourceType: 'ig_business',
+    maxDays: 730,
+    events: [
+      { value: 'ig_business_profile_all', label: 'Todos los que interactuaron con la cuenta' },
+      { value: 'ig_business_profile_visit', label: 'Personas que visitaron el perfil' },
+      { value: 'ig_business_profile_engaged', label: 'Personas que interactuaron con contenido o anuncios' },
+      { value: 'ig_business_profile_ad_saved', label: 'Personas que guardaron un post o anuncio' },
+      { value: 'ig_user_messaged_business', label: 'Personas que enviaron un mensaje' },
+    ]
+  },
+  {
+    id: 'page',
+    label: 'Página de Facebook',
+    icon: Globe,
+    color: '#1877F2',
+    sourceType: 'page',
+    maxDays: 730,
+    events: [
+      { value: 'page_engaged', label: 'Todos los que interactuaron con la página' },
+      { value: 'page_visited', label: 'Personas que visitaron la página' },
+      { value: 'page_messaged', label: 'Personas que enviaron un mensaje' },
+      { value: 'page_cta_clicked', label: 'Personas que hicieron clic en un botón CTA' },
+      { value: 'page_or_post_save', label: 'Personas que guardaron la página o un post' },
+      { value: 'page_post_interaction', label: 'Personas que reaccionaron, compartieron o comentaron' },
+    ]
+  },
+  {
+    id: 'video',
+    label: 'Video',
+    icon: Video,
+    color: '#FF6B35',
+    sourceType: 'video',
+    maxDays: 365,
+    needsVideoSource: true,
+    events: [
+      { value: 'video_view_3s', label: 'Personas que vieron al menos 3 segundos' },
+      { value: 'video_view_10s', label: 'Personas que vieron al menos 10 segundos' },
+      { value: 'video_view_15s', label: 'Personas que vieron ThruPlay (15 segundos)' },
+      { value: 'video_view_p25', label: 'Personas que vieron el 25% del video' },
+      { value: 'video_view_p50', label: 'Personas que vieron el 50% del video' },
+      { value: 'video_view_p75', label: 'Personas que vieron el 75% del video' },
+      { value: 'video_view_p95', label: 'Personas que vieron el 95% del video' },
+    ]
+  },
+  {
+    id: 'leads',
+    label: 'Formularios de Leads',
+    icon: ClipboardList,
+    color: '#10B981',
+    sourceType: 'lead',
+    maxDays: 90,
+    needsLeadForm: true,
+    events: [
+      { value: 'lead_generation_submitted', label: 'Personas que completaron y enviaron el formulario' },
+      { value: 'lead_generation_opened', label: 'Personas que abrieron el formulario' },
+      { value: 'lead_generation_dropoff', label: 'Personas que abrieron pero no enviaron' },
+    ]
+  }
+];
+
+export default function AudienceCreator({ accessToken, adAccounts, pages, onBack }) {
+  // Step: 'account' → 'source' → 'config' → 'done'
+  const [step, setStep] = useState('account');
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [selectedSource, setSelectedSource] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState('');
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [audienceName, setAudienceName] = useState('');
+  const [audienceDescription, setAudienceDescription] = useState('');
+
+  // Source-specific
+  const [sourceId, setSourceId] = useState(''); // IG account ID, Page ID, etc.
+  const [igAccounts, setIgAccounts] = useState([]);
+  const [accountPages, setAccountPages] = useState([]);
+  const [leadForms, setLeadForms] = useState([]);
+  const [loadingSource, setLoadingSource] = useState(false);
+  const [selectedVideoSource, setSelectedVideoSource] = useState('page'); // 'page' or 'ig'
+
+  // Create state
+  const [creating, setCreating] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  // Load pages and IG accounts when account is selected
+  useEffect(() => {
+    if (!selectedAccount || !accessToken) return;
+    const loadAccountData = async () => {
+      setLoadingSource(true);
+      const metaService = new MetaAdsService(accessToken);
+
+      // Load promote_pages for this ad account
+      try {
+        const normalizedId = metaService.normalizeAccountId(selectedAccount);
+        const pagesResp = await fetch(
+          `https://graph.facebook.com/v21.0/${normalizedId}/promote_pages?fields=id,name,picture&access_token=${accessToken}&limit=50`
+        );
+        const pagesData = await pagesResp.json();
+        setAccountPages(pagesData.data || []);
+      } catch (e) {
+        console.error('Error loading pages:', e);
+        setAccountPages([]);
+      }
+
+      // Load IG accounts
+      try {
+        const igResult = await metaService.getInstagramAccountsFromAdAccount(selectedAccount);
+        setIgAccounts(igResult.success ? (igResult.data || []) : []);
+      } catch (e) {
+        setIgAccounts([]);
+      }
+
+      setLoadingSource(false);
+    };
+    loadAccountData();
+  }, [selectedAccount, accessToken]);
+
+  // Load lead forms when source is leads and page is selected
+  useEffect(() => {
+    if (selectedSource?.id !== 'leads' || !sourceId || !accessToken) return;
+    const loadForms = async () => {
+      setLoadingSource(true);
+      const metaService = new MetaAdsService(accessToken);
+      const result = await metaService.getLeadForms(sourceId);
+      setLeadForms(result.success ? result.data : []);
+      setLoadingSource(false);
+    };
+    loadForms();
+  }, [selectedSource, sourceId, accessToken]);
+
+  // Auto-generate name
+  useEffect(() => {
+    if (!selectedSource || !selectedEvent) return;
+    const eventLabel = selectedSource.events.find(e => e.value === selectedEvent)?.label || '';
+    const shortLabel = eventLabel.replace('Personas que ', '').substring(0, 40);
+    setAudienceName(`${shortLabel} - ${retentionDays}d`);
+  }, [selectedSource, selectedEvent, retentionDays]);
+
+  const handleCreate = async () => {
+    if (!audienceName.trim()) { setError('Ingresa un nombre para el público'); return; }
+    if (!sourceId) { setError('Selecciona una fuente'); return; }
+    if (!selectedEvent) { setError('Selecciona un evento'); return; }
+
+    setCreating(true);
+    setError('');
+    const metaService = new MetaAdsService(accessToken);
+
+    let createResult;
+    if (selectedSource.id === 'video') {
+      createResult = await metaService.createVideoAudience(selectedAccount, {
+        name: audienceName.trim(),
+        description: audienceDescription.trim() || null,
+        sourceId,
+        sourceType: selectedVideoSource === 'ig' ? 'ig_business' : 'page',
+        event: selectedEvent,
+        retentionDays
+      });
+    } else {
+      createResult = await metaService.createEngagementAudience(selectedAccount, {
+        name: audienceName.trim(),
+        description: audienceDescription.trim() || null,
+        sourceType: selectedSource.sourceType,
+        sourceId,
+        event: selectedEvent,
+        retentionDays
+      });
+    }
+
+    setCreating(false);
+    if (createResult.success) {
+      setResult(createResult.data);
+      setStep('done');
+    } else {
+      setError(createResult.error);
+    }
+  };
+
+  const accountOptions = (adAccounts || []).map(acc => ({
+    value: acc.id,
+    label: `${acc.name || acc.id} (${acc.id})`
+  }));
+
+  const resetForm = () => {
+    setStep('source');
+    setSelectedSource(null);
+    setSelectedEvent('');
+    setRetentionDays(30);
+    setAudienceName('');
+    setAudienceDescription('');
+    setSourceId('');
+    setResult(null);
+    setError('');
+  };
+
+  return (
+    <div className="builder-content" style={{ maxWidth: '700px', margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+        <button
+          type="button"
+          onClick={step === 'account' ? onBack : step === 'source' ? () => setStep('account') : step === 'config' ? () => setStep('source') : resetForm}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Crear Público Personalizado</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+            {step === 'account' ? 'Selecciona la cuenta publicitaria' : step === 'source' ? 'Elige el origen del público' : step === 'config' ? 'Configura el público' : 'Público creado'}
+          </p>
+        </div>
+      </div>
+
+      {/* Step 1: Account Selection */}
+      {step === 'account' && (
+        <div className="section-card">
+          <h4><span className="section-icon"><Users size={18} /></span> Cuenta Publicitaria</h4>
+          <div className="form-group">
+            <label>Selecciona la cuenta donde se creará el público</label>
+            <CustomSelect
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              searchable
+              placeholder="Selecciona una cuenta publicitaria"
+              options={accountOptions}
+            />
+          </div>
+          {selectedAccount && (
+            <button
+              type="button"
+              className="submit-button"
+              onClick={() => setStep('source')}
+              style={{ marginTop: '16px' }}
+            >
+              Continuar
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Step 2: Source Selection */}
+      {step === 'source' && (
+        <div className="section-card">
+          <h4><span className="section-icon"><MessageSquare size={18} /></span> Orígenes de Meta</h4>
+          <p className="hint" style={{ marginBottom: '16px' }}>Selecciona el tipo de interacción para crear tu público</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+            {SOURCES.map((source) => {
+              const Icon = source.icon;
+              return (
+                <button
+                  key={source.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSource(source);
+                    setSelectedEvent('');
+                    setSourceId('');
+                    setStep('config');
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '14px 16px', borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border-light)',
+                    color: 'var(--text-primary)', cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'left'
+                  }}
+                  className="custom-select-option"
+                >
+                  <Icon size={20} style={{ color: source.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{source.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Configure */}
+      {step === 'config' && selectedSource && (
+        <div className="section-card">
+          <h4>
+            <span className="section-icon">
+              {(() => { const Icon = selectedSource.icon; return <Icon size={18} style={{ color: selectedSource.color }} />; })()}
+            </span>
+            {selectedSource.label}
+          </h4>
+
+          {/* Source selector: IG account or Page */}
+          <div className="form-group">
+            <label>Origen</label>
+            {selectedSource.id === 'instagram' ? (
+              <CustomSelect
+                value={sourceId}
+                onChange={(e) => setSourceId(e.target.value)}
+                loading={loadingSource}
+                searchable
+                placeholder={igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Selecciona cuenta de Instagram'}
+                options={igAccounts.map(ig => ({
+                  value: ig.id,
+                  label: ig.username ? `@${ig.username}` : ig.id
+                }))}
+              />
+            ) : selectedSource.id === 'page' ? (
+              <CustomSelect
+                value={sourceId}
+                onChange={(e) => setSourceId(e.target.value)}
+                loading={loadingSource}
+                searchable
+                placeholder={accountPages.length === 0 ? 'No se encontraron páginas' : 'Selecciona página de Facebook'}
+                options={accountPages.map(p => ({
+                  value: p.id,
+                  label: p.name || p.id
+                }))}
+              />
+            ) : selectedSource.id === 'video' ? (
+              <>
+                <div className="toggle-group" style={{ marginBottom: '10px' }}>
+                  <button type="button" className={`toggle-btn ${selectedVideoSource === 'page' ? 'active' : ''}`} onClick={() => { setSelectedVideoSource('page'); setSourceId(''); }}>
+                    <Globe size={14} style={{ marginRight: '4px' }} /> Página de Facebook
+                  </button>
+                  <button type="button" className={`toggle-btn ${selectedVideoSource === 'ig' ? 'active' : ''}`} onClick={() => { setSelectedVideoSource('ig'); setSourceId(''); }}>
+                    <Instagram size={14} style={{ marginRight: '4px' }} /> Instagram
+                  </button>
+                </div>
+                {selectedVideoSource === 'page' ? (
+                  <CustomSelect
+                    value={sourceId}
+                    onChange={(e) => setSourceId(e.target.value)}
+                    loading={loadingSource}
+                    searchable
+                    placeholder="Selecciona página de Facebook"
+                    options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
+                  />
+                ) : (
+                  <CustomSelect
+                    value={sourceId}
+                    onChange={(e) => setSourceId(e.target.value)}
+                    loading={loadingSource}
+                    searchable
+                    placeholder="Selecciona cuenta de Instagram"
+                    options={igAccounts.map(ig => ({ value: ig.id, label: ig.username ? `@${ig.username}` : ig.id }))}
+                  />
+                )}
+              </>
+            ) : selectedSource.id === 'leads' ? (
+              <>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Página del formulario</label>
+                <CustomSelect
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  loading={loadingSource}
+                  searchable
+                  placeholder="Selecciona página de Facebook"
+                  options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
+                />
+                {sourceId && leadForms.length > 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Formulario</label>
+                    <CustomSelect
+                      value={sourceId}
+                      onChange={(e) => setSourceId(e.target.value)}
+                      searchable
+                      placeholder="Selecciona formulario"
+                      options={leadForms.map(f => ({ value: f.id, label: f.name || f.id }))}
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+
+          {/* Event selector */}
+          <div className="form-group">
+            <label>Eventos</label>
+            <CustomSelect
+              value={selectedEvent}
+              onChange={(e) => setSelectedEvent(e.target.value)}
+              placeholder="Selecciona el tipo de interacción"
+              options={selectedSource.events.map(ev => ({
+                value: ev.value,
+                label: ev.label
+              }))}
+            />
+          </div>
+
+          {/* Retention days */}
+          <div className="form-group">
+            <label>Retención</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>En los últimos</span>
+              <input
+                type="number"
+                min={1}
+                max={selectedSource.maxDays}
+                value={retentionDays}
+                onChange={(e) => setRetentionDays(Math.min(parseInt(e.target.value) || 1, selectedSource.maxDays))}
+                style={{ width: '80px', textAlign: 'center' }}
+              />
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>días</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: 'auto' }}>Máx: {selectedSource.maxDays} días</span>
+            </div>
+            {/* Quick buttons */}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+              {[7, 14, 30, 60, 90, 180, 365].filter(d => d <= selectedSource.maxDays).map(days => (
+                <button
+                  key={days}
+                  type="button"
+                  className={`toggle-btn ${retentionDays === days ? 'active' : ''}`}
+                  onClick={() => setRetentionDays(days)}
+                  style={{ fontSize: '11px', padding: '3px 10px' }}
+                >
+                  {days}d
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Name & Description */}
+          <div className="form-group">
+            <label>Nombre del público *</label>
+            <input
+              type="text"
+              value={audienceName}
+              onChange={(e) => setAudienceName(e.target.value)}
+              placeholder="Ej: Interactuaron IG 30 días"
+              maxLength={50}
+            />
+            <p className="hint">{audienceName.length}/50</p>
+          </div>
+
+          <div className="form-group">
+            <label>Descripción (opcional)</label>
+            <input
+              type="text"
+              value={audienceDescription}
+              onChange={(e) => setAudienceDescription(e.target.value)}
+              placeholder="Descripción del público"
+              maxLength={100}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+              color: '#ef4444', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px'
+            }}>
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="submit-button"
+            onClick={handleCreate}
+            disabled={creating || !sourceId || !selectedEvent || !audienceName.trim()}
+            style={{ marginTop: '16px' }}
+          >
+            {creating ? (
+              <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Creando público...</>
+            ) : (
+              'Crear Público'
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Step 4: Done */}
+      {step === 'done' && result && (
+        <div className="section-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+          <div style={{
+            width: '56px', height: '56px', borderRadius: '50%',
+            background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px'
+          }}>
+            <Check size={28} style={{ color: '#10B981' }} />
+          </div>
+          <h3 style={{ color: 'var(--text-primary)', margin: '0 0 8px' }}>Público Creado</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 4px' }}>
+            <strong>{audienceName}</strong>
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '0 0 24px' }}>
+            ID: {result.id} · Meta está recopilando datos...
+          </p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button type="button" className="toggle-btn active" onClick={resetForm}>
+              Crear Otro Público
+            </button>
+            <button type="button" className="toggle-btn" onClick={onBack}>
+              Volver al Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

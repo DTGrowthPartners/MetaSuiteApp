@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import CreativeBuilder from './components/CreativeBuilder';
 import AccountDashboard from './components/AccountDashboard';
 import CampaignReport from './components/CampaignReport';
+import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
 import { LogOut, Loader2 } from 'lucide-react';
 import './App.css';
@@ -241,10 +242,20 @@ function App() {
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [accountsError, setAccountsError] = useState(null);
 
-  // Hash-based routing: #dashboard → AccountDashboard
-  const [page, setPage] = useState(() => window.location.hash === '#dashboard' ? 'dashboard' : 'main');
+  // Hash-based routing: #dashboard, #audiences → different views
+  const [page, setPage] = useState(() => {
+    const hash = window.location.hash;
+    if (hash === '#dashboard') return 'dashboard';
+    if (hash === '#audiences') return 'audiences';
+    return 'main';
+  });
   useEffect(() => {
-    const onHash = () => setPage(window.location.hash === '#dashboard' ? 'dashboard' : 'main');
+    const onHash = () => {
+      const hash = window.location.hash;
+      if (hash === '#dashboard') setPage('dashboard');
+      else if (hash === '#audiences') setPage('audiences');
+      else setPage('main');
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -320,6 +331,20 @@ function App() {
             <span className="nav-title">MetaSuite</span>
           </div>
         </div>
+        <div className="nav-links">
+          <button
+            className={`nav-link ${page === 'main' && !reportSlug ? 'active' : ''}`}
+            onClick={() => { window.location.hash = ''; setPage('main'); }}
+          >
+            Campañas
+          </button>
+          <button
+            className={`nav-link ${page === 'audiences' ? 'active' : ''}`}
+            onClick={() => { window.location.hash = '#audiences'; setPage('audiences'); }}
+          >
+            Públicos
+          </button>
+        </div>
         <div className="nav-info">
           {loadingAccounts ? (
             <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</span>
@@ -358,6 +383,12 @@ function App() {
           <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} />
         ) : page === 'dashboard' ? (
           <AccountDashboard
+            adAccounts={adAccounts}
+            onBack={() => { window.location.hash = ''; setPage('main'); }}
+          />
+        ) : page === 'audiences' ? (
+          <AudienceCreator
+            accessToken={accessToken}
             adAccounts={adAccounts}
             onBack={() => { window.location.hash = ''; setPage('main'); }}
           />
