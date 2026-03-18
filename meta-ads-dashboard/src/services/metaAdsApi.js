@@ -818,6 +818,94 @@ class MetaAdsService {
     return results;
   }
 
+  // ============================================
+  // BÚSQUEDA DE UBICACIONES E INTERESES
+  // ============================================
+
+  // Buscar ubicaciones para targeting (ciudades, regiones, países, etc.)
+  async searchLocations(query) {
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/search`, {
+        params: {
+          access_token: this.accessToken,
+          type: 'adgeolocation',
+          q: query,
+          location_types: JSON.stringify(['city', 'region', 'country', 'zip', 'geo_market', 'neighborhood']),
+          limit: 15
+        }
+      });
+      const results = (resp.data.data || []).map(loc => ({
+        key: loc.key,
+        name: loc.name,
+        type: loc.type,
+        country_code: loc.country_code,
+        country_name: loc.country_name,
+        region: loc.region,
+        supports_radius: loc.supports_radius || false,
+        // Para display
+        displayName: loc.type === 'country' ? loc.name
+          : loc.type === 'region' ? `${loc.name}, ${loc.country_name}`
+          : loc.type === 'city' ? `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
+          : `${loc.name}, ${loc.country_name}`
+      }));
+      return { success: true, data: results };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Buscar intereses para targeting (Advantage+ detailed targeting)
+  async searchInterests(query) {
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/search`, {
+        params: {
+          access_token: this.accessToken,
+          type: 'adinterest',
+          q: query,
+          limit: 20
+        }
+      });
+      const results = (resp.data.data || []).map(interest => ({
+        id: interest.id,
+        name: interest.name,
+        audience_size_lower_bound: interest.audience_size_lower_bound,
+        audience_size_upper_bound: interest.audience_size_upper_bound,
+        path: interest.path || [],
+        topic: interest.topic,
+        description: interest.description
+      }));
+      return { success: true, data: results };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Buscar comportamientos para targeting
+  async searchBehaviors(query) {
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/search`, {
+        params: {
+          access_token: this.accessToken,
+          type: 'adTargetingCategory',
+          class: 'behaviors',
+          q: query,
+          limit: 20
+        }
+      });
+      const results = (resp.data.data || []).map(b => ({
+        id: b.id,
+        name: b.name,
+        audience_size_lower_bound: b.audience_size_lower_bound,
+        audience_size_upper_bound: b.audience_size_upper_bound,
+        path: b.path || [],
+        description: b.description
+      }));
+      return { success: true, data: results };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
   // Obtener cuentas de Instagram desde el business de la cuenta publicitaria
   async getInstagramAccountsFromAdAccount(adAccountId) {
     try {

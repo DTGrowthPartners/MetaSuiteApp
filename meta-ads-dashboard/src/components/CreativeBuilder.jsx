@@ -17,7 +17,8 @@ import {
   Megaphone, Globe, MessageCircle, ShoppingCart, Send,
   Smartphone, Camera, Tag, Image, Video, GalleryHorizontal,
   ChevronDown, Upload, Loader2, Check, AlertCircle, LogOut,
-  MessageSquare, Instagram, Phone, BarChart3, Plus, Trash2, X
+  MessageSquare, Instagram, Phone, BarChart3, Plus, Trash2, X,
+  MapPin, Search, Heart
 } from 'lucide-react';
 import CustomSelect from './ui/CustomSelect';
 import './CreativeBuilder.css';
@@ -669,6 +670,49 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [audienceError, setAudienceError] = useState('');
   // Múltiples públicos (replicar ads en varios AdSets con diferente público)
   const [multiAudiences, setMultiAudiences] = useState([]); // Array de { id, name, targeting, audienceType }
+  // Modo de público: 'saved' = público guardado, 'custom' = personalizado por ubicación
+  const [audienceMode, setAudienceMode] = useState('saved');
+  // Ubicaciones personalizadas
+  const [customLocations, setCustomLocations] = useState([]); // Array de { key, name, type, ... }
+  const [locationSearch, setLocationSearch] = useState('');
+  const [locationResults, setLocationResults] = useState([]);
+  const [searchingLocations, setSearchingLocations] = useState(false);
+  const [locationRadius, setLocationRadius] = useState(10); // Radio en KM
+  // Intereses personalizados
+  const [customInterests, setCustomInterests] = useState([]); // Array de { id, name, ... }
+  const [interestSearch, setInterestSearch] = useState('');
+  const [interestResults, setInterestResults] = useState([]);
+  const [searchingInterests, setSearchingInterests] = useState(false);
+  const locationSearchTimer = useRef(null);
+  const interestSearchTimer = useRef(null);
+
+  // Debounced location search
+  const handleLocationSearch = (query) => {
+    setLocationSearch(query);
+    if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current);
+    if (!query.trim() || query.length < 2) { setLocationResults([]); return; }
+    locationSearchTimer.current = setTimeout(async () => {
+      setSearchingLocations(true);
+      const metaService = new MetaAdsService(accessToken);
+      const result = await metaService.searchLocations(query);
+      if (result.success) setLocationResults(result.data);
+      setSearchingLocations(false);
+    }, 400);
+  };
+
+  // Debounced interest search
+  const handleInterestSearch = (query) => {
+    setInterestSearch(query);
+    if (interestSearchTimer.current) clearTimeout(interestSearchTimer.current);
+    if (!query.trim() || query.length < 2) { setInterestResults([]); return; }
+    interestSearchTimer.current = setTimeout(async () => {
+      setSearchingInterests(true);
+      const metaService = new MetaAdsService(accessToken);
+      const result = await metaService.searchInterests(query);
+      if (result.success) setInterestResults(result.data);
+      setSearchingInterests(false);
+    }, 400);
+  };
 
   // (headlines, descriptions, ctas are now per-ad in the ads array)
 
@@ -1352,6 +1396,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       return;
     }
 
+    if (audienceMode === 'custom' && customLocations.length === 0) {
+      setError('Por favor agrega al menos una ubicación para el público personalizado');
+      return;
+    }
+
     // Validar Instagram si el destino es Instagram Direct
     const effectiveDestForValidation = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
     if ((effectiveDestForValidation === 'INSTAGRAM_DIRECT' || templateRequirements.instagram) && !selectedIgAccount) {
@@ -1492,12 +1541,42 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         // Debug: log what WhatsApp values are being sent
         ...((() => { console.log('JOB WhatsApp values:', { whatsappNumber, selectedWhatsAppNumber, selectedInDropdown: whatsAppNumbers.find(n => String(n.id) === String(selectedWhatsAppNumber))?.display_phone_number }); return {}; })()),
         phoneNumber: phoneNumber.trim() || null,
-        // Público (puede ser null si no hay disponibles)
-        savedAudienceId: selectedAudience || null,
-        savedAudienceName: selectedAudienceData?.name || `Colombia ${ageMin}-${ageMax} (Por defecto)`,
-        savedAudienceTargeting: selectedAudienceData?.targeting || null,
-        audienceType: selectedAudienceData?.audienceType || 'default',
-        // Targeting personalizado
+        // Público
+        audienceMode: audienceMode,
+        savedAudienceId: audienceMode === 'saved' ? (selectedAudience || null) : null,
+        savedAudienceName: audienceMode === 'saved'
+          ? (selectedAudienceData?.name || `Colombia ${ageMin}-${ageMax} (Por defecto)`)
+          : (customLocations.length > 0 ? customLocations.map(l => l.displayName).join(', ') : `Colombia ${ageMin}-${ageMax}`),
+        savedAudienceTargeting: audienceMode === 'saved'
+          ? (selectedAudienceData?.targeting || null)
+          : (() => {
+              // Construir targeting object desde ubicaciones + intereses personalizados
+              const targeting = {};
+              if (customLocations.length > 0) {
+                const geoLocations = {};
+                const cities = customLocations.filter(l => l.type === 'city');
+                const regions = customLocations.filter(l => l.type === 'region');
+                const countries = customLocations.filter(l => l.type === 'country');
+                const zips = customLocations.filter(l => l.type === 'zip');
+                const neighborhoods = customLocations.filter(l => l.type === 'neighborhood');
+                const geoMarkets = customLocations.filter(l => l.type === 'geo_market');
+                if (cities.length > 0) geoLocations.cities = cities.map(c => ({ key: c.key, radius: locationRadius, distance_unit: 'kilometer' }));
+                if (regions.length > 0) geoLocations.regions = regions.map(r => ({ key: r.key }));
+                if (countries.length > 0) geoLocations.countries = countries.map(c => c.country_code);
+                if (zips.length > 0) geoLocations.zips = zips.map(z => ({ key: z.key }));
+                if (neighborhoods.length > 0) geoLocations.neighborhoods = neighborhoods.map(n => ({ key: n.key }));
+                if (geoMarkets.length > 0) geoLocations.geo_markets = geoMarkets.map(g => ({ key: g.key }));
+                targeting.geo_locations = geoLocations;
+              } else {
+                targeting.geo_locations = { countries: ['CO'] };
+              }
+              if (customInterests.length > 0) {
+                targeting.flexible_spec = [{ interests: customInterests.map(i => ({ id: i.id, name: i.name })) }];
+              }
+              return targeting;
+            })(),
+        audienceType: audienceMode === 'saved' ? (selectedAudienceData?.audienceType || 'default') : 'custom',
+        // Fechas
         startDate: startDate || null,
         endDate: endDate || null,
         ageMin: ageMin,
@@ -1924,7 +2003,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <div className="section-card" id="section-publico">
           <h4><span className="section-icon"><Users size={18} /></span> Público por conjunto de anuncio</h4>
 
-        {/* Audience Selection (Saved + Custom) - Shared when adSetMode=single */}
+        {/* Audience Mode Toggle */}
+        <div className="form-group">
+          <div className="toggle-group" style={{ marginBottom: '12px' }}>
+            <button type="button" className={`toggle-btn ${audienceMode === 'saved' ? 'active' : ''}`} onClick={() => setAudienceMode('saved')}>
+              <Users size={14} style={{ marginRight: '4px' }} /> Público guardado
+            </button>
+            <button type="button" className={`toggle-btn ${audienceMode === 'custom' ? 'active' : ''}`} onClick={() => setAudienceMode('custom')}>
+              <MapPin size={14} style={{ marginRight: '4px' }} /> Personalizado
+            </button>
+          </div>
+        </div>
+
+        {audienceMode === 'saved' ? (
+        <>
+        {/* Audience Selection (Saved + Custom) */}
         <div className="form-group">
           <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
           {/* Cabecera de columnas */}
@@ -2102,6 +2195,221 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             </div>
           )}
         </div>
+        </>
+        ) : (
+        <>
+        {/* ===== MODO PERSONALIZADO: Ubicación + Radio + Intereses ===== */}
+        <div className="form-group">
+          <label><MapPin size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Ubicación *</label>
+          <p className="hint">Busca ciudades, regiones o países donde quieres mostrar tus anuncios</p>
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={locationSearch}
+                onChange={(e) => handleLocationSearch(e.target.value)}
+                placeholder="Buscar ubicación (ej: Cartagena, Bogotá, Colombia...)"
+                style={{ paddingLeft: '32px' }}
+              />
+            </div>
+            {/* Resultados de búsqueda */}
+            {(locationResults.length > 0 || searchingLocations) && locationSearch.length >= 2 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                background: '#1e2840', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5)', maxHeight: '200px', overflowY: 'auto', marginTop: '4px'
+              }}>
+                {searchingLocations ? (
+                  <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: '6px' }} /> Buscando...
+                  </div>
+                ) : locationResults.map((loc) => {
+                  const alreadyAdded = customLocations.some(l => l.key === loc.key);
+                  return (
+                    <div
+                      key={loc.key}
+                      onClick={() => {
+                        if (!alreadyAdded) {
+                          setCustomLocations(prev => [...prev, loc]);
+                          setLocationSearch('');
+                          setLocationResults([]);
+                        }
+                      }}
+                      style={{
+                        padding: '8px 12px', cursor: alreadyAdded ? 'default' : 'pointer', fontSize: '13px',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        opacity: alreadyAdded ? 0.5 : 1,
+                        borderBottom: '1px solid rgba(255,255,255,0.05)'
+                      }}
+                      className={alreadyAdded ? '' : 'custom-select-option'}
+                    >
+                      <MapPin size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ color: 'var(--text-primary)' }}>{loc.displayName}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{loc.type}</div>
+                      </div>
+                      {alreadyAdded && <Check size={12} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Ubicaciones seleccionadas */}
+          {customLocations.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+              {customLocations.map((loc) => (
+                <span
+                  key={loc.key}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    background: 'rgba(59,130,246,0.15)', color: 'var(--accent)',
+                    padding: '4px 10px', borderRadius: '16px', fontSize: '12px'
+                  }}
+                >
+                  <MapPin size={10} /> {loc.displayName}
+                  <X
+                    size={12}
+                    style={{ cursor: 'pointer', marginLeft: '2px' }}
+                    onClick={() => setCustomLocations(prev => prev.filter(l => l.key !== loc.key))}
+                  />
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Radio */}
+        {customLocations.some(l => l.type === 'city' || l.type === 'zip' || l.type === 'neighborhood') && (
+          <div className="form-group">
+            <label><Target size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Radio de alcance</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="range"
+                min={1}
+                max={80}
+                value={locationRadius}
+                onChange={(e) => setLocationRadius(parseInt(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <div style={{
+                minWidth: '60px', textAlign: 'center', fontWeight: '600',
+                color: 'var(--accent)', fontSize: '14px'
+              }}>
+                {locationRadius} km
+              </div>
+            </div>
+            <p className="hint">Radio alrededor de las ubicaciones seleccionadas</p>
+          </div>
+        )}
+
+        {/* Intereses (Advantage+ Detailed Targeting) */}
+        <div className="form-group">
+          <label><Heart size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Intereses (opcional)</label>
+          <p className="hint">Segmentación detallada: busca intereses, comportamientos o demografía</p>
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={interestSearch}
+                onChange={(e) => handleInterestSearch(e.target.value)}
+                placeholder="Buscar intereses (ej: fitness, moda, restaurantes...)"
+                style={{ paddingLeft: '32px' }}
+              />
+            </div>
+            {/* Resultados de intereses */}
+            {(interestResults.length > 0 || searchingInterests) && interestSearch.length >= 2 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                background: '#1e2840', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5)', maxHeight: '220px', overflowY: 'auto', marginTop: '4px'
+              }}>
+                {searchingInterests ? (
+                  <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: '6px' }} /> Buscando...
+                  </div>
+                ) : interestResults.map((interest) => {
+                  const alreadyAdded = customInterests.some(i => i.id === interest.id);
+                  const audienceSize = interest.audience_size_lower_bound && interest.audience_size_upper_bound
+                    ? `${(interest.audience_size_lower_bound / 1e6).toFixed(1)}M - ${(interest.audience_size_upper_bound / 1e6).toFixed(1)}M`
+                    : null;
+                  return (
+                    <div
+                      key={interest.id}
+                      onClick={() => {
+                        if (!alreadyAdded) {
+                          setCustomInterests(prev => [...prev, interest]);
+                          setInterestSearch('');
+                          setInterestResults([]);
+                        }
+                      }}
+                      style={{
+                        padding: '8px 12px', cursor: alreadyAdded ? 'default' : 'pointer', fontSize: '13px',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        opacity: alreadyAdded ? 0.5 : 1,
+                        borderBottom: '1px solid rgba(255,255,255,0.05)'
+                      }}
+                      className={alreadyAdded ? '' : 'custom-select-option'}
+                    >
+                      <Heart size={12} style={{ color: '#f472b6', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: 'var(--text-primary)' }}>{interest.name}</div>
+                        {(interest.path?.length > 0 || audienceSize) && (
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            {interest.path?.join(' > ')}{audienceSize ? ` · ${audienceSize} personas` : ''}
+                          </div>
+                        )}
+                      </div>
+                      {alreadyAdded && <Check size={12} style={{ color: 'var(--accent)' }} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Intereses seleccionados */}
+          {customInterests.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+              {customInterests.map((interest) => (
+                <span
+                  key={interest.id}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    background: 'rgba(244,114,182,0.15)', color: '#f472b6',
+                    padding: '4px 10px', borderRadius: '16px', fontSize: '12px'
+                  }}
+                >
+                  <Heart size={10} /> {interest.name}
+                  <X
+                    size={12}
+                    style={{ cursor: 'pointer', marginLeft: '2px' }}
+                    onClick={() => setCustomInterests(prev => prev.filter(i => i.id !== interest.id))}
+                  />
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Resumen del targeting personalizado */}
+        {customLocations.length > 0 && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+            fontSize: '12px', color: 'var(--text-muted)'
+          }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Targeting personalizado:</strong>{' '}
+            {customLocations.map(l => l.displayName).join(', ')}
+            {customLocations.some(l => l.type === 'city') && ` (+${locationRadius}km)`}
+            {customInterests.length > 0 && ` · Intereses: ${customInterests.map(i => i.name).join(', ')}`}
+          </div>
+        )}
+        </>
+        )}
 
         </div>{/* fin section-card Público */}
 
