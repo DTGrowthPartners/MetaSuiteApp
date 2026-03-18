@@ -2245,9 +2245,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       className={alreadyAdded ? '' : 'custom-select-option'}
                     >
                       <MapPin size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <div style={{ color: 'var(--text-primary)' }}>{loc.displayName}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{loc.type}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          <span style={{ textTransform: 'capitalize' }}>{loc.type === 'city' ? 'Ciudad' : loc.type === 'region' ? 'Región' : loc.type === 'country' ? 'País' : loc.type === 'neighborhood' ? 'Barrio' : loc.type === 'zip' ? 'Código postal' : loc.type}</span>
+                          {loc.country_name && loc.type !== 'country' && ` · ${loc.country_name}`}
+                        </div>
                       </div>
                       {alreadyAdded && <Check size={12} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
                     </div>

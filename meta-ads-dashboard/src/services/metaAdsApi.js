@@ -841,12 +841,16 @@ class MetaAdsService {
         country_code: loc.country_code,
         country_name: loc.country_name,
         region: loc.region,
+        region_id: loc.region_id,
+        primary_city: loc.primary_city,
         supports_radius: loc.supports_radius || false,
-        // Para display
+        // Para display — lo más específico posible
         displayName: loc.type === 'country' ? loc.name
           : loc.type === 'region' ? `${loc.name}, ${loc.country_name}`
           : loc.type === 'city' ? `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
-          : `${loc.name}, ${loc.country_name}`
+          : loc.type === 'neighborhood' ? `${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
+          : loc.type === 'zip' ? `${loc.name}${loc.primary_city ? ' (' + loc.primary_city + ')' : ''}, ${loc.country_name}`
+          : `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
       }));
       return { success: true, data: results };
     } catch (error) {
