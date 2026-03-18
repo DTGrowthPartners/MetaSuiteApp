@@ -214,9 +214,9 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
     loadForms();
   }, [selectedSource, sourceId, accessToken]);
 
-  // Load videos when source is video
+  // Load videos when source is video AND page is selected
   useEffect(() => {
-    if (selectedSource?.id !== 'video' || !selectedAccount || !accessToken) return;
+    if (selectedSource?.id !== 'video' || !sourceId || !selectedAccount || !accessToken) return;
     const loadVideos = async () => {
       setLoadingVideos(true);
       try {
@@ -239,7 +239,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
       setLoadingVideos(false);
     };
     loadVideos();
-  }, [selectedSource, selectedAccount, accessToken]);
+  }, [selectedSource, sourceId, selectedAccount, accessToken]);
 
   // Auto-generate name
   useEffect(() => {
@@ -264,6 +264,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
         name: audienceName.trim(),
         description: audienceDescription.trim() || null,
         sourceId,
+        videoIds: selectedVideos.length > 0 ? selectedVideos.map(v => v.id) : null,
         event: selectedEvent,
         retentionDays
       });
@@ -446,15 +447,77 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
               />
             ) : selectedSource.needsPage ? (
               <>
-                <p className="hint" style={{ marginBottom: '4px' }}>Incluye todos los videos publicados desde esta página</p>
                 <CustomSelect
                   value={sourceId}
-                  onChange={(e) => setSourceId(e.target.value)}
+                  onChange={(e) => { setSourceId(e.target.value); setSelectedVideos([]); }}
                   loading={loadingSource}
                   searchable
                   placeholder={accountPages.length === 0 ? 'No se encontraron páginas' : 'Selecciona página de Facebook'}
                   options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
                 />
+                {/* Video selector */}
+                {sourceId && (
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      Videos ({loadingVideos ? '...' : adVideos.length})
+                    </label>
+                    {loadingVideos ? (
+                      <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: '6px' }} /> Cargando videos...
+                      </div>
+                    ) : adVideos.length === 0 ? (
+                      <p className="hint">No se encontraron videos</p>
+                    ) : (
+                      <>
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px'
+                        }}>
+                          <button type="button" className="toggle-btn" style={{ fontSize: '11px', padding: '2px 8px' }}
+                            onClick={() => setSelectedVideos(selectedVideos.length === adVideos.length ? [] : [...adVideos])}
+                          >
+                            {selectedVideos.length === adVideos.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                          </button>
+                          {selectedVideos.length > 0 && (
+                            <span style={{ fontSize: '11px', color: 'var(--accent)' }}>
+                              {selectedVideos.length} seleccionado{selectedVideos.length > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '2px' }}>
+                          {adVideos.map(video => {
+                            const isSelected = selectedVideos.some(v => v.id === video.id);
+                            return (
+                              <div key={video.id} onClick={() => {
+                                setSelectedVideos(prev => isSelected ? prev.filter(v => v.id !== video.id) : [...prev, video]);
+                              }} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                                cursor: 'pointer', borderRadius: '4px',
+                                background: isSelected ? 'rgba(59,130,246,0.1)' : 'transparent'
+                              }}>
+                                <div style={{
+                                  width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0,
+                                  border: isSelected ? 'none' : '1.5px solid var(--text-muted)',
+                                  background: isSelected ? 'var(--accent)' : 'transparent',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                  {isSelected && <Check size={10} style={{ color: '#fff' }} />}
+                                </div>
+                                {video.thumbnail && (
+                                  <img src={video.thumbnail} alt="" style={{ width: 36, height: 36, borderRadius: '3px', objectFit: 'cover', flexShrink: 0 }} />
+                                )}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {video.title}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             ) : selectedSource.id === 'leads' ? (
               <>

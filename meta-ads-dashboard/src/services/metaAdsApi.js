@@ -961,30 +961,45 @@ class MetaAdsService {
   }
 
   // Crear Custom Audience de Video
-  async createVideoAudience(adAccountId, { name, description, sourceId, event, retentionDays }) {
+  async createVideoAudience(adAccountId, { name, description, sourceId, videoIds, event, retentionDays }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
       const retentionSeconds = retentionDays * 86400;
 
-      // Video usa page como event_source (cubre todos los videos de la página)
-      const rule = {
-        inclusions: {
-          operator: 'or',
-          rules: [{
-            event_sources: [{ type: 'page', id: sourceId }],
-            retention_seconds: retentionSeconds,
-            filter: {
-              operator: 'and',
-              filters: [
-                { field: 'event', operator: 'eq', value: 'video_watched' },
-                { field: 'video_watched', operator: 'eq', value: event }
-              ]
-            },
-            min_retention_seconds: 0,
-            count: 0
-          }]
-        }
-      };
+      // Si hay videos seleccionados, crear un rule por video; si no, usar la página completa
+      let rules;
+      if (videoIds && videoIds.length > 0) {
+        // Cada video como event_source individual en rules separados
+        rules = videoIds.map(videoId => ({
+          event_sources: [{ type: 'video', id: videoId }],
+          retention_seconds: retentionSeconds,
+          filter: {
+            operator: 'and',
+            filters: [
+              { field: 'event', operator: 'eq', value: 'video_watched' },
+              { field: 'video_watched', operator: 'eq', value: event }
+            ]
+          },
+          min_retention_seconds: 0,
+          count: 0
+        }));
+      } else {
+        rules = [{
+          event_sources: [{ type: 'page', id: sourceId }],
+          retention_seconds: retentionSeconds,
+          filter: {
+            operator: 'and',
+            filters: [
+              { field: 'event', operator: 'eq', value: 'video_watched' },
+              { field: 'video_watched', operator: 'eq', value: event }
+            ]
+          },
+          min_retention_seconds: 0,
+          count: 0
+        }];
+      }
+
+      const rule = { inclusions: { operator: 'or', rules } };
 
       console.log('Creating video audience:', { name, sourceId, event, retentionDays });
       console.log('Video Rule JSON:', JSON.stringify(rule));
