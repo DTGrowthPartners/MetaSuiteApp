@@ -933,15 +933,20 @@ class MetaAdsService {
         }
       };
 
-      const formData = new URLSearchParams();
-      formData.append('name', name);
-      formData.append('rule', JSON.stringify(rule));
-      formData.append('prefill', '1');
-      formData.append('access_token', this.accessToken);
-      if (description) formData.append('description', description);
+      const ruleStr = JSON.stringify(rule);
+      console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
+      console.log('Rule JSON:', ruleStr);
 
-      console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays, rule: JSON.stringify(rule) });
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, null, {
+        params: {
+          name,
+          rule: ruleStr,
+          prefill: 1,
+          customer_file_source: 'USER_PROVIDED_ONLY',
+          access_token: this.accessToken,
+          ...(description ? { description } : {})
+        }
+      });
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
