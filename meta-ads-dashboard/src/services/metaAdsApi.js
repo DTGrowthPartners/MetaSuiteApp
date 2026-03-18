@@ -935,16 +935,18 @@ class MetaAdsService {
 
       const formData = new URLSearchParams();
       formData.append('name', name);
-      formData.append('subtype', 'ENGAGEMENT');
       formData.append('rule', JSON.stringify(rule));
       formData.append('prefill', '1');
       formData.append('access_token', this.accessToken);
       if (description) formData.append('description', description);
 
+      console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays, rule: JSON.stringify(rule) });
       const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
       return { success: true, data: resp.data };
     } catch (error) {
-      const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
+      const errData = error.response?.data?.error;
+      console.error('Custom audience creation error:', errData);
+      const errMsg = errData?.error_user_msg || errData?.message || error.message;
       return { success: false, error: errMsg };
     }
   }
