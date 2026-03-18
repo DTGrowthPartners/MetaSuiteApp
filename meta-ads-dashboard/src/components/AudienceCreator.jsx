@@ -16,11 +16,11 @@ const SOURCES = [
     sourceType: 'ig_business',
     maxDays: 730,
     events: [
-      { value: 'ig_business_profile_all', label: 'Todos los que interactuaron con la cuenta' },
-      { value: 'ig_business_profile_visit', label: 'Personas que visitaron el perfil' },
-      { value: 'ig_business_profile_engaged', label: 'Personas que interactuaron con contenido o anuncios' },
-      { value: 'ig_business_profile_ad_saved', label: 'Personas que guardaron un post o anuncio' },
-      { value: 'ig_user_messaged_business', label: 'Personas que enviaron un mensaje' },
+      { value: 'ig_user_engaged', label: 'Cualquier interacción (likes, comentarios, guardados, compartidos)' },
+      { value: 'ig_user_profile_visit', label: 'Personas que visitaron el perfil' },
+      { value: 'ig_user_organic_and_ad', label: 'Interactuaron con contenido orgánico o anuncios' },
+      { value: 'ig_user_saved_media', label: 'Personas que guardaron una publicación' },
+      { value: 'ig_user_messaged', label: 'Personas que enviaron un mensaje DM' },
     ]
   },
   {
@@ -31,12 +31,12 @@ const SOURCES = [
     sourceType: 'page',
     maxDays: 730,
     events: [
-      { value: 'page_engaged', label: 'Todos los que interactuaron con la página' },
+      { value: 'page_engaged', label: 'Cualquier interacción con la página' },
       { value: 'page_visited', label: 'Personas que visitaron la página' },
-      { value: 'page_messaged', label: 'Personas que enviaron un mensaje' },
-      { value: 'page_cta_clicked', label: 'Personas que hicieron clic en un botón CTA' },
-      { value: 'page_or_post_save', label: 'Personas que guardaron la página o un post' },
-      { value: 'page_post_interaction', label: 'Personas que reaccionaron, compartieron o comentaron' },
+      { value: 'page_liked', label: 'Personas que le dieron like a la página' },
+      { value: 'page_messaged', label: 'Personas que enviaron un mensaje por Messenger' },
+      { value: 'page_cta_clicked', label: 'Personas que hicieron clic en el CTA' },
+      { value: 'page_saved', label: 'Personas que guardaron una publicación' },
     ]
   },
   {
@@ -48,13 +48,13 @@ const SOURCES = [
     maxDays: 365,
     needsVideoSource: true,
     events: [
-      { value: 'video_view_3s', label: 'Personas que vieron al menos 3 segundos' },
-      { value: 'video_view_10s', label: 'Personas que vieron al menos 10 segundos' },
-      { value: 'video_view_15s', label: 'Personas que vieron ThruPlay (15 segundos)' },
-      { value: 'video_view_p25', label: 'Personas que vieron el 25% del video' },
-      { value: 'video_view_p50', label: 'Personas que vieron el 50% del video' },
-      { value: 'video_view_p75', label: 'Personas que vieron el 75% del video' },
-      { value: 'video_view_p95', label: 'Personas que vieron el 95% del video' },
+      { value: 'video_watched_3s', label: 'Personas que vieron al menos 3 segundos' },
+      { value: 'video_watched_10s', label: 'Personas que vieron al menos 10 segundos' },
+      { value: 'video_watched_25_percent', label: 'Personas que vieron el 25% del video' },
+      { value: 'video_watched_50_percent', label: 'Personas que vieron el 50% del video' },
+      { value: 'video_watched_75_percent', label: 'Personas que vieron el 75% del video' },
+      { value: 'video_watched_95_percent', label: 'Personas que vieron el 95% del video' },
+      { value: 'video_completed', label: 'Personas que vieron el 100% del video' },
     ]
   },
   {

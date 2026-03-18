@@ -933,19 +933,21 @@ class MetaAdsService {
         }
       };
 
-      const ruleStr = JSON.stringify(rule);
       console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
-      console.log('Rule JSON:', ruleStr);
+      console.log('Rule JSON:', JSON.stringify(rule, null, 2));
 
-      // Enviar como FormData (multipart) — igual que curl -F de la documentación de Meta
-      const formData = new FormData();
-      formData.append('name', name);
-      formData.append('rule', ruleStr);
-      formData.append('prefill', '1');
-      formData.append('access_token', this.accessToken);
-      if (description) formData.append('description', description);
+      // Enviar como JSON con Content-Type: application/json
+      const body = {
+        name,
+        subtype: 'ENGAGEMENT',
+        rule,
+        access_token: this.accessToken
+      };
+      if (description) body.description = description;
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, body, {
+        headers: { 'Content-Type': 'application/json' }
+      });
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
@@ -961,32 +963,43 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
       const retentionSeconds = retentionDays * 86400;
 
+      // Video usa filtro doble: event=video_watched + video_watched=porcentaje
       const rule = {
         inclusions: {
           operator: 'or',
           rules: [{
-            event_sources: [{ id: sourceId, type: sourceType || 'video' }],
+            event_sources: [{ id: sourceId, type: sourceType || 'page' }],
             retention_seconds: retentionSeconds,
             filter: {
               operator: 'and',
-              filters: [{ field: 'event', operator: 'eq', value: event }]
+              filters: [
+                { field: 'event', operator: 'eq', value: 'video_watched' },
+                { field: 'video_watched', operator: 'eq', value: event }
+              ]
             }
           }]
         }
       };
 
-      const formData = new URLSearchParams();
-      formData.append('name', name);
-      formData.append('subtype', 'ENGAGEMENT');
-      formData.append('rule', JSON.stringify(rule));
-      formData.append('prefill', '1');
-      formData.append('access_token', this.accessToken);
-      if (description) formData.append('description', description);
+      console.log('Creating video audience:', { name, sourceId, sourceType, event, retentionDays });
+      console.log('Video Rule JSON:', JSON.stringify(rule, null, 2));
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, formData);
+      const body = {
+        name,
+        subtype: 'ENGAGEMENT',
+        rule,
+        access_token: this.accessToken
+      };
+      if (description) body.description = description;
+
+      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`, body, {
+        headers: { 'Content-Type': 'application/json' }
+      });
       return { success: true, data: resp.data };
     } catch (error) {
-      const errMsg = error.response?.data?.error?.error_user_msg || error.response?.data?.error?.message || error.message;
+      const errData = error.response?.data?.error;
+      console.error('Video audience creation error:', errData);
+      const errMsg = errData?.error_user_msg || errData?.message || error.message;
       return { success: false, error: errMsg };
     }
   }
