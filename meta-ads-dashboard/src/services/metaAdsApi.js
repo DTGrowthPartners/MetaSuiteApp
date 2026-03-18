@@ -989,10 +989,12 @@ class MetaAdsService {
       console.log('Creating video audience:', { name, sourceId, event, retentionDays });
       console.log('Video Rule JSON:', JSON.stringify(rule));
 
+      const ruleStr = JSON.stringify(rule);
+      console.log('Video Rule JSON:', ruleStr);
+
       const params = new URLSearchParams();
       params.append('name', name);
-      params.append('subtype', 'ENGAGEMENT');
-      params.append('rule', JSON.stringify(rule));
+      params.append('rule', ruleStr);
       params.append('prefill', 'true');
       params.append('access_token', this.accessToken);
       if (description) params.append('description', description);
