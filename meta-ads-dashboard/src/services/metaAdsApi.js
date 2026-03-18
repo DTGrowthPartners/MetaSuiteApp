@@ -964,57 +964,23 @@ class MetaAdsService {
   async createVideoAudience(adAccountId, { name, description, sourceId, videoIds, event, retentionDays }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
-      const retentionSeconds = retentionDays * 86400;
 
-      // Si hay videos seleccionados, crear un rule por video; si no, usar la página completa
-      let rules;
-      if (videoIds && videoIds.length > 0) {
-        // Cada video como event_source individual en rules separados
-        rules = videoIds.map(videoId => ({
-          event_sources: [{ type: 'video', id: videoId }],
-          retention_seconds: retentionSeconds,
-          filter: {
-            operator: 'and',
-            filters: [
-              { field: 'event', operator: 'eq', value: 'video_watched' },
-              { field: 'video_watched', operator: 'eq', value: event }
-            ]
-          },
-          min_retention_seconds: 0,
-          count: 0
-        }));
-      } else {
-        rules = [{
-          event_sources: [{ type: 'page', id: sourceId }],
-          retention_seconds: retentionSeconds,
-          filter: {
-            operator: 'and',
-            filters: [
-              { field: 'event', operator: 'eq', value: 'video_watched' },
-              { field: 'video_watched', operator: 'eq', value: event }
-            ]
-          },
-          min_retention_seconds: 0,
-          count: 0
-        }];
-      }
+      console.log('Creating video audience (legacy):', { name, sourceId, videoIds, event, retentionDays });
 
-      const rule = { inclusions: { operator: 'or', rules } };
-
-      console.log('Creating video audience:', { name, sourceId, event, retentionDays });
-      console.log('Video Rule JSON:', JSON.stringify(rule));
-
-      const ruleStr = JSON.stringify(rule);
-      console.log('Video Rule JSON:', ruleStr);
-
-      // Intentar con subtype VIDEO en v21.0
+      // Video usa formato LEGACY: rule es un string simple, no JSON
       const params = new URLSearchParams();
       params.append('name', name);
-      params.append('subtype', 'VIDEO');
-      params.append('rule', ruleStr);
+      params.append('subtype', 'ENGAGEMENT');
+      params.append('content_type', 'VIDEO');
+      params.append('object_id', sourceId);
+      params.append('rule', event); // String simple: video_watched_25_percent, etc.
+      params.append('retention_days', String(retentionDays));
       params.append('prefill', 'true');
       params.append('access_token', this.accessToken);
       if (description) params.append('description', description);
+      if (videoIds && videoIds.length > 0) {
+        params.append('video_group_ids', JSON.stringify(videoIds));
+      }
 
       const resp = await axios.post(
         `https://graph.facebook.com/v21.0/${normalizedId}/customaudiences`,
