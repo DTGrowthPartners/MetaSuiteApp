@@ -85,10 +85,12 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
 
   // Source-specific
   const [sourceId, setSourceId] = useState(''); // IG account ID, Page ID, etc.
+  const [selectedPageForIg, setSelectedPageForIg] = useState(''); // Page to load IG from
   const [igAccounts, setIgAccounts] = useState([]);
   const [accountPages, setAccountPages] = useState([]);
   const [leadForms, setLeadForms] = useState([]);
   const [loadingSource, setLoadingSource] = useState(false);
+  const [loadingIg, setLoadingIg] = useState(false);
   const [selectedVideoSource, setSelectedVideoSource] = useState('page'); // 'page' or 'ig'
 
   // Create state
@@ -96,14 +98,12 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  // Load pages and IG accounts when account is selected
+  // Load pages when account is selected
   useEffect(() => {
     if (!selectedAccount || !accessToken) return;
-    const loadAccountData = async () => {
+    const loadPages = async () => {
       setLoadingSource(true);
       const metaService = new MetaAdsService(accessToken);
-
-      // Load promote_pages for this ad account
       try {
         const normalizedId = metaService.normalizeAccountId(selectedAccount);
         const pagesResp = await fetch(
@@ -115,19 +115,43 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
         console.error('Error loading pages:', e);
         setAccountPages([]);
       }
-
-      // Load IG accounts
-      try {
-        const igResult = await metaService.getInstagramAccountsFromAdAccount(selectedAccount);
-        setIgAccounts(igResult.success ? (igResult.data || []) : []);
-      } catch (e) {
-        setIgAccounts([]);
-      }
-
       setLoadingSource(false);
     };
-    loadAccountData();
+    loadPages();
   }, [selectedAccount, accessToken]);
+
+  // Load IG accounts when a page is selected (for Instagram source or Video IG)
+  useEffect(() => {
+    if (!selectedPageForIg || !accessToken) return;
+    const loadIg = async () => {
+      setLoadingIg(true);
+      setIgAccounts([]);
+      try {
+        // Try page's instagram_accounts
+        const resp = await fetch(
+          `https://graph.facebook.com/v21.0/${selectedPageForIg}/instagram_accounts?fields=id,username,profile_pic&access_token=${accessToken}`
+        );
+        const data = await resp.json();
+        let accounts = data.data || [];
+        // Fallback: page_backed_instagram_accounts
+        if (accounts.length === 0) {
+          const resp2 = await fetch(
+            `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=page_backed_instagram_accounts{id,username}&access_token=${accessToken}`
+          );
+          const data2 = await resp2.json();
+          accounts = data2.page_backed_instagram_accounts?.data || [];
+        }
+        setIgAccounts(accounts);
+        // Auto-select if only one
+        if (accounts.length === 1) setSourceId(accounts[0].id);
+      } catch (e) {
+        console.error('Error loading IG accounts:', e);
+        setIgAccounts([]);
+      }
+      setLoadingIg(false);
+    };
+    loadIg();
+  }, [selectedPageForIg, accessToken]);
 
   // Load lead forms when source is leads and page is selected
   useEffect(() => {
@@ -268,6 +292,8 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                     setSelectedSource(source);
                     setSelectedEvent('');
                     setSourceId('');
+                    setSelectedPageForIg('');
+                    setIgAccounts([]);
                     setStep('config');
                   }}
                   style={{
@@ -304,17 +330,33 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
           <div className="form-group">
             <label>Origen</label>
             {selectedSource.id === 'instagram' ? (
-              <CustomSelect
-                value={sourceId}
-                onChange={(e) => setSourceId(e.target.value)}
-                loading={loadingSource}
-                searchable
-                placeholder={igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Selecciona cuenta de Instagram'}
-                options={igAccounts.map(ig => ({
-                  value: ig.id,
-                  label: ig.username ? `@${ig.username}` : ig.id
-                }))}
-              />
+              <>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Página de Facebook vinculada</label>
+                <CustomSelect
+                  value={selectedPageForIg}
+                  onChange={(e) => { setSelectedPageForIg(e.target.value); setSourceId(''); setIgAccounts([]); }}
+                  loading={loadingSource}
+                  searchable
+                  placeholder="Primero selecciona la página de Facebook"
+                  options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
+                />
+                {selectedPageForIg && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Cuenta de Instagram</label>
+                    <CustomSelect
+                      value={sourceId}
+                      onChange={(e) => setSourceId(e.target.value)}
+                      loading={loadingIg}
+                      searchable
+                      placeholder={loadingIg ? 'Cargando...' : igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Selecciona cuenta de Instagram'}
+                      options={igAccounts.map(ig => ({
+                        value: ig.id,
+                        label: ig.username ? `@${ig.username}` : ig.id
+                      }))}
+                    />
+                  </div>
+                )}
+              </>
             ) : selectedSource.id === 'page' ? (
               <CustomSelect
                 value={sourceId}
@@ -347,14 +389,28 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                     options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
                   />
                 ) : (
-                  <CustomSelect
-                    value={sourceId}
-                    onChange={(e) => setSourceId(e.target.value)}
-                    loading={loadingSource}
-                    searchable
-                    placeholder="Selecciona cuenta de Instagram"
-                    options={igAccounts.map(ig => ({ value: ig.id, label: ig.username ? `@${ig.username}` : ig.id }))}
-                  />
+                  <>
+                    <CustomSelect
+                      value={selectedPageForIg}
+                      onChange={(e) => { setSelectedPageForIg(e.target.value); setSourceId(''); setIgAccounts([]); }}
+                      loading={loadingSource}
+                      searchable
+                      placeholder="Primero selecciona la página de Facebook"
+                      options={accountPages.map(p => ({ value: p.id, label: p.name || p.id }))}
+                    />
+                    {selectedPageForIg && (
+                      <div style={{ marginTop: '8px' }}>
+                        <CustomSelect
+                          value={sourceId}
+                          onChange={(e) => setSourceId(e.target.value)}
+                          loading={loadingIg}
+                          searchable
+                          placeholder={loadingIg ? 'Cargando...' : igAccounts.length === 0 ? 'No se encontraron cuentas de IG' : 'Selecciona cuenta de Instagram'}
+                          options={igAccounts.map(ig => ({ value: ig.id, label: ig.username ? `@${ig.username}` : ig.id }))}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             ) : selectedSource.id === 'leads' ? (
