@@ -830,7 +830,7 @@ class MetaAdsService {
           access_token: this.accessToken,
           type: 'adgeolocation',
           q: query,
-          location_types: JSON.stringify(['city', 'region', 'country', 'zip', 'geo_market', 'neighborhood']),
+          location_types: JSON.stringify(['city', 'region', 'country', 'subcity']),
           limit: 15
         }
       });
@@ -848,9 +848,40 @@ class MetaAdsService {
         displayName: loc.type === 'country' ? loc.name
           : loc.type === 'region' ? `${loc.name}, ${loc.country_name}`
           : loc.type === 'city' ? `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
-          : loc.type === 'neighborhood' ? `${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
-          : loc.type === 'zip' ? `${loc.name}${loc.primary_city ? ' (' + loc.primary_city + ')' : ''}, ${loc.country_name}`
+          : loc.type === 'subcity' ? `${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
           : `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
+      }));
+      return { success: true, data: results };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  }
+
+  // Buscar lugares específicos (centros comerciales, negocios, etc.) — devuelve lat/lng para custom_locations
+  async searchPlaces(query) {
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/search`, {
+        params: {
+          access_token: this.accessToken,
+          type: 'place',
+          q: query,
+          fields: 'name,location,category_list,picture',
+          limit: 10
+        }
+      });
+      const results = (resp.data.data || []).filter(p => p.location?.latitude && p.location?.longitude).map(place => ({
+        id: place.id,
+        key: `place_${place.id}`,
+        name: place.name,
+        type: 'place',
+        latitude: place.location.latitude,
+        longitude: place.location.longitude,
+        city: place.location.city,
+        country: place.location.country,
+        street: place.location.street,
+        category: place.category_list?.[0]?.name || '',
+        picture: place.picture?.data?.url || null,
+        displayName: `${place.name}${place.location.city ? ', ' + place.location.city : ''}${place.location.country ? ', ' + place.location.country : ''}`
       }));
       return { success: true, data: results };
     } catch (error) {

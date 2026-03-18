@@ -686,7 +686,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const locationSearchTimer = useRef(null);
   const interestSearchTimer = useRef(null);
 
-  // Debounced location search
+  // Debounced location search (busca ciudades/regiones + lugares específicos)
   const handleLocationSearch = (query) => {
     setLocationSearch(query);
     if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current);
@@ -694,8 +694,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     locationSearchTimer.current = setTimeout(async () => {
       setSearchingLocations(true);
       const metaService = new MetaAdsService(accessToken);
-      const result = await metaService.searchLocations(query);
-      if (result.success) setLocationResults(result.data);
+      // Buscar en paralelo: ciudades/regiones + lugares específicos
+      const [geoResult, placesResult] = await Promise.all([
+        metaService.searchLocations(query),
+        metaService.searchPlaces(query)
+      ]);
+      const combined = [
+        ...(geoResult.success ? geoResult.data : []),
+        ...(placesResult.success ? placesResult.data : [])
+      ];
+      setLocationResults(combined);
       setSearchingLocations(false);
     }, 400);
   };
@@ -1554,18 +1562,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               const targeting = {};
               if (customLocations.length > 0) {
                 const geoLocations = {};
-                const cities = customLocations.filter(l => l.type === 'city');
+                const citiesAndSubcities = customLocations.filter(l => l.type === 'city' || l.type === 'subcity');
                 const regions = customLocations.filter(l => l.type === 'region');
                 const countries = customLocations.filter(l => l.type === 'country');
-                const zips = customLocations.filter(l => l.type === 'zip');
-                const neighborhoods = customLocations.filter(l => l.type === 'neighborhood');
-                const geoMarkets = customLocations.filter(l => l.type === 'geo_market');
-                if (cities.length > 0) geoLocations.cities = cities.map(c => ({ key: c.key, radius: locationRadius, distance_unit: 'kilometer' }));
+                const places = customLocations.filter(l => l.type === 'place');
+                if (citiesAndSubcities.length > 0) geoLocations.cities = citiesAndSubcities.map(c => ({ key: c.key, radius: locationRadius, distance_unit: 'kilometer' }));
                 if (regions.length > 0) geoLocations.regions = regions.map(r => ({ key: r.key }));
                 if (countries.length > 0) geoLocations.countries = countries.map(c => c.country_code);
-                if (zips.length > 0) geoLocations.zips = zips.map(z => ({ key: z.key }));
-                if (neighborhoods.length > 0) geoLocations.neighborhoods = neighborhoods.map(n => ({ key: n.key }));
-                if (geoMarkets.length > 0) geoLocations.geo_markets = geoMarkets.map(g => ({ key: g.key }));
+                if (places.length > 0) geoLocations.custom_locations = places.map(p => ({ latitude: p.latitude, longitude: p.longitude, radius: locationRadius, distance_unit: 'kilometer', name: p.name }));
                 targeting.geo_locations = geoLocations;
               } else {
                 targeting.geo_locations = { countries: ['CO'] };
@@ -2244,12 +2248,22 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       }}
                       className={alreadyAdded ? '' : 'custom-select-option'}
                     >
-                      <MapPin size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      {loc.type === 'place' ? (
+                        loc.picture ? <img src={loc.picture} alt="" style={{ width: 20, height: 20, borderRadius: '4px', objectFit: 'cover', flexShrink: 0 }} />
+                        : <ShoppingCart size={12} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                      ) : (
+                        <MapPin size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      )}
                       <div style={{ flex: 1 }}>
                         <div style={{ color: 'var(--text-primary)' }}>{loc.displayName}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                          <span style={{ textTransform: 'capitalize' }}>{loc.type === 'city' ? 'Ciudad' : loc.type === 'region' ? 'Región' : loc.type === 'country' ? 'País' : loc.type === 'neighborhood' ? 'Barrio' : loc.type === 'zip' ? 'Código postal' : loc.type}</span>
-                          {loc.country_name && loc.type !== 'country' && ` · ${loc.country_name}`}
+                          {loc.type === 'place'
+                            ? <span>{loc.category || 'Lugar'}{loc.street ? ` · ${loc.street}` : ''}</span>
+                            : <>
+                                <span style={{ textTransform: 'capitalize' }}>{loc.type === 'city' ? 'Ciudad' : loc.type === 'subcity' ? 'Zona/Barrio' : loc.type === 'region' ? 'Región' : loc.type === 'country' ? 'País' : loc.type}</span>
+                                {loc.country_name && loc.type !== 'country' && ` · ${loc.country_name}`}
+                              </>
+                          }
                         </div>
                       </div>
                       {alreadyAdded && <Check size={12} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
@@ -2268,11 +2282,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   key={loc.key}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    background: 'rgba(59,130,246,0.15)', color: 'var(--accent)',
+                    background: loc.type === 'place' ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                    color: loc.type === 'place' ? '#f59e0b' : 'var(--accent)',
                     padding: '4px 10px', borderRadius: '16px', fontSize: '12px'
                   }}
                 >
-                  <MapPin size={10} /> {loc.displayName}
+                  {loc.type === 'place' ? <ShoppingCart size={10} /> : <MapPin size={10} />} {loc.displayName}
                   <X
                     size={12}
                     style={{ cursor: 'pointer', marginLeft: '2px' }}
@@ -2285,7 +2300,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>
 
         {/* Radio */}
-        {customLocations.some(l => l.type === 'city' || l.type === 'zip' || l.type === 'neighborhood') && (
+        {customLocations.some(l => l.type === 'city' || l.type === 'subcity' || l.type === 'place') && (
           <div className="form-group">
             <label><Target size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Radio de alcance</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
