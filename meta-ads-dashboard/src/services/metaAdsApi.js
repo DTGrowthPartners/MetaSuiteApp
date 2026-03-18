@@ -857,39 +857,55 @@ class MetaAdsService {
     }
   }
 
-  // Buscar lugares específicos (centros comerciales, negocios, etc.) — devuelve lat/lng para custom_locations
-  async searchPlaces(query, center = null) {
+  // Buscar lugares específicos (centros comerciales, negocios, etc.) via OpenStreetMap Nominatim
+  async searchPlaces(query) {
     try {
-      const params = {
-        access_token: this.accessToken,
-        type: 'place',
-        q: query,
-        fields: 'name,location,category_list,picture',
-        limit: 10
-      };
-      // Si hay un centro (lat,lng), buscar cerca de esa ubicación
-      if (center) {
-        params.center = `${center.latitude},${center.longitude}`;
-        params.distance = 50000; // 50km de radio de búsqueda
-      }
-      const resp = await axios.get(`${META_API_BASE_URL}/search`, { params });
-      const results = (resp.data.data || []).filter(p => p.location?.latitude && p.location?.longitude).map(place => ({
-        id: place.id,
-        key: `place_${place.id}`,
-        name: place.name,
-        type: 'place',
-        latitude: place.location.latitude,
-        longitude: place.location.longitude,
-        city: place.location.city,
-        country: place.location.country,
-        street: place.location.street,
-        category: place.category_list?.[0]?.name || '',
-        picture: place.picture?.data?.url || null,
-        displayName: `${place.name}${place.location.city ? ', ' + place.location.city : ''}${place.location.country ? ', ' + place.location.country : ''}`
-      }));
+      const resp = await axios.get('https://nominatim.openstreetmap.org/search', {
+        params: {
+          q: query,
+          format: 'json',
+          addressdetails: 1,
+          limit: 8,
+          'accept-language': 'es'
+        },
+        headers: { 'User-Agent': 'MetaSuiteApp/1.0' }
+      });
+      const results = (resp.data || [])
+        .filter(p => p.lat && p.lon)
+        .map(place => {
+          const addr = place.address || {};
+          const city = addr.city || addr.town || addr.village || addr.municipality || '';
+          const state = addr.state || addr.region || '';
+          const country = addr.country || '';
+          const placeType = place.type || place.class || '';
+          // Categorizar el tipo para mostrar
+          const categoryMap = {
+            mall: 'Centro Comercial', shop: 'Tienda', restaurant: 'Restaurante',
+            hotel: 'Hotel', hospital: 'Hospital', school: 'Escuela',
+            university: 'Universidad', park: 'Parque', stadium: 'Estadio',
+            airport: 'Aeropuerto', church: 'Iglesia', bank: 'Banco',
+            cinema: 'Cine', gym: 'Gimnasio', cafe: 'Café',
+            supermarket: 'Supermercado', marketplace: 'Mercado'
+          };
+          const category = categoryMap[placeType] || (place.class === 'shop' ? 'Comercio' : place.class === 'amenity' ? 'Lugar' : '');
+          return {
+            id: `osm_${place.osm_id}`,
+            key: `place_${place.osm_id}`,
+            name: place.display_name?.split(',')[0] || place.name,
+            type: 'place',
+            latitude: parseFloat(place.lat),
+            longitude: parseFloat(place.lon),
+            city,
+            country,
+            street: addr.road || '',
+            category,
+            picture: null,
+            displayName: `${place.display_name?.split(',').slice(0, 3).join(',') || place.name}`
+          };
+        });
       return { success: true, data: results };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error?.message || error.message };
+      return { success: false, error: error.message };
     }
   }
 

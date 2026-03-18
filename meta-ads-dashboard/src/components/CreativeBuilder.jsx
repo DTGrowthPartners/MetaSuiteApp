@@ -686,7 +686,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const locationSearchTimer = useRef(null);
   const interestSearchTimer = useRef(null);
 
-  // Debounced location search (busca ciudades/regiones + lugares específicos)
+  // Debounced location search (busca ciudades/regiones via Meta + lugares específicos via OpenStreetMap)
   const handleLocationSearch = (query) => {
     setLocationSearch(query);
     if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current);
@@ -694,17 +694,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     locationSearchTimer.current = setTimeout(async () => {
       setSearchingLocations(true);
       const metaService = new MetaAdsService(accessToken);
-      // Si ya hay un place seleccionado, usar su centro para buscar lugares cercanos
-      const existingPlace = customLocations.find(l => l.latitude && l.longitude);
-      const center = existingPlace ? { latitude: existingPlace.latitude, longitude: existingPlace.longitude } : null;
-      // Si hay una ciudad seleccionada pero no coords, agregar el nombre de la ciudad al query de places
-      const cityLoc = customLocations.find(l => l.type === 'city');
-      const placesQuery = cityLoc && !center ? `${query} ${cityLoc.name}` : query;
-      // Buscar en paralelo: ciudades/regiones + lugares específicos
+      // Buscar en paralelo: Meta (ciudades/regiones) + OpenStreetMap (lugares específicos)
       const [geoResult, placesResult] = await Promise.all([
         metaService.searchLocations(query),
-        metaService.searchPlaces(placesQuery, center)
+        metaService.searchPlaces(query)
       ]);
+      // Ciudades primero, luego lugares
       const combined = [
         ...(geoResult.success ? geoResult.data : []),
         ...(placesResult.success ? placesResult.data : [])
