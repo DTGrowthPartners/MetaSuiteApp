@@ -138,21 +138,21 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
         if (pageEntry?.access_token) pageToken = pageEntry.access_token;
       } catch (e) { /* use user token */ }
 
-      // 2. page_backed_instagram_accounts (más confiable)
+      // 2. PRIORIDAD: instagram_business_account (cuenta IG REAL conectada — tiene permisos de audiencia)
       try {
         const resp = await fetch(
-          `https://graph.facebook.com/v21.0/${selectedPageForIg}/page_backed_instagram_accounts?fields=id,username,profile_picture_url&access_token=${pageToken}`
+          `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=instagram_business_account{id,username,profile_picture_url}&access_token=${pageToken}`
         );
         const data = await resp.json();
-        (data.data || []).forEach(ig => {
-          if (ig.id && !seenIds.has(ig.id)) {
-            seenIds.add(ig.id);
-            allIg.push({ id: ig.id, username: ig.username || 'Instagram', profile_pic: ig.profile_picture_url });
-          }
-        });
-      } catch (e) { console.warn('page_backed error:', e); }
+        const iba = data.instagram_business_account;
+        if (iba?.id && !seenIds.has(iba.id)) {
+          seenIds.add(iba.id);
+          allIg.push({ id: iba.id, username: iba.username || 'Instagram', profile_pic: iba.profile_picture_url });
+          console.log('IG from instagram_business_account:', iba.id, iba.username);
+        }
+      } catch (e) { console.warn('instagram_business_account error:', e); }
 
-      // 3. /{page}/instagram_accounts
+      // 3. /{page}/instagram_accounts con page token
       if (allIg.length === 0) {
         try {
           const resp = await fetch(
@@ -163,27 +163,13 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
             if (ig.id && !seenIds.has(ig.id)) {
               seenIds.add(ig.id);
               allIg.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_pic });
+              console.log('IG from /instagram_accounts:', ig.id, ig.username);
             }
           });
         } catch (e) { /* silent */ }
       }
 
-      // 4. instagram_business_account field
-      if (allIg.length === 0) {
-        try {
-          const resp = await fetch(
-            `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=instagram_business_account{id,username}&access_token=${pageToken}`
-          );
-          const data = await resp.json();
-          const iba = data.instagram_business_account;
-          if (iba?.id && !seenIds.has(iba.id)) {
-            seenIds.add(iba.id);
-            allIg.push({ id: iba.id, username: iba.username || 'Instagram' });
-          }
-        } catch (e) { /* silent */ }
-      }
-
-      // 5. Ad account instagram_accounts (último fallback)
+      // 4. Ad account instagram_accounts
       if (allIg.length === 0 && selectedAccount) {
         try {
           const metaService = new MetaAdsService(accessToken);
@@ -193,9 +179,27 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
               if (ig.id && !seenIds.has(ig.id)) {
                 seenIds.add(ig.id);
                 allIg.push(ig);
+                console.log('IG from ad account:', ig.id, ig.username);
               }
             });
           }
+        } catch (e) { /* silent */ }
+      }
+
+      // 5. Último fallback: page_backed_instagram_accounts (cuenta sintética — puede NO tener permisos de audiencia)
+      if (allIg.length === 0) {
+        try {
+          const resp = await fetch(
+            `https://graph.facebook.com/v21.0/${selectedPageForIg}/page_backed_instagram_accounts?fields=id,username,profile_picture_url&access_token=${pageToken}`
+          );
+          const data = await resp.json();
+          (data.data || []).forEach(ig => {
+            if (ig.id && !seenIds.has(ig.id)) {
+              seenIds.add(ig.id);
+              allIg.push({ id: ig.id, username: ig.username || 'Instagram (auto)', profile_pic: ig.profile_picture_url });
+              console.log('IG from page_backed (fallback):', ig.id, ig.username);
+            }
+          });
         } catch (e) { /* silent */ }
       }
 
