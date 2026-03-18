@@ -694,10 +694,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     locationSearchTimer.current = setTimeout(async () => {
       setSearchingLocations(true);
       const metaService = new MetaAdsService(accessToken);
+      // Si ya hay un place seleccionado, usar su centro para buscar lugares cercanos
+      const existingPlace = customLocations.find(l => l.latitude && l.longitude);
+      const center = existingPlace ? { latitude: existingPlace.latitude, longitude: existingPlace.longitude } : null;
+      // Si hay una ciudad seleccionada pero no coords, agregar el nombre de la ciudad al query de places
+      const cityLoc = customLocations.find(l => l.type === 'city');
+      const placesQuery = cityLoc && !center ? `${query} ${cityLoc.name}` : query;
       // Buscar en paralelo: ciudades/regiones + lugares específicos
       const [geoResult, placesResult] = await Promise.all([
         metaService.searchLocations(query),
-        metaService.searchPlaces(query)
+        metaService.searchPlaces(placesQuery, center)
       ]);
       const combined = [
         ...(geoResult.success ? geoResult.data : []),

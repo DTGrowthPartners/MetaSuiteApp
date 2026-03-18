@@ -858,17 +858,21 @@ class MetaAdsService {
   }
 
   // Buscar lugares específicos (centros comerciales, negocios, etc.) — devuelve lat/lng para custom_locations
-  async searchPlaces(query) {
+  async searchPlaces(query, center = null) {
     try {
-      const resp = await axios.get(`${META_API_BASE_URL}/search`, {
-        params: {
-          access_token: this.accessToken,
-          type: 'place',
-          q: query,
-          fields: 'name,location,category_list,picture',
-          limit: 10
-        }
-      });
+      const params = {
+        access_token: this.accessToken,
+        type: 'place',
+        q: query,
+        fields: 'name,location,category_list,picture',
+        limit: 10
+      };
+      // Si hay un centro (lat,lng), buscar cerca de esa ubicación
+      if (center) {
+        params.center = `${center.latitude},${center.longitude}`;
+        params.distance = 50000; // 50km de radio de búsqueda
+      }
+      const resp = await axios.get(`${META_API_BASE_URL}/search`, { params });
       const results = (resp.data.data || []).filter(p => p.location?.latitude && p.location?.longitude).map(place => ({
         id: place.id,
         key: `place_${place.id}`,
