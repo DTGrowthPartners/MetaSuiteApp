@@ -126,32 +126,86 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
     const loadIg = async () => {
       setLoadingIg(true);
       setIgAccounts([]);
+      const allIg = [];
+      const seenIds = new Set();
+
+      // 1. Obtener page token via /me/accounts
+      let pageToken = accessToken;
       try {
-        // Try page's instagram_accounts
+        const meResp = await fetch(`https://graph.facebook.com/v21.0/me/accounts?fields=id,access_token&access_token=${accessToken}`);
+        const meData = await meResp.json();
+        const pageEntry = (meData.data || []).find(p => p.id === selectedPageForIg);
+        if (pageEntry?.access_token) pageToken = pageEntry.access_token;
+      } catch (e) { /* use user token */ }
+
+      // 2. page_backed_instagram_accounts (más confiable)
+      try {
         const resp = await fetch(
-          `https://graph.facebook.com/v21.0/${selectedPageForIg}/instagram_accounts?fields=id,username,profile_pic&access_token=${accessToken}`
+          `https://graph.facebook.com/v21.0/${selectedPageForIg}/page_backed_instagram_accounts?fields=id,username,profile_picture_url&access_token=${pageToken}`
         );
         const data = await resp.json();
-        let accounts = data.data || [];
-        // Fallback: page_backed_instagram_accounts
-        if (accounts.length === 0) {
-          const resp2 = await fetch(
-            `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=page_backed_instagram_accounts{id,username}&access_token=${accessToken}`
+        (data.data || []).forEach(ig => {
+          if (ig.id && !seenIds.has(ig.id)) {
+            seenIds.add(ig.id);
+            allIg.push({ id: ig.id, username: ig.username || 'Instagram', profile_pic: ig.profile_picture_url });
+          }
+        });
+      } catch (e) { console.warn('page_backed error:', e); }
+
+      // 3. /{page}/instagram_accounts
+      if (allIg.length === 0) {
+        try {
+          const resp = await fetch(
+            `https://graph.facebook.com/v21.0/${selectedPageForIg}/instagram_accounts?fields=id,username,profile_pic&access_token=${pageToken}`
           );
-          const data2 = await resp2.json();
-          accounts = data2.page_backed_instagram_accounts?.data || [];
-        }
-        setIgAccounts(accounts);
-        // Auto-select if only one
-        if (accounts.length === 1) setSourceId(accounts[0].id);
-      } catch (e) {
-        console.error('Error loading IG accounts:', e);
-        setIgAccounts([]);
+          const data = await resp.json();
+          (data.data || []).forEach(ig => {
+            if (ig.id && !seenIds.has(ig.id)) {
+              seenIds.add(ig.id);
+              allIg.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_pic });
+            }
+          });
+        } catch (e) { /* silent */ }
       }
+
+      // 4. instagram_business_account field
+      if (allIg.length === 0) {
+        try {
+          const resp = await fetch(
+            `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=instagram_business_account{id,username}&access_token=${pageToken}`
+          );
+          const data = await resp.json();
+          const iba = data.instagram_business_account;
+          if (iba?.id && !seenIds.has(iba.id)) {
+            seenIds.add(iba.id);
+            allIg.push({ id: iba.id, username: iba.username || 'Instagram' });
+          }
+        } catch (e) { /* silent */ }
+      }
+
+      // 5. Ad account instagram_accounts (último fallback)
+      if (allIg.length === 0 && selectedAccount) {
+        try {
+          const metaService = new MetaAdsService(accessToken);
+          const result = await metaService.getInstagramAccounts(selectedAccount);
+          if (result.success) {
+            (result.data || []).forEach(ig => {
+              if (ig.id && !seenIds.has(ig.id)) {
+                seenIds.add(ig.id);
+                allIg.push(ig);
+              }
+            });
+          }
+        } catch (e) { /* silent */ }
+      }
+
+      console.log('IG accounts found for page', selectedPageForIg, ':', allIg.length, allIg);
+      setIgAccounts(allIg);
+      if (allIg.length === 1) setSourceId(allIg[0].id);
       setLoadingIg(false);
     };
     loadIg();
-  }, [selectedPageForIg, accessToken]);
+  }, [selectedPageForIg, accessToken, selectedAccount]);
 
   // Load lead forms when source is leads and page is selected
   useEffect(() => {
