@@ -933,14 +933,22 @@ class MetaAdsService {
         }
       };
 
-      const ruleStr = JSON.stringify(rule);
       console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
-      console.log('Rule JSON:', ruleStr);
+      console.log('Rule JSON:', JSON.stringify(rule, null, 2));
 
-      // Meta requiere rule como string JSON, no como objeto
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`,
-        `name=${encodeURIComponent(name)}&subtype=ENGAGEMENT&rule=${encodeURIComponent(ruleStr)}&prefill=1&access_token=${this.accessToken}${description ? '&description=' + encodeURIComponent(description) : ''}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      // Formato exacto del doc: JSON body + Authorization header
+      const body = { name, subtype: 'ENGAGEMENT', rule };
+      if (description) body.description = description;
+
+      const resp = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
+        body,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       return { success: true, data: resp.data };
     } catch (error) {
@@ -975,13 +983,21 @@ class MetaAdsService {
         }
       };
 
-      const ruleStr = JSON.stringify(rule);
       console.log('Creating video audience:', { name, sourceId, sourceType, event, retentionDays });
-      console.log('Video Rule JSON:', ruleStr);
+      console.log('Video Rule JSON:', JSON.stringify(rule, null, 2));
 
-      const resp = await axios.post(`${META_API_BASE_URL}/${normalizedId}/customaudiences`,
-        `name=${encodeURIComponent(name)}&subtype=ENGAGEMENT&rule=${encodeURIComponent(ruleStr)}&prefill=1&access_token=${this.accessToken}${description ? '&description=' + encodeURIComponent(description) : ''}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      const body = { name, subtype: 'ENGAGEMENT', rule };
+      if (description) body.description = description;
+
+      const resp = await axios.post(
+        `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
+        body,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       return { success: true, data: resp.data };
     } catch (error) {
