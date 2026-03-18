@@ -16,11 +16,11 @@ const SOURCES = [
     sourceType: 'ig_business',
     maxDays: 730,
     events: [
-      { value: 'ig_user_engaged', label: 'Cualquier interacción (likes, comentarios, guardados, compartidos)' },
-      { value: 'ig_user_profile_visit', label: 'Personas que visitaron el perfil' },
-      { value: 'ig_user_organic_and_ad', label: 'Interactuaron con contenido orgánico o anuncios' },
-      { value: 'ig_user_saved_media', label: 'Personas que guardaron una publicación' },
-      { value: 'ig_user_messaged', label: 'Personas que enviaron un mensaje DM' },
+      { value: 'ig_business_profile_all', label: 'Todos los que interactuaron con la cuenta' },
+      { value: 'ig_business_profile_visit', label: 'Personas que visitaron el perfil' },
+      { value: 'ig_business_profile_engaged', label: 'Interactuaron con contenido o anuncios' },
+      { value: 'ig_business_profile_ad_saved', label: 'Personas que guardaron un post o anuncio' },
+      { value: 'ig_user_messaged_business', label: 'Personas que enviaron un mensaje DM' },
     ]
   },
   {

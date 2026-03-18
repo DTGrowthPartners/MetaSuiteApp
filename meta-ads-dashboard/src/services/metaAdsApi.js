@@ -923,32 +923,33 @@ class MetaAdsService {
         inclusions: {
           operator: 'or',
           rules: [{
-            event_sources: [{ id: sourceId, type: sourceType }],
+            event_sources: [{ type: sourceType, id: sourceId }],
             retention_seconds: retentionSeconds,
             filter: {
               operator: 'and',
               filters: [{ field: 'event', operator: 'eq', value: event }]
-            }
+            },
+            min_retention_seconds: 0,
+            count: 0
           }]
         }
       };
 
       console.log('Creating engagement audience:', { name, sourceType, sourceId, event, retentionDays });
-      console.log('Rule JSON:', JSON.stringify(rule, null, 2));
+      console.log('Rule JSON:', JSON.stringify(rule));
 
-      // Formato exacto del doc: JSON body + Authorization header
-      const body = { name, subtype: 'ENGAGEMENT', rule };
-      if (description) body.description = description;
+      // Formato exacto de Ads Manager: form-urlencoded, sin subtype, rule como JSON string
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('rule', JSON.stringify(rule));
+      params.append('prefill', 'true');
+      params.append('access_token', this.accessToken);
+      if (description) params.append('description', description);
 
       const resp = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
-        body,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        params.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       return { success: true, data: resp.data };
     } catch (error) {
@@ -970,7 +971,7 @@ class MetaAdsService {
         inclusions: {
           operator: 'or',
           rules: [{
-            event_sources: [{ id: sourceId, type: sourceType || 'page' }],
+            event_sources: [{ type: sourceType || 'page', id: sourceId }],
             retention_seconds: retentionSeconds,
             filter: {
               operator: 'and',
@@ -978,26 +979,27 @@ class MetaAdsService {
                 { field: 'event', operator: 'eq', value: 'video_watched' },
                 { field: 'video_watched', operator: 'eq', value: event }
               ]
-            }
+            },
+            min_retention_seconds: 0,
+            count: 0
           }]
         }
       };
 
       console.log('Creating video audience:', { name, sourceId, sourceType, event, retentionDays });
-      console.log('Video Rule JSON:', JSON.stringify(rule, null, 2));
+      console.log('Video Rule JSON:', JSON.stringify(rule));
 
-      const body = { name, subtype: 'ENGAGEMENT', rule };
-      if (description) body.description = description;
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('rule', JSON.stringify(rule));
+      params.append('prefill', 'true');
+      params.append('access_token', this.accessToken);
+      if (description) params.append('description', description);
 
       const resp = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
-        body,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        params.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       return { success: true, data: resp.data };
     } catch (error) {
