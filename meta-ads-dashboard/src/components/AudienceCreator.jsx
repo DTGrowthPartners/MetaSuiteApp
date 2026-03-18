@@ -138,26 +138,21 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
         if (pageEntry?.access_token) pageToken = pageEntry.access_token;
       } catch (e) { /* use user token */ }
 
-      // 2. PRIORIDAD para audiencias: /{ad_account}/instagram_accounts (Marketing API ID — el que usa Ads Manager)
-      if (selectedAccount) {
-        try {
-          const metaService = new MetaAdsService(accessToken);
-          const normalizedId = metaService.normalizeAccountId(selectedAccount);
-          const resp = await fetch(
-            `https://graph.facebook.com/v21.0/${normalizedId}/instagram_accounts?fields=id,username,profile_pic&access_token=${accessToken}`
-          );
-          const data = await resp.json();
-          (data.data || []).forEach(ig => {
-            if (ig.id && !seenIds.has(ig.id)) {
-              seenIds.add(ig.id);
-              allIg.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_pic });
-              console.log('IG from ad account instagram_accounts (Marketing ID):', ig.id, ig.username);
-            }
-          });
-        } catch (e) { console.warn('ad account IG error:', e); }
-      }
+      // 2. PRIORIDAD: instagram_business_account (cuenta IG real — crea audiencias funcionales)
+      try {
+        const resp = await fetch(
+          `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=instagram_business_account{id,username,profile_picture_url}&access_token=${pageToken}`
+        );
+        const data = await resp.json();
+        const iba = data.instagram_business_account;
+        if (iba?.id && !seenIds.has(iba.id)) {
+          seenIds.add(iba.id);
+          allIg.push({ id: iba.id, username: iba.username || 'Instagram', profile_pic: iba.profile_picture_url });
+          console.log('IG from instagram_business_account:', iba.id, '@' + iba.username);
+        }
+      } catch (e) { console.warn('instagram_business_account error:', e); }
 
-      // 3. /{page}/instagram_accounts con page token
+      // 3. Fallback: /{page}/instagram_accounts
       if (allIg.length === 0) {
         try {
           const resp = await fetch(
@@ -167,14 +162,14 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
           (data.data || []).forEach(ig => {
             if (ig.id && !seenIds.has(ig.id)) {
               seenIds.add(ig.id);
-              allIg.push({ id: ig.id, username: ig.username, profile_pic: ig.profile_pic });
-              console.log('IG from page /instagram_accounts:', ig.id, ig.username);
+              allIg.push({ id: ig.id, username: ig.username || 'Instagram', profile_pic: ig.profile_pic });
+              console.log('IG from page /instagram_accounts:', ig.id, '@' + ig.username);
             }
           });
         } catch (e) { /* silent */ }
       }
 
-      // 4. page_backed_instagram_accounts
+      // 4. Fallback: page_backed_instagram_accounts
       if (allIg.length === 0) {
         try {
           const resp = await fetch(
@@ -184,26 +179,12 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
           (data.data || []).forEach(ig => {
             if (ig.id && !seenIds.has(ig.id)) {
               seenIds.add(ig.id);
-              allIg.push({ id: ig.id, username: ig.username || 'Instagram', profile_pic: ig.profile_picture_url });
-              console.log('IG from page_backed:', ig.id, ig.username);
+              // Usar nombre de la página si no hay username
+              const pageName = accountPages.find(p => p.id === selectedPageForIg)?.name;
+              allIg.push({ id: ig.id, username: ig.username || pageName || 'Instagram', profile_pic: ig.profile_picture_url });
+              console.log('IG from page_backed:', ig.id, ig.username || pageName);
             }
           });
-        } catch (e) { /* silent */ }
-      }
-
-      // 5. instagram_business_account (Graph API ID — último recurso)
-      if (allIg.length === 0) {
-        try {
-          const resp = await fetch(
-            `https://graph.facebook.com/v21.0/${selectedPageForIg}?fields=instagram_business_account{id,username}&access_token=${pageToken}`
-          );
-          const data = await resp.json();
-          const iba = data.instagram_business_account;
-          if (iba?.id && !seenIds.has(iba.id)) {
-            seenIds.add(iba.id);
-            allIg.push({ id: iba.id, username: iba.username || 'Instagram' });
-            console.log('IG from instagram_business_account (Graph API ID):', iba.id, iba.username);
-          }
         } catch (e) { /* silent */ }
       }
 
