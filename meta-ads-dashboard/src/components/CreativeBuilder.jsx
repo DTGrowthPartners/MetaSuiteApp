@@ -3336,6 +3336,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         targeting.genders = job.gender === 'male' ? [1] : [2];
       }
 
+      console.log('TARGETING FINAL:', JSON.stringify(targeting, null, 2));
+      addLog(`Targeting: ${job.audienceMode === 'custom' ? 'Personalizado' : 'Guardado'} — ${JSON.stringify(targeting.geo_locations || {})}`);
+
       // Obtener configuración desde el job
       const objective = job.objective || 'OUTCOME_TRAFFIC';
       const optimizationGoal = job.optimizationGoal || 'LANDING_PAGE_VIEWS';
