@@ -48,13 +48,13 @@ const SOURCES = [
     maxDays: 365,
     needsPage: true,
     events: [
-      { value: 'video_watched_3s', label: 'Personas que vieron al menos 3 segundos' },
+      { value: 'video_watched', label: 'Personas que vieron al menos 3 segundos' },
       { value: 'video_watched_10s', label: 'Personas que vieron al menos 10 segundos' },
+      { value: 'video_view_15s', label: 'ThruPlay (15 segundos o completo)' },
       { value: 'video_watched_25_percent', label: 'Personas que vieron el 25% del video' },
       { value: 'video_watched_50_percent', label: 'Personas que vieron el 50% del video' },
       { value: 'video_watched_75_percent', label: 'Personas que vieron el 75% del video' },
       { value: 'video_watched_95_percent', label: 'Personas que vieron el 95% del video' },
-      { value: 'video_completed', label: 'Personas que vieron el 100% del video' },
     ]
   },
   {

@@ -967,91 +967,30 @@ class MetaAdsService {
 
       console.log('Creating video audience:', { name, sourceId, videoIds, event, retentionDays });
 
-      // Intentar múltiples formatos hasta que uno funcione
-      const attempts = [
-        // Formato 1: Legacy array rule con object_id
-        () => {
-          const rule = videoIds?.length > 0
-            ? videoIds.map(vid => ({ object_id: vid, event_name: event }))
-            : [{ object_id: sourceId, event_name: event }];
-          const p = new URLSearchParams();
-          p.append('name', name);
-          p.append('subtype', 'ENGAGEMENT');
-          p.append('rule', JSON.stringify(rule));
-          p.append('retention_days', String(retentionDays));
-          p.append('prefill', 'true');
-          p.append('access_token', this.accessToken);
-          if (description) p.append('description', description);
-          console.log('Video attempt 1 (legacy array):', JSON.stringify(rule));
-          return p;
-        },
-        // Formato 2: subtype VIDEO + object_id + rule string
-        () => {
-          const p = new URLSearchParams();
-          p.append('name', name);
-          p.append('subtype', 'VIDEO');
-          p.append('object_id', sourceId);
-          p.append('rule', event);
-          p.append('retention_days', String(retentionDays));
-          p.append('prefill', 'true');
-          p.append('access_token', this.accessToken);
-          if (description) p.append('description', description);
-          if (videoIds?.length > 0) p.append('video_group_ids', JSON.stringify(videoIds));
-          console.log('Video attempt 2 (VIDEO subtype)');
-          return p;
-        },
-        // Formato 3: Sin subtype, JSON rule con page source + video_watched filter
-        () => {
-          const rule = {
-            inclusions: {
-              operator: 'or',
-              rules: [{
-                event_sources: [{ type: 'page', id: sourceId }],
-                retention_seconds: retentionDays * 86400,
-                filter: {
-                  operator: 'and',
-                  filters: [
-                    { field: 'event', operator: 'eq', value: 'video_watched' },
-                    { field: 'video_watched', operator: 'eq', value: event }
-                  ]
-                },
-                min_retention_seconds: 0,
-                count: 0
-              }]
-            }
-          };
-          const p = new URLSearchParams();
-          p.append('name', name);
-          p.append('rule', JSON.stringify(rule));
-          p.append('prefill', 'true');
-          p.append('access_token', this.accessToken);
-          if (description) p.append('description', description);
-          console.log('Video attempt 3 (JSON rule no subtype):', JSON.stringify(rule));
-          return p;
-        }
-      ];
+      // Formato exacto de Ads Manager: subtype ENGAGEMENT + rule como JSON array
+      // Cada video es un entry: { event_name, object_id (video), context_id (page) }
+      const rule = videoIds?.length > 0
+        ? videoIds.map(vid => ({ event_name: event, object_id: vid, context_id: sourceId }))
+        : [{ event_name: event, object_id: sourceId, context_id: sourceId }];
 
-      let lastError = null;
-      for (let i = 0; i < attempts.length; i++) {
-        try {
-          const params = attempts[i]();
-          const resp = await axios.post(
-            `https://graph.facebook.com/v21.0/${normalizedId}/customaudiences`,
-            params.toString(),
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-          );
-          console.log(`Video attempt ${i + 1} SUCCESS:`, resp.data);
-          return { success: true, data: resp.data };
-        } catch (err) {
-          const errData = err.response?.data?.error;
-          console.warn(`Video attempt ${i + 1} failed:`, errData?.message || err.message);
-          lastError = errData;
-        }
-      }
+      console.log('Video rule:', JSON.stringify(rule));
 
-      // Todos fallaron
-      const errMsg = lastError?.error_user_msg || lastError?.message || 'Todos los formatos fallaron';
-      return { success: false, error: errMsg };
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('subtype', 'ENGAGEMENT');
+      params.append('rule', JSON.stringify(rule));
+      params.append('retention_days', String(retentionDays));
+      params.append('prefill', 'true');
+      params.append('access_token', this.accessToken);
+      if (description) params.append('description', description);
+
+      const resp = await axios.post(
+        `https://graph.facebook.com/v22.0/${normalizedId}/customaudiences`,
+        params.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      console.log('Video audience SUCCESS:', resp.data);
+      return { success: true, data: resp.data };
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
