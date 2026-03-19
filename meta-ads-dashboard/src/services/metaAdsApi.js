@@ -965,12 +965,13 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      console.log('Creating video audience:', { name, videoIds, event, retentionDays });
+      console.log('Creating video audience:', { name, sourceId, videoIds, event, retentionDays });
 
-      // Video usa subtype VIDEO + rule como string simple + video_group_ids
+      // Video: subtype VIDEO + object_id (page) + rule string + video_group_ids
       const params = new URLSearchParams();
       params.append('name', name);
       params.append('subtype', 'VIDEO');
+      if (sourceId) params.append('object_id', sourceId);
       params.append('rule', event); // String simple: video_watched_25_percent, etc.
       params.append('retention_days', String(retentionDays));
       params.append('prefill', 'true');
