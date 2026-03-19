@@ -967,19 +967,46 @@ class MetaAdsService {
 
       console.log('Creating video audience:', { name, sourceId, videoIds, event, retentionDays });
 
-      // Formato exacto de Ads Manager: subtype ENGAGEMENT + rule como JSON array
-      // Cada video es un entry: { event_name, object_id (video), context_id (page) }
-      const rule = videoIds?.length > 0
-        ? videoIds.map(vid => ({ event_name: event, object_id: vid, context_id: sourceId }))
-        : [{ event_name: event, object_id: sourceId, context_id: sourceId }];
+      // La API pública no soporta subtype ENGAGEMENT para video (solo funciona en adsmanager-graph interno)
+      // Usamos JSON rule sin subtype — crea audiencia funcional para targeting
+      // aunque Meta UI la muestre como "Facebook Page" en vez de "Video"
+      const retentionSeconds = retentionDays * 86400;
 
+      // Si hay videos seleccionados, crear una rule por video; si no, todos los videos de la página
+      const rules = videoIds?.length > 0
+        ? videoIds.map(vid => ({
+            event_sources: [{ type: 'page', id: sourceId }],
+            retention_seconds: retentionSeconds,
+            filter: {
+              operator: 'and',
+              filters: [
+                { field: 'event', operator: 'eq', value: 'video_watched' },
+                { field: 'video_watched', operator: 'eq', value: event }
+              ]
+            },
+            min_retention_seconds: 0,
+            count: 0
+          }))
+        : [{
+            event_sources: [{ type: 'page', id: sourceId }],
+            retention_seconds: retentionSeconds,
+            filter: {
+              operator: 'and',
+              filters: [
+                { field: 'event', operator: 'eq', value: 'video_watched' },
+                { field: 'video_watched', operator: 'eq', value: event }
+              ]
+            },
+            min_retention_seconds: 0,
+            count: 0
+          }];
+
+      const rule = { inclusions: { operator: 'or', rules } };
       console.log('Video rule:', JSON.stringify(rule));
 
       const params = new URLSearchParams();
       params.append('name', name);
-      params.append('subtype', 'ENGAGEMENT');
       params.append('rule', JSON.stringify(rule));
-      params.append('retention_days', String(retentionDays));
       params.append('prefill', 'true');
       params.append('access_token', this.accessToken);
       if (description) params.append('description', description);
@@ -990,7 +1017,6 @@ class MetaAdsService {
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       console.log('Video audience SUCCESS:', resp.data);
-      return { success: true, data: resp.data };
       return { success: true, data: resp.data };
     } catch (error) {
       const errData = error.response?.data?.error;
