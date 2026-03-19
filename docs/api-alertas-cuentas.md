@@ -45,36 +45,63 @@ Devuelve todas las cuentas publicitarias accesibles con su estado actual:
 | 100 | Cerrada | No se puede reactivar |
 | 101 | Cualquier estado desconocido | Verificar en Meta Business Suite |
 
-## Formato de alerta (OBLIGATORIO)
+## Plantilla: Alerta de pago rechazado (OBLIGATORIO)
 
-Cuando el estado de una cuenta **cambie**, Maria debe enviar una alerta con este formato exacto:
+Cuando el estado cambie a **3 (pago pendiente)** o similar, Maria debe enviar este mensaje exacto:
 
 ```
-🚨 Alerta Meta Ads
+Hola {nombre_cliente},
+
+⚠️ Alerta de Publicidad
 
 Cuenta: {nombre_cuenta}
-Estado anterior: {estado_anterior}
-Estado nuevo: {estado_nuevo}
-Razón: {razón si está disponible, sino "Sin razón especificada"}
+Estado: Pausada por fallo de pago
+💰 Monto pendiente: ${monto} {moneda}
 
-Acción: {acción recomendada según la tabla de códigos}
+El método de pago fue rechazado. Tus campañas están detenidas y no se muestran anuncios.
+
+🔹 ¿Qué hacer?
+Recarga o actualiza tu método de pago por un valor mínimo de ${monto} para reactivar tus campañas.
+
+⏳ Mientras no se resuelva, estás perdiendo visibilidad, clientes y ventas.
+
+¿Dudas o necesitas ayuda? Contacta a Dairo: +573007189383
+— Equipo DT Growth Partners
 ```
 
-### Reglas del formato:
-1. **NO incluir gasto acumulado** — esta métrica no es relevante para alertas de estado y puede confundir al cliente
-2. **NO incluir `amount_spent`** ni ningún dato financiero en las alertas de estado
-3. **NO incluir códigos numéricos** entre paréntesis — solo mostrar el nombre del estado en texto (ej: "Activa", "No liquidada", "Deshabilitada"). Nunca poner "(1)", "(3)", etc.
-4. Solo alertar cuando el estado CAMBIE (no repetir la misma alerta)
-5. Si el estado vuelve a Activa, enviar alerta positiva con este formato exacto (sin estado anterior, sin gasto, sin códigos):
+### Variables:
+- `{nombre_cliente}`: nombre del cliente/dueño de la cuenta
+- `{nombre_cuenta}`: nombre de la cuenta publicitaria
+- `{monto}`: monto pendiente de pago (si está disponible en la API, sino omitir la línea de monto)
+- `{moneda}`: moneda de la cuenta (COP, USD, etc.)
+
+## Plantilla: Cuenta reactivada (OBLIGATORIO)
+
+Cuando el estado vuelva a **1 (Activa)**, Maria debe enviar este mensaje exacto:
 
 ```
-✅ Cuenta reactivada
+Hola {nombre_cliente},
+
+✅ Tu cuenta publicitaria está activa nuevamente
 
 Cuenta: {nombre_cuenta}
-Estado: Activa
+💰 Pago procesado: ${monto} {moneda}
 
-La cuenta fue reactivada exitosamente. Tus campañas de anuncios correran normalmente.
+Tus campañas ya están corriendo con normalidad. Tus anuncios se están mostrando nuevamente.
+
+⚡ Recuerda mantener tu método de pago al día para evitar pausas que reinicien el aprendizaje de tus campañas y afecten su rendimiento.
+
+Gracias por resolver el pago rápidamente 🙌
+
+— Equipo DT Growth Partners
 ```
+
+### Reglas generales:
+1. **NO incluir códigos numéricos** de estado — nunca poner "(1)", "(3)", etc.
+2. **NO incluir `amount_spent`** (gasto acumulado) — solo mostrar el monto pendiente si aplica
+3. Solo alertar cuando el estado **CAMBIE** (no repetir la misma alerta)
+4. Si no se tiene el monto pendiente, omitir la línea de "💰 Monto pendiente" o "💰 Pago procesado"
+5. Si no se tiene el nombre del cliente, omitir "Hola {nombre_cliente}," y empezar directo con la alerta
 
 ## Lógica de monitoreo
 
