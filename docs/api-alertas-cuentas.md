@@ -53,8 +53,8 @@ Cuando el estado de una cuenta **cambie**, Maria debe enviar una alerta con este
 🚨 Alerta Meta Ads
 
 Cuenta: {nombre_cuenta}
-Estado anterior: {estado_anterior} ({codigo_anterior})
-Estado nuevo: {estado_nuevo} ({codigo_nuevo})
+Estado anterior: {estado_anterior}
+Estado nuevo: {estado_nuevo}
 Razón: {razón si está disponible, sino "Sin razón especificada"}
 
 Acción: {acción recomendada según la tabla de códigos}
@@ -63,8 +63,9 @@ Acción: {acción recomendada según la tabla de códigos}
 ### Reglas del formato:
 1. **NO incluir gasto acumulado** — esta métrica no es relevante para alertas de estado y puede confundir al cliente
 2. **NO incluir `amount_spent`** ni ningún dato financiero en las alertas de estado
-3. Solo alertar cuando el estado CAMBIE (no repetir la misma alerta)
-4. Si el estado vuelve a 1 (Activa), enviar alerta positiva con este formato exacto (sin estado anterior, sin gasto):
+3. **NO incluir códigos numéricos** entre paréntesis — solo mostrar el nombre del estado en texto (ej: "Activa", "No liquidada", "Deshabilitada"). Nunca poner "(1)", "(3)", etc.
+4. Solo alertar cuando el estado CAMBIE (no repetir la misma alerta)
+5. Si el estado vuelve a Activa, enviar alerta positiva con este formato exacto (sin estado anterior, sin gasto, sin códigos):
 
 ```
 ✅ Cuenta reactivada
