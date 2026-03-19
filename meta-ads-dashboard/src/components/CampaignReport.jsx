@@ -113,7 +113,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   if (!data) return null;
 
   const { campaigns = [], dateRange, name, businessName, locations = [] } = data;
-  const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday';
+  const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : viewMode === 'today' ? 'insightsToday' : 'insightsLastMonth';
 
   // Campañas con gasto en el periodo
   const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
@@ -189,6 +189,9 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
           <button className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('today')}>
             Hoy<span className="report-day-date">{formatDate(dateRange?.today)}</span>
           </button>
+          <button className={`report-day-btn ${viewMode === 'lastMonth' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('lastMonth')}>
+            Mes pasado<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
+          </button>
         </div>
       </div>
 
@@ -209,7 +212,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
       </section>
 
       {active.length === 0 && (
-        <div className="report-no-data">Sin datos para {viewMode === 'yesterday' ? 'ayer' : 'hoy'}</div>
+        <div className="report-no-data">Sin datos para {viewMode === 'yesterday' ? 'ayer' : viewMode === 'today' ? 'hoy' : 'el mes pasado'}</div>
       )}
 
       {/* Grouped Tables */}

@@ -2049,9 +2049,27 @@ function getReportDates() {
   return { yesterday, today, colombiaTime };
 }
 
+// Helper: obtener primer y último día del mes pasado (zona Colombia)
+function getLastMonthRange() {
+  const now = new Date();
+  const colombiaOffset = -5 * 60;
+  const colombiaTime = new Date(now.getTime() + (colombiaOffset - now.getTimezoneOffset()) * 60000);
+  const y = colombiaTime.getFullYear();
+  const m = colombiaTime.getMonth(); // mes actual (0-based)
+  // Mes pasado
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay = new Date(y, m, 0); // día 0 del mes actual = último día del mes anterior
+  const since = firstDay.toISOString().split('T')[0];
+  const until = lastDay.toISOString().split('T')[0];
+  const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const label = `${months[firstDay.getMonth()]} ${firstDay.getFullYear()}`;
+  return { since, until, label };
+}
+
 // Helper: obtener campañas con insights por rango de fechas
 async function getReportData(accountId, token) {
   const { yesterday, today } = getReportDates();
+  const lastMonth = getLastMonthRange();
   const normalizedId = normalizeAccountId(accountId);
 
   // Obtener campañas activas y pausadas
@@ -2065,14 +2083,17 @@ async function getReportData(accountId, token) {
   });
   const campaigns = campaignsResp.data.data || [];
 
+  const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
+
   const withInsights = await Promise.all(campaigns.map(async (campaign) => {
     let insightsYesterday = {};
     let insightsToday = {};
+    let insightsLastMonth = {};
     try {
       const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
         params: {
           access_token: token,
-          fields: 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks',
+          fields: insightsFields,
           time_range: JSON.stringify({ since: yesterday, until: yesterday })
         }
       });
@@ -2082,25 +2103,36 @@ async function getReportData(accountId, token) {
       const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
         params: {
           access_token: token,
-          fields: 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks',
+          fields: insightsFields,
           time_range: JSON.stringify({ since: today, until: today })
         }
       });
       insightsToday = resp.data.data?.[0] || {};
     } catch (e) {}
+    try {
+      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
+        params: {
+          access_token: token,
+          fields: insightsFields,
+          time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until })
+        }
+      });
+      insightsLastMonth = resp.data.data?.[0] || {};
+    } catch (e) {}
 
-    return { ...campaign, insightsYesterday, insightsToday };
+    return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth };
   }));
 
   const activeCampaigns = withInsights.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
     parseFloat(c.insightsToday?.spend || 0) > 0 ||
+    parseFloat(c.insightsLastMonth?.spend || 0) > 0 ||
     c.status === 'ACTIVE'
   );
 
   return {
     campaigns: activeCampaigns,
-    dateRange: { yesterday, today },
+    dateRange: { yesterday, today, lastMonth: { since: lastMonth.since, until: lastMonth.until, label: lastMonth.label } },
     fetchedAt: new Date().toISOString(),
     totalCampaigns: activeCampaigns.length
   };
