@@ -3,7 +3,7 @@ import MetaAdsService from '../services/metaAdsApi';
 import CustomSelect from './ui/CustomSelect';
 import {
   Users, Instagram, MessageSquare, Video, ClipboardList,
-  ArrowLeft, Check, Loader2, AlertCircle, Globe
+  ArrowLeft, Check, Loader2, AlertCircle, Globe, Monitor
 } from 'lucide-react';
 
 // Fuentes de engagement
@@ -52,6 +52,25 @@ const SOURCES = [
       { value: 'lead_generation_opened', label: 'Personas que abrieron el formulario' },
       { value: 'lead_generation_dropoff', label: 'Personas que abrieron pero no enviaron' },
     ]
+  },
+  {
+    id: 'website',
+    label: 'Sitio Web (Pixel)',
+    icon: Monitor,
+    color: '#8B5CF6',
+    sourceType: 'pixel',
+    maxDays: 180,
+    needsPixel: true,
+    events: [
+      { value: 'ALL_VISITORS', label: 'Todos los visitantes del sitio web' },
+      { value: 'ViewContent', label: 'Personas que vieron un producto (ViewContent)' },
+      { value: 'AddToCart', label: 'Personas que agregaron al carrito (AddToCart)' },
+      { value: 'InitiateCheckout', label: 'Personas que iniciaron checkout (InitiateCheckout)' },
+      { value: 'Purchase', label: 'Personas que compraron (Purchase)' },
+      { value: 'Lead', label: 'Personas que se registraron como lead (Lead)' },
+      { value: 'Search', label: 'Personas que usaron la búsqueda (Search)' },
+      { value: 'PageView', label: 'Personas que visitaron una página específica (PageView)' },
+    ]
   }
 ];
 
@@ -71,6 +90,7 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
   const [igAccounts, setIgAccounts] = useState([]);
   const [accountPages, setAccountPages] = useState([]);
   const [leadForms, setLeadForms] = useState([]);
+  const [pixels, setPixels] = useState([]);
   const [loadingSource, setLoadingSource] = useState(false);
   const [loadingIg, setLoadingIg] = useState(false);
 
@@ -102,7 +122,27 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
     loadPages();
   }, [selectedAccount, accessToken]);
 
-  // Load IG accounts when a page is selected (for Instagram source or Video IG)
+  // Load pixels when account is selected
+  useEffect(() => {
+    if (!selectedAccount || !accessToken) return;
+    const loadPixels = async () => {
+      try {
+        const metaService = new MetaAdsService(accessToken);
+        const normalizedId = metaService.normalizeAccountId(selectedAccount);
+        const resp = await fetch(
+          `https://graph.facebook.com/v21.0/${normalizedId}/adspixels?fields=id,name&access_token=${accessToken}`
+        );
+        const data = await resp.json();
+        setPixels(data.data || []);
+      } catch (e) {
+        console.error('Error loading pixels:', e);
+        setPixels([]);
+      }
+    };
+    loadPixels();
+  }, [selectedAccount, accessToken]);
+
+  // Load IG accounts when a page is selected (for Instagram source)
   useEffect(() => {
     if (!selectedPageForIg || !accessToken) return;
     const loadIg = async () => {
@@ -210,14 +250,24 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
     const metaService = new MetaAdsService(accessToken);
 
     let createResult;
-    createResult = await metaService.createEngagementAudience(selectedAccount, {
-      name: audienceName.trim(),
-      description: audienceDescription.trim() || null,
-      sourceType: selectedSource.sourceType,
-      sourceId,
-      event: selectedEvent,
-      retentionDays
-    });
+    if (selectedSource.id === 'website') {
+      createResult = await metaService.createWebsiteAudience(selectedAccount, {
+        name: audienceName.trim(),
+        description: audienceDescription.trim() || null,
+        pixelId: sourceId,
+        event: selectedEvent,
+        retentionDays
+      });
+    } else {
+      createResult = await metaService.createEngagementAudience(selectedAccount, {
+        name: audienceName.trim(),
+        description: audienceDescription.trim() || null,
+        sourceType: selectedSource.sourceType,
+        sourceId,
+        event: selectedEvent,
+        retentionDays
+      });
+    }
 
     setCreating(false);
     if (createResult.success) {
@@ -406,6 +456,22 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                       options={leadForms.map(f => ({ value: f.id, label: f.name || f.id }))}
                     />
                   </div>
+                )}
+              </>
+            ) : selectedSource.id === 'website' ? (
+              <>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Pixel</label>
+                <CustomSelect
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  searchable
+                  placeholder={pixels.length === 0 ? 'No se encontraron pixels en esta cuenta' : 'Selecciona un pixel'}
+                  options={pixels.map(p => ({ value: p.id, label: p.name || p.id }))}
+                />
+                {pixels.length === 0 && (
+                  <p className="hint" style={{ marginTop: '6px', color: '#F59E0B' }}>
+                    Esta cuenta no tiene pixels configurados. Crea uno en Events Manager.
+                  </p>
                 )}
               </>
             ) : null}

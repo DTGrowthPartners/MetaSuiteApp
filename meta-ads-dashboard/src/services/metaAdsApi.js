@@ -1026,6 +1026,62 @@ class MetaAdsService {
     }
   }
 
+  // Crear audiencia de Website (Pixel)
+  async createWebsiteAudience(adAccountId, { name, description, pixelId, event, retentionDays }) {
+    try {
+      const normalizedId = this.normalizeAccountId(adAccountId);
+      const retentionSeconds = retentionDays * 86400;
+
+      console.log('Creating website audience:', { name, pixelId, event, retentionDays });
+
+      // Website usa subtype WEBSITE + rule JSON con pixel como source
+      let filters;
+      if (event === 'ALL_VISITORS') {
+        // Todos los visitantes — sin filtro de evento específico
+        filters = [{ field: 'url', operator: 'i_contains', value: '' }];
+      } else {
+        // Evento específico del pixel (ViewContent, AddToCart, Purchase, etc.)
+        filters = [{ field: 'event', operator: 'eq', value: event }];
+      }
+
+      const rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixelId }],
+            retention_seconds: retentionSeconds,
+            filter: { operator: 'and', filters },
+            min_retention_seconds: 0,
+            count: 0
+          }]
+        }
+      };
+
+      console.log('Website rule:', JSON.stringify(rule));
+
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('subtype', 'WEBSITE');
+      params.append('rule', JSON.stringify(rule));
+      params.append('prefill', 'true');
+      params.append('access_token', this.accessToken);
+      if (description) params.append('description', description);
+
+      const resp = await axios.post(
+        `https://graph.facebook.com/v22.0/${normalizedId}/customaudiences`,
+        params.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      console.log('Website audience SUCCESS:', resp.data);
+      return { success: true, data: resp.data };
+    } catch (error) {
+      const errData = error.response?.data?.error;
+      console.error('Website audience creation error:', errData);
+      const errMsg = errData?.error_user_msg || errData?.message || error.message;
+      return { success: false, error: errMsg };
+    }
+  }
+
   // Obtener formularios de leads de una página
   async getLeadForms(pageId) {
     try {
