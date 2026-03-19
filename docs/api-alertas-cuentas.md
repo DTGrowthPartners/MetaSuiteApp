@@ -64,15 +64,15 @@ Acción: {acción recomendada según la tabla de códigos}
 1. **NO incluir gasto acumulado** — esta métrica no es relevante para alertas de estado y puede confundir al cliente
 2. **NO incluir `amount_spent`** ni ningún dato financiero en las alertas de estado
 3. Solo alertar cuando el estado CAMBIE (no repetir la misma alerta)
-4. Si el estado vuelve a 1 (Activa), enviar alerta positiva:
+4. Si el estado vuelve a 1 (Activa), enviar alerta positiva con este formato exacto (sin estado anterior, sin gasto):
 
 ```
 ✅ Cuenta reactivada
 
 Cuenta: {nombre_cuenta}
-Estado: Activa (1)
+Estado: Activa
 
-La cuenta ha vuelto a su estado normal.
+La cuenta fue reactivada exitosamente. Tus campañas de anuncios correran normalmente.
 ```
 
 ## Lógica de monitoreo
