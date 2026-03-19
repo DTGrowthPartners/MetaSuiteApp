@@ -2066,13 +2066,43 @@ function getLastMonthRange() {
   return { since, until, label };
 }
 
+// Helper: obtener insights del mes pasado a nivel de cuenta (incluye campañas eliminadas/archivadas)
+async function getLastMonthInsightsByAccount(accountId, token, lastMonth) {
+  const insightsFields = 'campaign_id,campaign_name,spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
+  const allResults = [];
+  let url = `${META_API_BASE_URL}/${accountId}/insights`;
+  let params = {
+    access_token: token,
+    fields: insightsFields,
+    level: 'campaign',
+    time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until }),
+    limit: 500
+  };
+
+  try {
+    // Paginar todos los resultados
+    while (url) {
+      const resp = await axios.get(url, { params });
+      const data = resp.data.data || [];
+      allResults.push(...data);
+      // Siguiente página
+      url = resp.data.paging?.next || null;
+      params = {}; // next URL ya incluye los params
+    }
+  } catch (e) {
+    console.error('Error fetching last month insights:', e.response?.data || e.message);
+  }
+
+  return allResults;
+}
+
 // Helper: obtener campañas con insights por rango de fechas
 async function getReportData(accountId, token) {
   const { yesterday, today } = getReportDates();
   const lastMonth = getLastMonthRange();
   const normalizedId = normalizeAccountId(accountId);
 
-  // Obtener campañas activas y pausadas
+  // Obtener campañas activas y pausadas (para hoy/ayer)
   const campaignsResp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
     params: {
       access_token: token,
@@ -2085,10 +2115,10 @@ async function getReportData(accountId, token) {
 
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
 
+  // Fetch ayer/hoy por campaña (solo ACTIVE/PAUSED)
   const withInsights = await Promise.all(campaigns.map(async (campaign) => {
     let insightsYesterday = {};
     let insightsToday = {};
-    let insightsLastMonth = {};
     try {
       const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
         params: {
@@ -2109,19 +2139,42 @@ async function getReportData(accountId, token) {
       });
       insightsToday = resp.data.data?.[0] || {};
     } catch (e) {}
-    try {
-      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
-        params: {
-          access_token: token,
-          fields: insightsFields,
-          time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until })
-        }
-      });
-      insightsLastMonth = resp.data.data?.[0] || {};
-    } catch (e) {}
 
-    return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth };
+    return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth: {} };
   }));
+
+  // Fetch mes pasado a nivel de cuenta (incluye campañas eliminadas/archivadas)
+  const lastMonthInsights = await getLastMonthInsightsByAccount(normalizedId, token, lastMonth);
+
+  // Crear mapa de insights del mes pasado por campaign_id
+  const lastMonthMap = {};
+  for (const ins of lastMonthInsights) {
+    lastMonthMap[ins.campaign_id] = ins;
+  }
+
+  // Asignar insightsLastMonth a campañas existentes
+  for (const c of withInsights) {
+    if (lastMonthMap[c.id]) {
+      c.insightsLastMonth = lastMonthMap[c.id];
+      delete lastMonthMap[c.id]; // ya asignada
+    }
+  }
+
+  // Agregar campañas que solo existieron en el mes pasado (eliminadas/archivadas)
+  for (const [campaignId, ins] of Object.entries(lastMonthMap)) {
+    if (parseFloat(ins.spend || 0) > 0) {
+      withInsights.push({
+        id: campaignId,
+        name: ins.campaign_name || `Campaña ${campaignId}`,
+        status: 'DELETED',
+        objective: '',
+        configured_status: 'DELETED',
+        insightsYesterday: {},
+        insightsToday: {},
+        insightsLastMonth: ins
+      });
+    }
+  }
 
   const activeCampaigns = withInsights.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
