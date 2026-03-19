@@ -1061,14 +1061,13 @@ class MetaAdsService {
 
       const params = new URLSearchParams();
       params.append('name', name);
-      params.append('subtype', 'WEBSITE');
       params.append('rule', JSON.stringify(rule));
       params.append('prefill', 'true');
       params.append('access_token', this.accessToken);
       if (description) params.append('description', description);
 
       const resp = await axios.post(
-        `https://graph.facebook.com/v22.0/${normalizedId}/customaudiences`,
+        `https://graph.facebook.com/v21.0/${normalizedId}/customaudiences`,
         params.toString(),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
