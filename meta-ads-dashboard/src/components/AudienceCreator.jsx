@@ -309,7 +309,6 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
                     setSourceId('');
                     setSelectedPageForIg('');
                     setIgAccounts([]);
-                    setSelectedVideos([]);
                     setStep('config');
                   }}
                   style={{
