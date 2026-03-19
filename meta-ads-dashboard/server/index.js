@@ -2049,16 +2049,16 @@ function getReportDates() {
   return { yesterday, today, colombiaTime };
 }
 
-// Helper: obtener primer y último día del mes pasado (zona Colombia)
-function getLastMonthRange() {
+// Helper: obtener primer y último día de un mes relativo al actual (zona Colombia)
+// offset: -1 = mes pasado, -2 = hace 2 meses, etc.
+function getMonthRange(offset = -1) {
   const now = new Date();
   const colombiaOffset = -5 * 60;
   const colombiaTime = new Date(now.getTime() + (colombiaOffset - now.getTimezoneOffset()) * 60000);
   const y = colombiaTime.getFullYear();
   const m = colombiaTime.getMonth(); // mes actual (0-based)
-  // Mes pasado
-  const firstDay = new Date(y, m - 1, 1);
-  const lastDay = new Date(y, m, 0); // día 0 del mes actual = último día del mes anterior
+  const firstDay = new Date(y, m + offset, 1);
+  const lastDay = new Date(y, m + offset + 1, 0);
   const since = firstDay.toISOString().split('T')[0];
   const until = lastDay.toISOString().split('T')[0];
   const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -2066,8 +2066,11 @@ function getLastMonthRange() {
   return { since, until, label };
 }
 
-// Helper: obtener insights del mes pasado a nivel de cuenta (incluye campañas eliminadas/archivadas)
-async function getLastMonthInsightsByAccount(accountId, token, lastMonth) {
+function getLastMonthRange() { return getMonthRange(-1); }
+function getMonthBeforeLastRange() { return getMonthRange(-2); }
+
+// Helper: obtener insights a nivel de cuenta por rango de fechas (incluye campañas eliminadas/archivadas)
+async function getAccountInsightsByCampaign(accountId, token, dateRange) {
   const insightsFields = 'campaign_id,campaign_name,spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
   const allResults = [];
   let url = `${META_API_BASE_URL}/${accountId}/insights`;
@@ -2075,31 +2078,54 @@ async function getLastMonthInsightsByAccount(accountId, token, lastMonth) {
     access_token: token,
     fields: insightsFields,
     level: 'campaign',
-    time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until }),
+    time_range: JSON.stringify({ since: dateRange.since, until: dateRange.until }),
     limit: 500
   };
 
   try {
-    // Paginar todos los resultados
     while (url) {
       const resp = await axios.get(url, { params });
       const data = resp.data.data || [];
       allResults.push(...data);
-      // Siguiente página
       url = resp.data.paging?.next || null;
-      params = {}; // next URL ya incluye los params
+      params = {};
     }
   } catch (e) {
-    console.error('Error fetching last month insights:', e.response?.data || e.message);
+    console.error('Error fetching account insights:', e.response?.data || e.message);
   }
 
   return allResults;
+}
+
+// Helper: construir mapa de insights por campaign_id
+function buildInsightsMap(insightsArray) {
+  const map = {};
+  for (const ins of insightsArray) {
+    map[ins.campaign_id] = ins;
+  }
+  return map;
+}
+
+// Helper: extraer métricas agregadas de un array de insights
+function aggregateInsights(insightsArray) {
+  let spend = 0, impressions = 0, reach = 0, conversations = 0, firstReplies = 0;
+  for (const ins of insightsArray) {
+    spend += parseFloat(ins.spend || 0);
+    impressions += parseInt(ins.impressions || 0);
+    reach += parseInt(ins.reach || 0);
+    for (const a of (ins.actions || [])) {
+      if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversations += parseInt(a.value || 0);
+      if (a.action_type === 'onsite_conversion.messaging_first_reply') firstReplies += parseInt(a.value || 0);
+    }
+  }
+  return { spend, impressions, reach, conversations, firstReplies };
 }
 
 // Helper: obtener campañas con insights por rango de fechas
 async function getReportData(accountId, token) {
   const { yesterday, today } = getReportDates();
   const lastMonth = getLastMonthRange();
+  const monthBeforeLast = getMonthBeforeLastRange();
   const normalizedId = normalizeAccountId(accountId);
 
   // Obtener campañas activas y pausadas (para hoy/ayer)
@@ -2115,66 +2141,65 @@ async function getReportData(accountId, token) {
 
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
 
-  // Fetch ayer/hoy por campaña (solo ACTIVE/PAUSED)
-  const withInsights = await Promise.all(campaigns.map(async (campaign) => {
-    let insightsYesterday = {};
-    let insightsToday = {};
-    try {
-      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
-        params: {
-          access_token: token,
-          fields: insightsFields,
-          time_range: JSON.stringify({ since: yesterday, until: yesterday })
-        }
-      });
-      insightsYesterday = resp.data.data?.[0] || {};
-    } catch (e) {}
-    try {
-      const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
-        params: {
-          access_token: token,
-          fields: insightsFields,
-          time_range: JSON.stringify({ since: today, until: today })
-        }
-      });
-      insightsToday = resp.data.data?.[0] || {};
-    } catch (e) {}
+  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta (en paralelo)
+  const [dailyInsights, lastMonthInsights, prevMonthInsights] = await Promise.all([
+    // Ayer/hoy por campaña
+    Promise.all(campaigns.map(async (campaign) => {
+      let insightsYesterday = {};
+      let insightsToday = {};
+      try {
+        const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
+          params: { access_token: token, fields: insightsFields, time_range: JSON.stringify({ since: yesterday, until: yesterday }) }
+        });
+        insightsYesterday = resp.data.data?.[0] || {};
+      } catch (e) {}
+      try {
+        const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
+          params: { access_token: token, fields: insightsFields, time_range: JSON.stringify({ since: today, until: today }) }
+        });
+        insightsToday = resp.data.data?.[0] || {};
+      } catch (e) {}
+      return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth: {}, insightsMonthBeforeLast: {} };
+    })),
+    // Mes pasado a nivel de cuenta
+    getAccountInsightsByCampaign(normalizedId, token, lastMonth),
+    // Mes anterior al pasado (para comparativa)
+    getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast)
+  ]);
 
-    return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth: {} };
-  }));
+  const withInsights = dailyInsights;
 
-  // Fetch mes pasado a nivel de cuenta (incluye campañas eliminadas/archivadas)
-  const lastMonthInsights = await getLastMonthInsightsByAccount(normalizedId, token, lastMonth);
-
-  // Crear mapa de insights del mes pasado por campaign_id
-  const lastMonthMap = {};
-  for (const ins of lastMonthInsights) {
-    lastMonthMap[ins.campaign_id] = ins;
-  }
-
-  // Asignar insightsLastMonth a campañas existentes
+  // Asignar insightsLastMonth
+  const lastMonthMap = buildInsightsMap(lastMonthInsights);
   for (const c of withInsights) {
     if (lastMonthMap[c.id]) {
       c.insightsLastMonth = lastMonthMap[c.id];
-      delete lastMonthMap[c.id]; // ya asignada
+      delete lastMonthMap[c.id];
     }
   }
-
-  // Agregar campañas que solo existieron en el mes pasado (eliminadas/archivadas)
+  // Campañas que solo existieron el mes pasado
   for (const [campaignId, ins] of Object.entries(lastMonthMap)) {
     if (parseFloat(ins.spend || 0) > 0) {
       withInsights.push({
         id: campaignId,
         name: ins.campaign_name || `Campaña ${campaignId}`,
-        status: 'DELETED',
-        objective: '',
-        configured_status: 'DELETED',
-        insightsYesterday: {},
-        insightsToday: {},
-        insightsLastMonth: ins
+        status: 'DELETED', objective: '', configured_status: 'DELETED',
+        insightsYesterday: {}, insightsToday: {},
+        insightsLastMonth: ins, insightsMonthBeforeLast: {}
       });
     }
   }
+
+  // Asignar insightsMonthBeforeLast
+  const prevMonthMap = buildInsightsMap(prevMonthInsights);
+  for (const c of withInsights) {
+    if (prevMonthMap[c.id]) {
+      c.insightsMonthBeforeLast = prevMonthMap[c.id];
+    }
+  }
+
+  // Totales del mes anterior (para comparativa)
+  const prevMonthTotals = aggregateInsights(prevMonthInsights);
 
   const activeCampaigns = withInsights.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
@@ -2185,7 +2210,12 @@ async function getReportData(accountId, token) {
 
   return {
     campaigns: activeCampaigns,
-    dateRange: { yesterday, today, lastMonth: { since: lastMonth.since, until: lastMonth.until, label: lastMonth.label } },
+    dateRange: {
+      yesterday, today,
+      lastMonth: { since: lastMonth.since, until: lastMonth.until, label: lastMonth.label },
+      monthBeforeLast: { since: monthBeforeLast.since, until: monthBeforeLast.until, label: monthBeforeLast.label }
+    },
+    prevMonthTotals,
     fetchedAt: new Date().toISOString(),
     totalCampaigns: activeCampaigns.length
   };

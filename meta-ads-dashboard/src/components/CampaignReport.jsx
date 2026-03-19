@@ -7,11 +7,22 @@ function formatCOP(value) {
   return '$' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-// Extraer resultado principal según objetivo de campaña
-function getResult(insights, objective) {
+function formatCompact(value) {
+  const num = parseFloat(value || 0);
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return num.toLocaleString('es-CO');
+}
+
+function pctChange(current, previous) {
+  if (!previous || previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+// Extraer métricas de actions
+function extractActions(insights) {
   const actions = insights?.actions || [];
   let conversations = 0, firstReplies = 0, leads = 0, linkClicks = 0, lpv = 0;
-
   for (const a of actions) {
     if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversations = parseInt(a.value || 0);
     if (a.action_type === 'onsite_conversion.messaging_first_reply') firstReplies = parseInt(a.value || 0);
@@ -19,17 +30,18 @@ function getResult(insights, objective) {
     if (a.action_type === 'link_click') linkClicks = parseInt(a.value || 0);
     if (a.action_type === 'landing_page_view') lpv = parseInt(a.value || 0);
   }
+  return { conversations, firstReplies, leads, linkClicks, lpv, msgs: Math.max(conversations, firstReplies) };
+}
 
-  const msgs = Math.max(conversations, firstReplies);
+// Extraer resultado principal según objetivo de campaña
+function getResult(insights, objective) {
+  const { msgs, leads, linkClicks, lpv } = extractActions(insights);
   const obj = (objective || '').toUpperCase();
 
-  // Tráfico: mostrar visitas a la página (landing_page_view), NO link_clicks
   if (obj.includes('TRAFFIC')) {
     if (lpv > 0) return { count: lpv, label: 'Visitas' };
     if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
   }
-
-  // Todo lo demás: mensajes primero (WhatsApp/Messenger), luego leads, luego clicks
   if (msgs > 0) return { count: msgs, label: 'Mensajes' };
   if (leads > 0) return { count: leads, label: 'Leads' };
   if (linkClicks > 0) return { count: linkClicks, label: 'Clicks' };
@@ -42,7 +54,7 @@ function detectLocation(campaignName, locations = []) {
   for (const loc of locations) {
     if (nameLower.includes(loc.toLowerCase())) return loc;
   }
-  return 'Otros';
+  return 'General';
 }
 
 function cleanName(campaignName, locations = []) {
@@ -55,70 +67,48 @@ function cleanName(campaignName, locations = []) {
   return name || campaignName;
 }
 
-export default function CampaignReport({ slug, accessToken, adAccounts = [], loadingAccounts = false }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [hasAccess, setHasAccess] = useState(null);
-  const [viewMode, setViewMode] = useState('yesterday');
-
-  useEffect(() => {
-    if (loadingAccounts) return;
-    if (!adAccounts || adAccounts.length === 0) { setHasAccess(false); return; }
-    setHasAccess(null);
-  }, [adAccounts, loadingAccounts, slug]);
-
-  const fetchReport = useCallback(async () => {
-    if (!accessToken) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const resp = await fetch(`${API_BASE}/report/${slug}?accessToken=${encodeURIComponent(accessToken)}`);
-      const json = await resp.json();
-      if (!json.success) throw new Error(json.error || 'Error cargando reporte');
-
-      const reportAccountId = json.accountId;
-      if (reportAccountId && adAccounts.length > 0) {
-        const has = adAccounts.some(a => a.id === reportAccountId || a.id === reportAccountId.replace('act_', ''));
-        setHasAccess(has);
-        if (!has) { setLoading(false); return; }
-      } else {
-        setHasAccess(true);
-      }
-      setData(json);
-      setLastUpdate(new Date());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [slug, accessToken, adAccounts]);
-
-  useEffect(() => {
-    if (!loadingAccounts && accessToken) fetchReport();
-    const interval = setInterval(() => { if (accessToken) fetchReport(); }, 30 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchReport, loadingAccounts, accessToken]);
-
-  if (loadingAccounts || (loading && !data)) {
-    return (<div className="report-page"><div className="report-loading"><div className="report-spinner" /><p>Cargando reporte...</p></div></div>);
+// Agregar métricas de una lista de campañas
+function aggregateCampaigns(list, insightsKey) {
+  let spend = 0, impressions = 0, reach = 0, conversations = 0, firstReplies = 0;
+  for (const c of list) {
+    const ins = c[insightsKey] || {};
+    spend += parseFloat(ins.spend || 0);
+    impressions += parseInt(ins.impressions || 0);
+    reach += parseInt(ins.reach || 0);
+    const a = extractActions(ins);
+    conversations += a.conversations;
+    firstReplies += a.firstReplies;
   }
-  if (hasAccess === false) {
-    return (<div className="report-page"><div className="report-error"><h2>Sin Acceso</h2><p>Tu cuenta de Facebook no tiene acceso a esta cuenta publicitaria.</p></div></div>);
-  }
-  if (error && !data) {
-    return (<div className="report-page"><div className="report-error"><h2>Error</h2><p>{error}</p><button onClick={fetchReport} className="report-retry-btn">Reintentar</button></div></div>);
-  }
-  if (!data) return null;
+  const msgs = Math.max(conversations, firstReplies);
+  return { spend, impressions, reach, conversations, firstReplies, msgs, cpr: msgs > 0 ? spend / msgs : 0 };
+}
 
-  const { campaigns = [], dateRange, name, businessName, locations = [] } = data;
-  const insightsKey = viewMode === 'yesterday' ? 'insightsYesterday' : viewMode === 'today' ? 'insightsToday' : 'insightsLastMonth';
+// Badge de cambio porcentual
+function ChangeBadge({ current, previous, invertColor = false }) {
+  const pct = pctChange(current, previous);
+  if (pct === null) return null;
+  const isUp = pct > 0;
+  // Para CPR, subir es malo (invertColor=true)
+  const isGood = invertColor ? !isUp : isUp;
+  const color = isGood ? '#22c55e' : '#ef4444';
+  const arrow = isUp ? '↑' : '↓';
+  return (
+    <span style={{ fontSize: '12px', color, fontWeight: 600 }}>
+      {arrow} {Math.abs(pct).toFixed(1)}% vs mes anterior
+    </span>
+  );
+}
 
-  // Campañas con gasto en el periodo
-  const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
+// ===================== VISTA MENSUAL (estilo PDF) =====================
+function MonthlyReportView({ data, locations }) {
+  const { campaigns = [], dateRange, prevMonthTotals } = data;
+  const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
 
-  // Agrupar por ubicación
+  // Totales del mes actual
+  const totals = aggregateCampaigns(active, 'insightsLastMonth');
+  const prev = prevMonthTotals || {};
+
+  // === Rendimiento por Sede ===
   const grouped = {};
   for (const c of active) {
     const loc = detectLocation(c.name, locations);
@@ -134,7 +124,287 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     return iA - iB;
   });
 
-  // Totales
+  const sedeTotals = sortedLocs.map(loc => {
+    const t = aggregateCampaigns(grouped[loc], 'insightsLastMonth');
+    return { loc, ...t, pctInversion: totals.spend > 0 ? (t.spend / totals.spend * 100) : 0 };
+  });
+
+  // === Top 5 campañas más eficientes ===
+  const campaignsWithCPR = active
+    .map(c => {
+      const ins = c.insightsLastMonth;
+      const a = extractActions(ins);
+      const spend = parseFloat(ins?.spend || 0);
+      return { name: c.name, msgs: a.conversations, firstReplies: a.firstReplies, spend, cpr: a.conversations > 0 ? spend / a.conversations : Infinity };
+    })
+    .filter(c => c.msgs > 0)
+    .sort((a, b) => a.cpr - b.cpr)
+    .slice(0, 5);
+
+  // === Comparativa ===
+  const compRows = [
+    { label: 'Inversión Total', cur: totals.spend, prev: prev.spend, fmt: formatCOP },
+    { label: 'Mensajes (Conv.)', cur: totals.conversations, prev: prev.conversations, fmt: v => formatCompact(v) },
+    { label: 'Nuevos Contactos', cur: totals.firstReplies, prev: prev.firstReplies, fmt: v => formatCompact(v) },
+    { label: 'CPR Mensajes', cur: totals.cpr, prev: prev.conversations > 0 ? prev.spend / prev.conversations : 0, fmt: formatCOP },
+    { label: 'Alcance', cur: totals.reach, prev: prev.reach, fmt: v => formatCompact(v) },
+  ];
+
+  // === Insights automáticos ===
+  const bestSede = sedeTotals.length > 0 ? [...sedeTotals].sort((a, b) => (a.cpr || Infinity) - (b.cpr || Infinity))[0] : null;
+  const bestCampaign = campaignsWithCPR[0];
+  const msgChange = pctChange(totals.conversations, prev.conversations);
+
+  return (
+    <div className="monthly-report">
+      {/* Sección 1: Resumen Ejecutivo */}
+      <section className="monthly-section">
+        <h2 className="monthly-section-title">Resumen Ejecutivo</h2>
+        <div className="monthly-summary-grid">
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{formatCOP(totals.spend)}</span>
+            <span className="monthly-metric-label">Inversión Total</span>
+            <ChangeBadge current={totals.spend} previous={prev.spend} />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{formatCompact(totals.conversations)}</span>
+            <span className="monthly-metric-label">Mensajes</span>
+            <ChangeBadge current={totals.conversations} previous={prev.conversations} />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{totals.cpr > 0 ? formatCOP(totals.cpr) : '-'}</span>
+            <span className="monthly-metric-label">Costo por Resultado</span>
+            <ChangeBadge current={totals.cpr} previous={prev.conversations > 0 ? prev.spend / prev.conversations : 0} invertColor />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{formatCompact(totals.reach)}</span>
+            <span className="monthly-metric-label">Alcance</span>
+            <ChangeBadge current={totals.reach} previous={prev.reach} />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{formatCompact(totals.impressions)}</span>
+            <span className="monthly-metric-label">Impresiones</span>
+            <ChangeBadge current={totals.impressions} previous={prev.impressions} />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{formatCompact(totals.firstReplies)}</span>
+            <span className="monthly-metric-label">Nuevos Contactos</span>
+            <ChangeBadge current={totals.firstReplies} previous={prev.firstReplies} />
+          </div>
+        </div>
+      </section>
+
+      {/* Sección 2: Rendimiento por Sede */}
+      {sedeTotals.length > 0 && (
+        <section className="monthly-section">
+          <h2 className="monthly-section-title">Rendimiento por Sede</h2>
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th className="report-th-service">Sede</th>
+                  <th className="report-th-num">Inversión</th>
+                  <th className="report-th-num">Mensajes</th>
+                  <th className="report-th-num">Nuevos Contactos</th>
+                  <th className="report-th-num">CPR</th>
+                  <th className="report-th-num">% Inversión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sedeTotals.map(s => (
+                  <tr key={s.loc}>
+                    <td className="report-td-service">{s.loc}</td>
+                    <td className="report-td-num">{formatCOP(s.spend)}</td>
+                    <td className="report-td-num">{s.conversations.toLocaleString('es-CO')}</td>
+                    <td className="report-td-num">{s.firstReplies.toLocaleString('es-CO')}</td>
+                    <td className="report-td-num">{s.cpr > 0 ? formatCOP(s.cpr) : '-'}</td>
+                    <td className="report-td-num">{s.pctInversion.toFixed(0)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="report-location-totals">
+                  <td><strong>Total</strong></td>
+                  <td className="report-td-num"><strong>{formatCOP(totals.spend)}</strong></td>
+                  <td className="report-td-num"><strong>{totals.conversations.toLocaleString('es-CO')}</strong></td>
+                  <td className="report-td-num"><strong>{totals.firstReplies.toLocaleString('es-CO')}</strong></td>
+                  <td className="report-td-num"><strong>{totals.cpr > 0 ? formatCOP(totals.cpr) : '-'}</strong></td>
+                  <td className="report-td-num"><strong>100%</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sección 3: Comparativa mensual */}
+      {prev.spend > 0 && (
+        <section className="monthly-section">
+          <h2 className="monthly-section-title">Comparativa {dateRange?.monthBeforeLast?.label} vs {dateRange?.lastMonth?.label}</h2>
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th className="report-th-service">Métrica</th>
+                  <th className="report-th-num">{dateRange?.monthBeforeLast?.label}</th>
+                  <th className="report-th-num">{dateRange?.lastMonth?.label}</th>
+                  <th className="report-th-num">Cambio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compRows.map(r => {
+                  const change = pctChange(r.cur, r.prev);
+                  return (
+                    <tr key={r.label}>
+                      <td className="report-td-service">{r.label}</td>
+                      <td className="report-td-num">{r.fmt(r.prev)}</td>
+                      <td className="report-td-num">{r.fmt(r.cur)}</td>
+                      <td className="report-td-num">
+                        {change !== null ? (
+                          <span style={{ color: change > 0 ? '#22c55e' : '#ef4444' }}>
+                            {change > 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
+                          </span>
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sección 4: Top 5 Campañas más eficientes */}
+      {campaignsWithCPR.length > 0 && (
+        <section className="monthly-section">
+          <h2 className="monthly-section-title">Top 5 Campañas Más Eficientes</h2>
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th className="report-th-service">Campaña</th>
+                  <th className="report-th-num">Mensajes</th>
+                  <th className="report-th-num">CPR</th>
+                  <th className="report-th-num">Inversión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaignsWithCPR.map((c, i) => (
+                  <tr key={i}>
+                    <td className="report-td-service">{c.name}</td>
+                    <td className="report-td-num">{c.msgs}</td>
+                    <td className="report-td-num">{formatCOP(c.cpr)}</td>
+                    <td className="report-td-num">{formatCOP(c.spend)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sección 5: Todas las campañas por sede */}
+      {sortedLocs.map(loc => {
+        const list = grouped[loc];
+        return (
+          <section key={loc} className="monthly-section">
+            <h2 className="monthly-section-title monthly-section-title--sede">{loc}</h2>
+            <div className="report-table-wrap">
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th className="report-th-service">Campaña</th>
+                    <th className="report-th-num">Mensajes</th>
+                    <th className="report-th-num">Nuevos</th>
+                    <th className="report-th-num">CPR</th>
+                    <th className="report-th-num">Inversión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map(c => {
+                    const ins = c.insightsLastMonth;
+                    const a = extractActions(ins);
+                    const spend = parseFloat(ins?.spend || 0);
+                    const cpr = a.conversations > 0 ? spend / a.conversations : 0;
+                    return (
+                      <tr key={c.id}>
+                        <td className="report-td-service">{cleanName(c.name, locations)}</td>
+                        <td className="report-td-num">{a.conversations > 0 ? a.conversations : '-'}</td>
+                        <td className="report-td-num">{a.firstReplies > 0 ? a.firstReplies : '-'}</td>
+                        <td className="report-td-num">{cpr > 0 ? formatCOP(cpr) : '-'}</td>
+                        <td className="report-td-num">{formatCOP(spend)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
+
+      {/* Sección 6: Insights */}
+      <section className="monthly-section">
+        <h2 className="monthly-section-title">Insights y Aprendizajes</h2>
+        <div className="monthly-insights">
+          {msgChange !== null && (
+            <div className="monthly-insight-card">
+              <h3>{msgChange > 0 ? 'Crecimiento' : 'Disminución'} de {Math.abs(msgChange).toFixed(0)}% en mensajes</h3>
+              <p>
+                En {dateRange?.lastMonth?.label} se generaron {totals.conversations.toLocaleString('es-CO')} conversaciones
+                vs {(prev.conversations || 0).toLocaleString('es-CO')} en {dateRange?.monthBeforeLast?.label}.
+                La inversión fue de {formatCOP(totals.spend)} vs {formatCOP(prev.spend || 0)}.
+              </p>
+            </div>
+          )}
+          {bestSede && bestSede.cpr > 0 && (
+            <div className="monthly-insight-card">
+              <h3>{bestSede.loc} lidera en eficiencia</h3>
+              <p>
+                {bestSede.loc} logró un CPR de {formatCOP(bestSede.cpr)} por mensaje,
+                con {bestSede.conversations.toLocaleString('es-CO')} mensajes y una inversión de {formatCOP(bestSede.spend)}.
+              </p>
+            </div>
+          )}
+          {bestCampaign && (
+            <div className="monthly-insight-card">
+              <h3>Campaña estrella: CPR de {formatCOP(bestCampaign.cpr)}</h3>
+              <p>
+                La campaña &ldquo;{bestCampaign.name}&rdquo; logró {bestCampaign.msgs} mensajes con un costo por resultado
+                de solo {formatCOP(bestCampaign.cpr)}. Es el mejor rendimiento del mes.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {active.length === 0 && (
+        <div className="report-no-data">Sin datos para el mes pasado</div>
+      )}
+    </div>
+  );
+}
+
+// ===================== VISTA DIARIA (original) =====================
+function DailyReportView({ campaigns, insightsKey, viewMode, locations }) {
+  const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
+
+  const grouped = {};
+  for (const c of active) {
+    const loc = detectLocation(c.name, locations);
+    if (!grouped[loc]) grouped[loc] = [];
+    grouped[loc].push(c);
+  }
+
+  const sortedLocs = Object.keys(grouped).sort((a, b) => {
+    const iA = locations.indexOf(a), iB = locations.indexOf(b);
+    if (iA === -1 && iB === -1) return a.localeCompare(b);
+    if (iA === -1) return 1;
+    if (iB === -1) return -1;
+    return iA - iB;
+  });
+
   function getGroupTotals(list) {
     let spend = 0;
     const byLabel = {};
@@ -156,46 +426,8 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
 
   const grand = getGroupTotals(active);
 
-  function formatDate(d) {
-    if (!d) return '';
-    const [y, m, day] = d.split('-');
-    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    return `${parseInt(day)} ${months[parseInt(m)-1]} ${y}`;
-  }
-
   return (
-    <div className="report-page">
-      <header className="report-header">
-        <div className="report-header-info">
-          <h1 className="report-title">{name}</h1>
-          <span className="report-business">{businessName}</span>
-        </div>
-        <div className="report-header-meta">
-          {lastUpdate && (
-            <span className="report-updated">
-              Actualizado: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-              {data.cached && ' (cache)'}
-            </span>
-          )}
-        </div>
-      </header>
-
-      {/* Day Switch */}
-      <div className="report-day-switch-wrap">
-        <div className="report-day-switch">
-          <button className={`report-day-btn ${viewMode === 'yesterday' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('yesterday')}>
-            Ayer<span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
-          </button>
-          <button className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('today')}>
-            Hoy<span className="report-day-date">{formatDate(dateRange?.today)}</span>
-          </button>
-          <button className={`report-day-btn ${viewMode === 'lastMonth' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('lastMonth')}>
-            Mes pasado<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Summary */}
+    <>
       <section className="report-grand-summary">
         <div className="report-grand-card">
           <span className="report-grand-label">Resultados</span>
@@ -212,14 +444,12 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
       </section>
 
       {active.length === 0 && (
-        <div className="report-no-data">Sin datos para {viewMode === 'yesterday' ? 'ayer' : viewMode === 'today' ? 'hoy' : 'el mes pasado'}</div>
+        <div className="report-no-data">Sin datos para {viewMode === 'yesterday' ? 'ayer' : 'hoy'}</div>
       )}
 
-      {/* Grouped Tables */}
       {sortedLocs.map(loc => {
         const list = grouped[loc];
         const totals = getGroupTotals(list);
-
         return (
           <section key={loc} className="report-location-group">
             <h2 className="report-location-title">{loc}</h2>
@@ -280,6 +510,120 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
             </table>
           </div>
         </section>
+      )}
+    </>
+  );
+}
+
+// ===================== COMPONENTE PRINCIPAL =====================
+export default function CampaignReport({ slug, accessToken, adAccounts = [], loadingAccounts = false }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [hasAccess, setHasAccess] = useState(null);
+  const [viewMode, setViewMode] = useState('yesterday');
+
+  useEffect(() => {
+    if (loadingAccounts) return;
+    if (!adAccounts || adAccounts.length === 0) { setHasAccess(false); return; }
+    setHasAccess(null);
+  }, [adAccounts, loadingAccounts, slug]);
+
+  const fetchReport = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const resp = await fetch(`${API_BASE}/report/${slug}?accessToken=${encodeURIComponent(accessToken)}`);
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.error || 'Error cargando reporte');
+
+      const reportAccountId = json.accountId;
+      if (reportAccountId && adAccounts.length > 0) {
+        const has = adAccounts.some(a => a.id === reportAccountId || a.id === reportAccountId.replace('act_', ''));
+        setHasAccess(has);
+        if (!has) { setLoading(false); return; }
+      } else {
+        setHasAccess(true);
+      }
+      setData(json);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, accessToken, adAccounts]);
+
+  useEffect(() => {
+    if (!loadingAccounts && accessToken) fetchReport();
+    const interval = setInterval(() => { if (accessToken) fetchReport(); }, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchReport, loadingAccounts, accessToken]);
+
+  if (loadingAccounts || (loading && !data)) {
+    return (<div className="report-page"><div className="report-loading"><div className="report-spinner" /><p>Cargando reporte...</p></div></div>);
+  }
+  if (hasAccess === false) {
+    return (<div className="report-page"><div className="report-error"><h2>Sin Acceso</h2><p>Tu cuenta de Facebook no tiene acceso a esta cuenta publicitaria.</p></div></div>);
+  }
+  if (error && !data) {
+    return (<div className="report-page"><div className="report-error"><h2>Error</h2><p>{error}</p><button onClick={fetchReport} className="report-retry-btn">Reintentar</button></div></div>);
+  }
+  if (!data) return null;
+
+  const { campaigns = [], dateRange, name, businessName, locations = [] } = data;
+
+  function formatDate(d) {
+    if (!d) return '';
+    const [y, m, day] = d.split('-');
+    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${parseInt(day)} ${months[parseInt(m)-1]} ${y}`;
+  }
+
+  return (
+    <div className="report-page">
+      <header className="report-header">
+        <div className="report-header-info">
+          <h1 className="report-title">{name}</h1>
+          <span className="report-business">{businessName}</span>
+        </div>
+        <div className="report-header-meta">
+          {lastUpdate && (
+            <span className="report-updated">
+              Actualizado: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              {data.cached && ' (cache)'}
+            </span>
+          )}
+        </div>
+      </header>
+
+      {/* Day Switch */}
+      <div className="report-day-switch-wrap">
+        <div className="report-day-switch">
+          <button className={`report-day-btn ${viewMode === 'yesterday' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('yesterday')}>
+            Ayer<span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
+          </button>
+          <button className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('today')}>
+            Hoy<span className="report-day-date">{formatDate(dateRange?.today)}</span>
+          </button>
+          <button className={`report-day-btn ${viewMode === 'lastMonth' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('lastMonth')}>
+            Mes pasado<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {viewMode === 'lastMonth' ? (
+        <MonthlyReportView data={data} locations={locations} />
+      ) : (
+        <DailyReportView
+          campaigns={campaigns}
+          insightsKey={viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday'}
+          viewMode={viewMode}
+          locations={locations}
+        />
       )}
 
       <footer className="report-footer">

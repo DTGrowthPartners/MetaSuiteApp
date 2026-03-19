@@ -1140,4 +1140,102 @@ body {
   .report-footer {
     padding: 16px;
   }
+  .monthly-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .monthly-section {
+    padding: 0 16px 16px !important;
+  }
+  .monthly-metric-value {
+    font-size: 22px !important;
+  }
+  .monthly-insights {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ======================== MONTHLY REPORT VIEW ======================== */
+.monthly-report {
+  padding-bottom: 8px;
+}
+
+.monthly-section {
+  padding: 0 32px 24px;
+}
+
+.monthly-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #a5b4fc;
+  margin: 24px 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.2);
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.monthly-section-title--sede {
+  color: #94a3b8;
+}
+
+/* Summary Grid — 6 cards (3x2) */
+.monthly-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.monthly-metric-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.monthly-metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.monthly-metric-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Insights cards */
+.monthly-insights {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.monthly-insight-card {
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.monthly-insight-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #a5b4fc;
+  margin: 0 0 8px;
+}
+
+.monthly-insight-card p {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.5;
 }
