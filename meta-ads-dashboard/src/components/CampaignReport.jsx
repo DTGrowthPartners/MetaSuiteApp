@@ -99,9 +99,19 @@ function ChangeBadge({ current, previous, invertColor = false }) {
   );
 }
 
+// Detectar tipo de campaña usando patrones configurados
+function detectCampaignType(campaignName, patterns = []) {
+  if (!patterns.length) return { type: 'Otros', group: 'conversion' };
+  const lower = campaignName.toLowerCase();
+  for (const p of patterns) {
+    if (p.patterns.some(pat => lower.includes(pat))) return { type: p.type, group: p.group };
+  }
+  return { type: 'Otros', group: 'conversion' };
+}
+
 // ===================== VISTA MENSUAL (estilo PDF) =====================
 function MonthlyReportView({ data, locations }) {
-  const { campaigns = [], dateRange, prevMonthTotals } = data;
+  const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [] } = data;
   const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
 
   // Totales del mes actual
@@ -128,6 +138,36 @@ function MonthlyReportView({ data, locations }) {
     const t = aggregateCampaigns(grouped[loc], 'insightsLastMonth');
     return { loc, ...t, pctInversion: totals.spend > 0 ? (t.spend / totals.spend * 100) : 0 };
   });
+
+  // === Rendimiento por Tipo de Campaña ===
+  const byType = {};
+  for (const c of active) {
+    const { type, group } = detectCampaignType(c.name, campaignTypePatterns);
+    if (!byType[type]) byType[type] = { campaigns: [], group };
+    byType[type].campaigns.push(c);
+  }
+
+  // Separar conversión vs reconocimiento/tráfico
+  const conversionTypes = [];
+  const awarenessTypes = [];
+  for (const [type, info] of Object.entries(byType)) {
+    const t = aggregateCampaigns(info.campaigns, 'insightsLastMonth');
+    const entry = { type, ...t, count: info.campaigns.length };
+    if (info.group === 'awareness') {
+      // Para awareness: obtener resultados principales (views, clicks, reach)
+      let totalResults = 0;
+      for (const c of info.campaigns) {
+        const a = extractActions(c.insightsLastMonth);
+        totalResults += a.lpv || a.linkClicks || a.msgs || 0;
+      }
+      entry.results = totalResults;
+      awarenessTypes.push(entry);
+    } else {
+      conversionTypes.push(entry);
+    }
+  }
+  conversionTypes.sort((a, b) => b.spend - a.spend);
+  awarenessTypes.sort((a, b) => b.spend - a.spend);
 
   // === Top 5 campañas más eficientes ===
   const campaignsWithCPR = active
@@ -233,6 +273,9 @@ function MonthlyReportView({ data, locations }) {
                 </tr>
               </tfoot>
             </table>
+            {grouped['General'] && (
+              <p className="monthly-footnote">* Campañas generales: reconocimiento de marca, tráfico al perfil de Instagram y campañas que cubren ambas sedes.</p>
+            )}
           </div>
         </section>
       )}
@@ -275,7 +318,67 @@ function MonthlyReportView({ data, locations }) {
         </section>
       )}
 
-      {/* Sección 4: Top 5 Campañas más eficientes */}
+      {/* Sección 4: Rendimiento por Tipo de Campaña */}
+      {conversionTypes.length > 0 && (
+        <section className="monthly-section">
+          <h2 className="monthly-section-title">Rendimiento por Tipo de Campaña</h2>
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th className="report-th-service">Tipo de Campaña</th>
+                  <th className="report-th-num">Inversión</th>
+                  <th className="report-th-num">Mensajes</th>
+                  <th className="report-th-num">Nuevos</th>
+                  <th className="report-th-num">CPR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conversionTypes.map(t => (
+                  <tr key={t.type}>
+                    <td className="report-td-service">{t.type}</td>
+                    <td className="report-td-num">{formatCOP(t.spend)}</td>
+                    <td className="report-td-num">{t.conversations.toLocaleString('es-CO')}</td>
+                    <td className="report-td-num">{t.firstReplies.toLocaleString('es-CO')}</td>
+                    <td className="report-td-num">{t.cpr > 0 ? formatCOP(t.cpr) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sección 4b: Campañas de Reconocimiento y Tráfico */}
+      {awarenessTypes.length > 0 && (
+        <section className="monthly-section">
+          <h2 className="monthly-section-title">Campañas de Reconocimiento y Tráfico</h2>
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th className="report-th-service">Tipo</th>
+                  <th className="report-th-num">Inversión</th>
+                  <th className="report-th-num">Resultados</th>
+                  <th className="report-th-num">Alcance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {awarenessTypes.map(t => (
+                  <tr key={t.type}>
+                    <td className="report-td-service">{t.type}</td>
+                    <td className="report-td-num">{formatCOP(t.spend)}</td>
+                    <td className="report-td-num">{formatCompact(t.results)}</td>
+                    <td className="report-td-num">{formatCompact(t.reach)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Sección 5: Top 5 Campañas más eficientes */}
       {campaignsWithCPR.length > 0 && (
         <section className="monthly-section">
           <h2 className="monthly-section-title">Top 5 Campañas Más Eficientes</h2>
@@ -303,46 +406,6 @@ function MonthlyReportView({ data, locations }) {
           </div>
         </section>
       )}
-
-      {/* Sección 5: Todas las campañas por sede */}
-      {sortedLocs.map(loc => {
-        const list = grouped[loc];
-        return (
-          <section key={loc} className="monthly-section">
-            <h2 className="monthly-section-title monthly-section-title--sede">{loc}</h2>
-            <div className="report-table-wrap">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th className="report-th-service">Campaña</th>
-                    <th className="report-th-num">Mensajes</th>
-                    <th className="report-th-num">Nuevos</th>
-                    <th className="report-th-num">CPR</th>
-                    <th className="report-th-num">Inversión</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map(c => {
-                    const ins = c.insightsLastMonth;
-                    const a = extractActions(ins);
-                    const spend = parseFloat(ins?.spend || 0);
-                    const cpr = a.conversations > 0 ? spend / a.conversations : 0;
-                    return (
-                      <tr key={c.id}>
-                        <td className="report-td-service">{cleanName(c.name, locations)}</td>
-                        <td className="report-td-num">{a.conversations > 0 ? a.conversations : '-'}</td>
-                        <td className="report-td-num">{a.firstReplies > 0 ? a.firstReplies : '-'}</td>
-                        <td className="report-td-num">{cpr > 0 ? formatCOP(cpr) : '-'}</td>
-                        <td className="report-td-num">{formatCOP(spend)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        );
-      })}
 
       {/* Sección 6: Insights */}
       <section className="monthly-section">

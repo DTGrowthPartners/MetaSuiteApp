@@ -1239,3 +1239,10 @@ body {
   margin: 0;
   line-height: 1.5;
 }
+
+.monthly-footnote {
+  font-size: 11px;
+  color: #64748b;
+  margin: 8px 0 0;
+  font-style: italic;
+}

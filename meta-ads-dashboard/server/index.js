@@ -1997,11 +1997,19 @@ const REPORT_ACCOUNTS = {
     accountId: 'act_1604918750004319',
     name: 'EQ Cartagena',
     businessName: 'Equilibrio Clinic',
-    // Ubicaciones para agrupar campañas (se busca en el nombre de la campaña)
     locations: ['Castellana', 'Bocagrande'],
-    // Métrica principal de resultado
-    resultMetric: 'conversations', // mensajes
-    resultLabel: 'Mensajes'
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes',
+    // Patrones para categorizar campañas por tipo de servicio (orden importa: primera coincidencia gana)
+    campaignTypePatterns: [
+      { type: 'Depilación Láser', patterns: ['laser', 'láser', 'dep laser'], group: 'conversion' },
+      { type: 'Tratamientos Faciales', patterns: ['facial', 'limpieza facial'], group: 'conversion' },
+      { type: 'Tratamientos Corporales', patterns: ['corporal', 'relajación', 'relajacion', 'combo'], group: 'conversion' },
+      { type: 'Ventas DM Instagram', patterns: ['dm ig', 'dm instagram', 'ventas dm'], group: 'conversion' },
+      { type: 'Ventas WhatsApp', patterns: ['whatsapp', 'wsap', 'wahtsapp', 'waspp', 'clientes potenciales', 'ventas'], group: 'conversion' },
+      { type: 'Reconocimiento', patterns: ['reconocimiento', 'true play', 'awareness'], group: 'awareness' },
+      { type: 'Tráfico Web/Links', patterns: ['trafico', 'tráfico', 'traffic', 'perfil ig'], group: 'awareness' },
+    ]
   },
   'acbfit': {
     accountId: 'act_1214099615878120',
