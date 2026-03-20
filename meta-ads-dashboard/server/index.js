@@ -2105,6 +2105,30 @@ async function getAccountInsightsByCampaign(accountId, token, dateRange) {
   return allResults;
 }
 
+// Helper: obtener suma de reach a nivel de adset (más preciso que campaign-level)
+async function getAdsetReachSum(accountId, token, dateRange) {
+  let total = 0;
+  let url = `${META_API_BASE_URL}/${accountId}/insights`;
+  let params = {
+    access_token: token,
+    fields: 'reach',
+    level: 'adset',
+    time_range: JSON.stringify({ since: dateRange.since, until: dateRange.until }),
+    limit: 500
+  };
+  try {
+    while (url) {
+      const resp = await axios.get(url, { params });
+      for (const row of (resp.data.data || [])) total += parseInt(row.reach || 0);
+      url = resp.data.paging?.next || null;
+      params = {};
+    }
+  } catch (e) {
+    console.error('Error fetching adset reach:', e.response?.data || e.message);
+  }
+  return total;
+}
+
 // Helper: construir mapa de insights por campaign_id
 function buildInsightsMap(insightsArray) {
   const map = {};
@@ -2149,8 +2173,8 @@ async function getReportData(accountId, token) {
 
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
 
-  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta (en paralelo)
-  const [dailyInsights, lastMonthInsights, prevMonthInsights] = await Promise.all([
+  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
+  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth] = await Promise.all([
     // Ayer/hoy por campaña
     Promise.all(campaigns.map(async (campaign) => {
       let insightsYesterday = {};
@@ -2172,7 +2196,10 @@ async function getReportData(accountId, token) {
     // Mes pasado a nivel de cuenta
     getAccountInsightsByCampaign(normalizedId, token, lastMonth),
     // Mes anterior al pasado (para comparativa)
-    getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast)
+    getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast),
+    // Reach a nivel de adset (más preciso que campaign-level)
+    getAdsetReachSum(normalizedId, token, lastMonth),
+    getAdsetReachSum(normalizedId, token, monthBeforeLast)
   ]);
 
   const withInsights = dailyInsights;
@@ -2208,6 +2235,7 @@ async function getReportData(accountId, token) {
 
   // Totales del mes anterior (para comparativa)
   const prevMonthTotals = aggregateInsights(prevMonthInsights);
+  prevMonthTotals.adsetReach = adsetReachPrevMonth;
 
   const activeCampaigns = withInsights.filter(c =>
     parseFloat(c.insightsYesterday?.spend || 0) > 0 ||
@@ -2223,6 +2251,7 @@ async function getReportData(accountId, token) {
       lastMonth: { since: lastMonth.since, until: lastMonth.until, label: lastMonth.label },
       monthBeforeLast: { since: monthBeforeLast.since, until: monthBeforeLast.until, label: monthBeforeLast.label }
     },
+    adsetReachLastMonth: adsetReachLastMonth,
     prevMonthTotals,
     fetchedAt: new Date().toISOString(),
     totalCampaigns: activeCampaigns.length

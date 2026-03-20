@@ -111,11 +111,13 @@ function detectCampaignType(campaignName, patterns = []) {
 
 // ===================== VISTA MENSUAL (estilo PDF) =====================
 function MonthlyReportView({ data, locations }) {
-  const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [] } = data;
+  const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [], adsetReachLastMonth = 0 } = data;
   const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
 
-  // Totales del mes actual
+  // Totales del mes actual (TODAS las campañas)
   const totals = aggregateCampaigns(active, 'insightsLastMonth');
+  // Alcance desde adset-level (más preciso, como en el PDF)
+  totals.adsetReach = adsetReachLastMonth;
   const prev = prevMonthTotals || {};
 
   // === Rendimiento por Sede ===
@@ -169,8 +171,15 @@ function MonthlyReportView({ data, locations }) {
   conversionTypes.sort((a, b) => b.spend - a.spend);
   awarenessTypes.sort((a, b) => b.spend - a.spend);
 
+  // === Totales solo conversión (como el PDF) ===
+  const convCampaigns = active.filter(c => detectCampaignType(c.name, campaignTypePatterns).group === 'conversion');
+  const convTotals = aggregateCampaigns(convCampaigns, 'insightsLastMonth');
+  // Totales prev month solo conversión
+  const prevConvCampaigns = active.filter(c => detectCampaignType(c.name, campaignTypePatterns).group === 'conversion');
+  const prevConvTotals = aggregateCampaigns(prevConvCampaigns, 'insightsMonthBeforeLast');
+
   // === Top 5 campañas más eficientes ===
-  const campaignsWithCPR = active
+  const campaignsWithCPR = convCampaigns
     .map(c => {
       const ins = c.insightsLastMonth;
       const a = extractActions(ins);
@@ -181,19 +190,19 @@ function MonthlyReportView({ data, locations }) {
     .sort((a, b) => a.cpr - b.cpr)
     .slice(0, 5);
 
-  // === Comparativa ===
+  // === Comparativa (usa totales generales para inversión/alcance, conversión para msgs/CPR) ===
   const compRows = [
     { label: 'Inversión Total', cur: totals.spend, prev: prev.spend, fmt: formatCOP },
-    { label: 'Mensajes (Conv.)', cur: totals.conversations, prev: prev.conversations, fmt: v => formatCompact(v) },
-    { label: 'Nuevos Contactos', cur: totals.firstReplies, prev: prev.firstReplies, fmt: v => formatCompact(v) },
-    { label: 'CPR Mensajes', cur: totals.cpr, prev: prev.conversations > 0 ? prev.spend / prev.conversations : 0, fmt: formatCOP },
-    { label: 'Alcance', cur: totals.reach, prev: prev.reach, fmt: v => formatCompact(v) },
+    { label: 'Mensajes (Conv.)', cur: convTotals.conversations, prev: prevConvTotals.conversations, fmt: v => formatCompact(v) },
+    { label: 'Nuevos Contactos', cur: convTotals.firstReplies, prev: prevConvTotals.firstReplies, fmt: v => formatCompact(v) },
+    { label: 'CPR Mensajes', cur: convTotals.cpr, prev: prevConvTotals.cpr, fmt: formatCOP },
+    { label: 'Alcance', cur: totals.adsetReach, prev: prev.adsetReach || prev.reach, fmt: v => formatCompact(v) },
   ];
 
   // === Insights automáticos ===
   const bestSede = sedeTotals.length > 0 ? [...sedeTotals].sort((a, b) => (a.cpr || Infinity) - (b.cpr || Infinity))[0] : null;
   const bestCampaign = campaignsWithCPR[0];
-  const msgChange = pctChange(totals.conversations, prev.conversations);
+  const msgChange = pctChange(convTotals.conversations, prevConvTotals.conversations);
 
   return (
     <div className="monthly-report">
@@ -207,19 +216,19 @@ function MonthlyReportView({ data, locations }) {
             <ChangeBadge current={totals.spend} previous={prev.spend} />
           </div>
           <div className="monthly-metric-card">
-            <span className="monthly-metric-value">{formatCompact(totals.conversations)}</span>
+            <span className="monthly-metric-value">{formatCompact(convTotals.conversations)}</span>
             <span className="monthly-metric-label">Mensajes</span>
-            <ChangeBadge current={totals.conversations} previous={prev.conversations} />
+            <ChangeBadge current={convTotals.conversations} previous={prevConvTotals.conversations} />
           </div>
           <div className="monthly-metric-card">
-            <span className="monthly-metric-value">{totals.cpr > 0 ? formatCOP(totals.cpr) : '-'}</span>
+            <span className="monthly-metric-value">{convTotals.cpr > 0 ? formatCOP(convTotals.cpr) : '-'}</span>
             <span className="monthly-metric-label">Costo por Resultado</span>
-            <ChangeBadge current={totals.cpr} previous={prev.conversations > 0 ? prev.spend / prev.conversations : 0} invertColor />
+            <ChangeBadge current={convTotals.cpr} previous={prevConvTotals.cpr} invertColor />
           </div>
           <div className="monthly-metric-card">
-            <span className="monthly-metric-value">{formatCompact(totals.reach)}</span>
-            <span className="monthly-metric-label">Alcance</span>
-            <ChangeBadge current={totals.reach} previous={prev.reach} />
+            <span className="monthly-metric-value">{formatCompact(totals.adsetReach)}</span>
+            <span className="monthly-metric-label">Alcance (Personas Únicas)</span>
+            <ChangeBadge current={totals.adsetReach} previous={prev.adsetReach || prev.reach} />
           </div>
           <div className="monthly-metric-card">
             <span className="monthly-metric-value">{formatCompact(totals.impressions)}</span>
@@ -227,9 +236,9 @@ function MonthlyReportView({ data, locations }) {
             <ChangeBadge current={totals.impressions} previous={prev.impressions} />
           </div>
           <div className="monthly-metric-card">
-            <span className="monthly-metric-value">{formatCompact(totals.firstReplies)}</span>
+            <span className="monthly-metric-value">{formatCompact(convTotals.firstReplies)}</span>
             <span className="monthly-metric-label">Nuevos Contactos</span>
-            <ChangeBadge current={totals.firstReplies} previous={prev.firstReplies} />
+            <ChangeBadge current={convTotals.firstReplies} previous={prevConvTotals.firstReplies} />
           </div>
         </div>
       </section>
@@ -415,8 +424,8 @@ function MonthlyReportView({ data, locations }) {
             <div className="monthly-insight-card">
               <h3>{msgChange > 0 ? 'Crecimiento' : 'Disminución'} de {Math.abs(msgChange).toFixed(0)}% en mensajes</h3>
               <p>
-                En {dateRange?.lastMonth?.label} se generaron {totals.conversations.toLocaleString('es-CO')} conversaciones
-                vs {(prev.conversations || 0).toLocaleString('es-CO')} en {dateRange?.monthBeforeLast?.label}.
+                En {dateRange?.lastMonth?.label} se generaron {convTotals.conversations.toLocaleString('es-CO')} conversaciones
+                vs {(prevConvTotals.conversations || 0).toLocaleString('es-CO')} en {dateRange?.monthBeforeLast?.label}.
                 La inversión fue de {formatCOP(totals.spend)} vs {formatCOP(prev.spend || 0)}.
               </p>
             </div>
