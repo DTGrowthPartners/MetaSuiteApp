@@ -970,6 +970,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   };
 
   // Si DC está bloqueado para esta plantilla y el modo actual es dynamic, cambiar a single
+  // per-ad sigue permitido (usa standard creative cuando DC está bloqueado)
   useEffect(() => {
     if (isDCBlocked && adSetMode === 'dynamic') setAdSetMode('single');
   }, [isDCBlocked]);
@@ -2458,16 +2459,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 <small>1 creativo x Ad · 5-5-5 Copys</small>
               </button>
             )}
-            {!isDCBlocked && (
-              <button
-                type="button"
-                className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
-                onClick={() => setAdSetMode('per-ad')}
-              >
-                <strong>1 Ad × 1 AdSet</strong>
-                <small>1 creativo x AdSet · público diferente</small>
-              </button>
-            )}
+            <button
+              type="button"
+              className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
+              onClick={() => setAdSetMode('per-ad')}
+            >
+              <strong>1 Ad × 1 AdSet</strong>
+              <small>1 creativo x AdSet · público diferente</small>
+            </button>
             {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
               <button
                 type="button"
