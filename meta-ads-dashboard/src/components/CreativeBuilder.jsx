@@ -2458,6 +2458,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 <small>1 creativo x Ad · 5-5-5 Copys</small>
               </button>
             )}
+            {!isDCBlocked && (
+              <button
+                type="button"
+                className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
+                onClick={() => setAdSetMode('per-ad')}
+              >
+                <strong>1 Ad × 1 AdSet</strong>
+                <small>1 creativo x AdSet · público diferente</small>
+              </button>
+            )}
             {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
               <button
                 type="button"
@@ -2474,6 +2484,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               ? 'Todos los anuncios en 1 solo Ad Set. Ideal para campañas simples con 1-2 anuncios.'
               : adSetMode === 'dynamic'
               ? 'Crea docenas de combinaciones automáticamente (5 títulos + 5 descripciones + 5 CTAs). Meta optimiza las mejores. Recomendado para la mayoría de campañas.'
+              : adSetMode === 'per-ad'
+              ? 'Cada anuncio tiene su propio Ad Set con público diferente. Ideal para testear audiencias distintas con el mismo creativo.'
               : 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio. Meta optimiza automáticamente. Solo para campañas de Ventas o Apps.'}
           </p>
         </div>
@@ -4216,7 +4228,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               } else {
                 return numAuds > 1 ? `${numAds * numAuds} Ad Sets` : `${numAds} Ad Sets`;
               }
-            })()}</strong> - {job.adSetMode === 'flexible' ? 'Flexible (todos los assets en 1 Ad)' : job.adSetMode === 'single' ? 'Standard' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}
+            })()}</strong> - {job.adSetMode === 'flexible' ? 'Flexible (todos los assets en 1 Ad)' : job.adSetMode === 'single' ? 'Standard' : job.adSetMode === 'per-ad' ? '1 Ad × 1 AdSet (DC 5+5+5)' : 'Dynamic Creative 5+5+5'} - {job.optimizationGoal || 'Landing Page Views'}
             {(job.multiAudiences?.length || 0) > 0 && <span className="text-accent"> ({(job.multiAudiences.length || 0) + 1} públicos)</span>}
             </li>
             {job.adSetMode === 'flexible' ? (
