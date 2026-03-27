@@ -4401,10 +4401,14 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Log resultado — mantener igActorId y destinationType siempre
-      // El AdSet con INSTAGRAM_PROFILE funciona. Si el Ad falla, el retry lo resuelve.
+      // Paso C: Si INSTAGRAM_PROFILE y no hay IG conectada → abortar con error claro
       if (!igConnected) {
-        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. AdSet OK, Ad retry will handle IG issues.`);
+        if (destinationType === 'INSTAGRAM_PROFILE') {
+          console.error('❌ INSTAGRAM_PROFILE requires IG connected to ad account. Aborting.');
+          results.errors.push('Tu cuenta de Instagram no está conectada a esta cuenta publicitaria. Para crear campañas de tráfico al perfil de IG, ve a Meta Business Suite > Configuración > Cuentas de Instagram > Agregar y asígnala a esta cuenta publicitaria. Solo se hace una vez.');
+          return { success: false, ...results };
+        }
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. Continuing without IG.`);
       } else {
         console.log(`✅ IG account ready: ${igActorId}`);
       }
