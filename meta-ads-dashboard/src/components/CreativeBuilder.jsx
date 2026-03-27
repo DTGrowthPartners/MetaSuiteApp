@@ -4015,14 +4015,38 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         });
         setCreated(true);
 
-        // Confetti celebration
-        const end = Date.now() + 2000;
-        const colors = ['#6366f1', '#a5b4fc', '#22c55e', '#fbbf24', '#f472b6'];
-        (function frame() {
-          confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors });
-          confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors });
-          if (Date.now() < end) requestAnimationFrame(frame);
-        })();
+        // Confetti celebration — explosión central
+        const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#22c55e', '#34d399', '#fbbf24'];
+        // Estallido inicial grande desde el centro
+        confetti({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 45, gravity: 0.8, ticks: 300, scalar: 1.2 });
+        setTimeout(() => {
+          confetti({ particleCount: 50, spread: 120, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 35, gravity: 0.7, ticks: 250 });
+        }, 200);
+        setTimeout(() => {
+          confetti({ particleCount: 30, spread: 140, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 25, gravity: 0.6, ticks: 200, scalar: 0.8 });
+        }, 500);
+
+        // Sonido de celebración con Web Audio API
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const playTone = (freq, start, dur, vol = 0.15) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+            gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(ctx.currentTime + start);
+            osc.stop(ctx.currentTime + start + dur);
+          };
+          // Melodía tipo "achievement unlocked" — Do-Mi-Sol-Do agudo
+          playTone(523, 0, 0.15, 0.12);    // C5
+          playTone(659, 0.1, 0.15, 0.12);  // E5
+          playTone(784, 0.2, 0.15, 0.12);  // G5
+          playTone(1047, 0.3, 0.3, 0.15);  // C6 (nota final más larga)
+          setTimeout(() => ctx.close(), 2000);
+        } catch (e) { /* Audio not available */ }
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);
