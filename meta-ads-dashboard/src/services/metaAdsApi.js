@@ -4400,12 +4400,17 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Si no se pudo conectar, anular igActorId para evitar errores en creatives
-      // Meta asignará automáticamente la IG de la página al crear el anuncio
+      // Paso C: Log resultado
       if (!igConnected) {
-        console.warn(`⚠️ Could not connect IG (${igActorId}) to ad account. Will create ads WITHOUT instagram_user_id.`);
-        console.warn('💡 Para asociar tu IG: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > asignar al Ad Account.');
-        igActorId = null; // Meta usará la IG de la página automáticamente
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account.`);
+        // Para INSTAGRAM_PROFILE: necesita IG conectada. Fallback a tráfico genérico con link al perfil.
+        if (destinationType === 'INSTAGRAM_PROFILE') {
+          console.warn('INSTAGRAM_PROFILE requires connected IG. Falling back to generic traffic with IG profile link.');
+          destinationType = null; // Meta creará como tráfico genérico
+          optimizationGoal = 'LINK_CLICKS'; // fallback a clicks
+          igActorId = null;
+        }
+        // Para otros destinos: mantener igActorId (funciona sin estar conectado, como en IG DM)
       } else {
         console.log(`✅ IG account ready: ${igActorId}`);
       }
