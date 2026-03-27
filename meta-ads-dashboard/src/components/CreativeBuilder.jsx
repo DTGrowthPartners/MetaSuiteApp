@@ -3435,6 +3435,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
   };
 
   const handleCreateDraft = async () => {
+    // Pre-crear AudioContext en el gesto del usuario (antes de los awaits)
+    let audioCtx = null;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+
     setCreating(true);
     setError('');
     setLogs([]);
@@ -4015,38 +4019,34 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         });
         setCreated(true);
 
-        // Confetti celebration — explosión central
+        // Confetti — explosión central en 3 oleadas
         const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#22c55e', '#34d399', '#fbbf24'];
-        // Estallido inicial grande desde el centro
-        confetti({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 45, gravity: 0.8, ticks: 300, scalar: 1.2 });
-        setTimeout(() => {
-          confetti({ particleCount: 50, spread: 120, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 35, gravity: 0.7, ticks: 250 });
-        }, 200);
-        setTimeout(() => {
-          confetti({ particleCount: 30, spread: 140, origin: { x: 0.5, y: 0.45 }, colors, startVelocity: 25, gravity: 0.6, ticks: 200, scalar: 0.8 });
-        }, 500);
+        confetti({ particleCount: 100, spread: 70, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 55, gravity: 1, ticks: 300, scalar: 1.3, shapes: ['circle', 'square'] });
+        setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 40, gravity: 0.8, ticks: 250 }), 250);
+        setTimeout(() => confetti({ particleCount: 40, spread: 130, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 30, gravity: 0.6, ticks: 200, scalar: 0.8 }), 500);
 
-        // Sonido de celebración con Web Audio API
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const playTone = (freq, start, dur, vol = 0.15) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-            gain.gain.setValueAtTime(vol, ctx.currentTime + start);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
-            osc.connect(gain).connect(ctx.destination);
-            osc.start(ctx.currentTime + start);
-            osc.stop(ctx.currentTime + start + dur);
-          };
-          // Melodía tipo "achievement unlocked" — Do-Mi-Sol-Do agudo
-          playTone(523, 0, 0.15, 0.12);    // C5
-          playTone(659, 0.1, 0.15, 0.12);  // E5
-          playTone(784, 0.2, 0.15, 0.12);  // G5
-          playTone(1047, 0.3, 0.3, 0.15);  // C6 (nota final más larga)
-          setTimeout(() => ctx.close(), 2000);
-        } catch (e) { /* Audio not available */ }
+        // Sonido de celebración (AudioContext creado al inicio del handler)
+        if (audioCtx) {
+          try {
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+            const playTone = (freq, start, dur, vol = 0.15) => {
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+              gain.gain.setValueAtTime(vol, audioCtx.currentTime + start);
+              gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + dur);
+              osc.connect(gain).connect(audioCtx.destination);
+              osc.start(audioCtx.currentTime + start);
+              osc.stop(audioCtx.currentTime + start + dur);
+            };
+            playTone(523, 0, 0.12, 0.15);    // C5
+            playTone(659, 0.08, 0.12, 0.15);  // E5
+            playTone(784, 0.16, 0.12, 0.15);  // G5
+            playTone(1047, 0.24, 0.4, 0.18);  // C6 — nota final larga
+            setTimeout(() => audioCtx.close(), 2000);
+          } catch (e) { /* Audio error */ }
+        }
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);
