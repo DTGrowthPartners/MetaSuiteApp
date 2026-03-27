@@ -3522,7 +3522,7 @@ class MetaAdsService {
           });
 
           // Si falla por igActorId, reintentar sin IG
-          if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+          if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account') || creativeResult.error?.includes('cuenta de Instagram') || creativeResult.error?.includes('asociado a una cuenta'))) {
             console.warn(`Creative${adLabel}: igActorId rejected, retrying without IG...`);
             creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
               name: `${i + 1} - Creative`,
@@ -4400,17 +4400,10 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Log resultado
+      // Paso C: Log resultado — mantener igActorId y destinationType siempre
+      // El AdSet con INSTAGRAM_PROFILE funciona. Si el Ad falla, el retry lo resuelve.
       if (!igConnected) {
-        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account.`);
-        // Para INSTAGRAM_PROFILE: necesita IG conectada. Fallback a tráfico genérico con link al perfil.
-        if (destinationType === 'INSTAGRAM_PROFILE') {
-          console.warn('INSTAGRAM_PROFILE requires connected IG. Falling back to generic traffic with IG profile link.');
-          destinationType = null; // Meta creará como tráfico genérico
-          optimizationGoal = 'LINK_CLICKS'; // fallback a clicks
-          igActorId = null;
-        }
-        // Para otros destinos: mantener igActorId (funciona sin estar conectado, como en IG DM)
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. AdSet OK, Ad retry will handle IG issues.`);
       } else {
         console.log(`✅ IG account ready: ${igActorId}`);
       }
@@ -4484,6 +4477,9 @@ class MetaAdsService {
         return { resolvedThumbUrl, resolvedThumbHash };
       };
 
+      // Helper: detectar error de IG en español/inglés
+      const isIgError = (err) => err?.includes('instagram_user_id') || err?.includes('instagram_actor_id') || err?.includes('Instagram account') || err?.includes('cuenta de Instagram') || err?.includes('asociado a una cuenta');
+
       // Helper: crear Dynamic Creative (asset_feed_spec 5+5+5) + ad
       // fallbackContext: { targeting, campaignId } — datos para crear AdSet sin DC si falla con 1885392
       const createDynamicCreativeAndAd = async (ad, adIndex, adSetId, fallbackContext = null) => {
@@ -4514,7 +4510,7 @@ class MetaAdsService {
         let creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, creativeParams);
 
         // Si falla por instagram_user_id inválido, reintentar sin IG
-        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account') || creativeResult.error?.includes('cuenta de Instagram') || creativeResult.error?.includes('asociado a una cuenta'))) {
           console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying without IG...`);
           creativeResult = await this.createAdCreativeWithAssetFeedSpec(adAccountId, {
             ...creativeParams,
@@ -4571,6 +4567,13 @@ class MetaAdsService {
           return stdSuccess;
         }
 
+        // ====== FALLBACK: Error de IG — recrear creative sin IG ======
+        if (!adResult.success && isIgError(adResult.error)) {
+          console.warn(`Ad ${adIndex + 1}: IG error at Ad level (DC). Falling back to standard creative without IG...`);
+          const stdSuccess = await createStandardCreativeAndAd(ad, adIndex, adSetId);
+          return stdSuccess;
+        }
+
         if (!adResult.success) {
           results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
           return false;
@@ -4605,7 +4608,7 @@ class MetaAdsService {
         let creativeResult = await this.createStandardAdCreative(adAccountId, stdCreativeParams);
 
         // Si falla por instagram_user_id inválido, reintentar sin IG
-        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account'))) {
+        if (!creativeResult.success && (creativeResult.error?.includes('instagram_user_id') || creativeResult.error?.includes('instagram_actor_id') || creativeResult.error?.includes('Instagram account') || creativeResult.error?.includes('cuenta de Instagram') || creativeResult.error?.includes('asociado a una cuenta'))) {
           console.warn(`Creative ${adIndex + 1}: igActorId rejected, retrying without IG...`);
           creativeResult = await this.createStandardAdCreative(adAccountId, {
             ...stdCreativeParams,
@@ -4619,13 +4622,31 @@ class MetaAdsService {
         }
         results.creatives.push(creativeResult.data);
 
-        // Crear Ad — el Creative ya tiene instagram_user_id
+        // Crear Ad
         let adResult = await this.createAd(adAccountId, {
           name: `${adIndex + 1}`,
           adsetId: adSetId,
           creativeId: creativeResult.data.id,
           status: 'ACTIVE'
         });
+
+        // Si el Ad falla por IG, recrear creative SIN igActorId y reintentar
+        if (!adResult.success && isIgError(adResult.error)) {
+          console.warn(`Ad ${adIndex + 1}: IG error at Ad level. Retrying creative WITHOUT igActorId...`);
+          const retryCreative = await this.createStandardAdCreative(adAccountId, {
+            ...stdCreativeParams,
+            igActorId: null
+          });
+          if (retryCreative.success) {
+            results.creatives.push(retryCreative.data);
+            adResult = await this.createAd(adAccountId, {
+              name: `${adIndex + 1}`,
+              adsetId: adSetId,
+              creativeId: retryCreative.data.id,
+              status: 'ACTIVE'
+            });
+          }
+        }
 
         if (!adResult.success) {
           results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
