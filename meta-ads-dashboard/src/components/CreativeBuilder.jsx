@@ -287,6 +287,40 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const [textLength, setTextLength] = useState('medium'); // 'short', 'medium', 'long'
   const [campaignContext, setCampaignContext] = useState(''); // Optional manual context for AI
 
+  // Contexto automático por cuenta publicitaria (negocio → info para la IA)
+  const BUSINESS_CONTEXT = {
+    'equilibrio': { name: 'Equilibrio Clinic', desc: 'Clínica de medicina estética y bienestar en Cartagena. Servicios: tratamientos faciales, corporales, depilación láser, rejuvenecimiento, botox, ácido hialurónico. Público: mujeres 25-55 años.' },
+    'acbfit': { name: 'Gimnasio ACBFit', desc: 'Gimnasio y centro fitness en Cartagena. Servicios: entrenamiento personalizado, clases grupales, crossfit, musculación. Público: hombres y mujeres activos.' },
+    'acb fit': { name: 'Gimnasio ACBFit', desc: 'Gimnasio y centro fitness en Cartagena. Servicios: entrenamiento personalizado, clases grupales, crossfit, musculación. Público: hombres y mujeres activos.' },
+    'auto express': { name: 'Auto Express Detailing SAS', desc: 'Empresa de detailing automotriz en Cartagena. Servicios: lavado premium, pulido, ceramicado, protección de pintura, limpieza interior profunda. Público: dueños de vehículos que buscan cuidado premium.' },
+    'tennis': { name: 'Tennis Cartagena', desc: 'Tienda de calzado deportivo y casual en Cartagena. Productos: tenis, zapatos deportivos, marcas reconocidas. Público: jóvenes y adultos que buscan calzado de calidad.' },
+    'innovaci': { name: 'Innovación Fashion Outlet', desc: 'Tienda de ropa y moda en Cartagena. Productos: ropa femenina y masculina, tendencias, colecciones de temporada, precios outlet. Público: mujeres y hombres 18-45 años.' },
+    'importaciones': { name: 'Importaciones CTG', desc: 'Tienda de ropa, moda y chanclas importadas en Cartagena. Productos: ropa casual, chanclas, accesorios de moda, precios competitivos.' },
+    'master barber': { name: 'Master Barber Shop', desc: 'Barbería premium en Cartagena. Servicios: cortes de cabello, barba, cejas, afeitado clásico, tratamientos capilares. Público: hombres que cuidan su imagen.' },
+    'dt growth': { name: 'DT Growth Partners', desc: 'Agencia de marketing digital y growth. Servicios: campañas Meta Ads, estrategia digital, consultoría de crecimiento para negocios.' },
+  };
+
+  // Auto-detectar contexto del negocio cuando cambia la cuenta publicitaria
+  useEffect(() => {
+    if (!selectedAccount) return;
+    const account = adAccounts.find(a => a.id === selectedAccount);
+    if (!account) return;
+    const accountNameLower = account.name.toLowerCase();
+    const match = Object.entries(BUSINESS_CONTEXT).find(([key]) => accountNameLower.includes(key));
+    if (match) {
+      const [, biz] = match;
+      const autoContext = `Empresa: ${biz.name}. ${biz.desc}`;
+      // Solo auto-rellenar si el usuario no ha escrito contexto propio
+      setCampaignContext(prev => {
+        // Si está vacío o es un contexto auto-generado anterior, reemplazar
+        if (!prev || Object.values(BUSINESS_CONTEXT).some(b => prev.startsWith(`Empresa: ${b.name}`))) {
+          return autoContext;
+        }
+        return prev; // Mantener lo que el usuario escribió
+      });
+    }
+  }, [selectedAccount, adAccounts]);
+
   // Multi-Ad System
   const [adSetMode, setAdSetMode] = useState('dynamic'); // 'single' = 1 AdSet sin 5+5+5, 'dynamic' = N AdSets con 5+5+5 mismo público, 'per-ad' = N AdSets público diferente
   const createEmptyAd = (index) => ({
