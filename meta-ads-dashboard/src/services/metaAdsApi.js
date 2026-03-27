@@ -4400,18 +4400,26 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Log resultado final
-      if (!igConnected && igActorId) {
-        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. Ads may fail if IG is required.`);
-        console.warn('💡 Conecta manualmente: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > asignar al Ad Account.');
-      } else if (igConnected) {
+      // Paso C: Si no se pudo conectar, anular igActorId para evitar errores en creatives
+      // Meta asignará automáticamente la IG de la página al crear el anuncio
+      if (!igConnected) {
+        console.warn(`⚠️ Could not connect IG (${igActorId}) to ad account. Will create ads WITHOUT instagram_user_id.`);
+        console.warn('💡 Para asociar tu IG: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > asignar al Ad Account.');
+        igActorId = null; // Meta usará la IG de la página automáticamente
+      } else {
         console.log(`✅ IG account ready: ${igActorId}`);
       }
 
       // promoted_object según destino
-      if (destinationType === 'INSTAGRAM_PROFILE' && igActorId) {
-        promotedObject = { page_id: pageId, instagram_profile_id: igActorId };
-        console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId}`);
+      if (destinationType === 'INSTAGRAM_PROFILE') {
+        // Si IG está conectada al ad account, usar instagram_profile_id; si no, solo page_id
+        if (igConnected && igActorId) {
+          promotedObject = { page_id: pageId, instagram_profile_id: igActorId };
+          console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId}`);
+        } else {
+          promotedObject = { page_id: pageId };
+          console.log(`promoted_object: INSTAGRAM_PROFILE with page_id only (IG not connected to ad account)`);
+        }
       } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'].includes(destinationType)) {
         promotedObject = { page_id: pageId };
         console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
