@@ -2313,14 +2313,21 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
       // Validar que descriptions (link descriptions) sean CORTAS y DIFERENTES de bodies (textos principales)
-      // Si son iguales o muy largas, reemplazar con títulos (que son cortos por naturaleza)
       let finalDescriptions = descriptions.slice(0, 5);
       const avgDescLen = finalDescriptions.filter(d => d?.trim()).reduce((s, d) => s + d.length, 0) / (finalDescriptions.filter(d => d?.trim()).length || 1);
       const bodiesSet = new Set(bodies.map(b => b?.trim()?.substring(0, 50)));
       const descsDuplicate = finalDescriptions.filter(d => d?.trim()).some(d => bodiesSet.has(d.trim().substring(0, 50)));
       if (avgDescLen > 40 || descsDuplicate) {
-        console.warn(`Descriptions too similar to bodies (avgLen: ${Math.round(avgDescLen)}, duplicate: ${descsDuplicate}). Using titles instead.`);
-        finalDescriptions = titles.slice(0, 5);
+        // Generar descripciones cortas originales basadas en el destino/tipo de campaña
+        const shortDescs = isWhatsApp
+          ? ['Escríbenos ahora', 'Respuesta inmediata', 'Chatea con nosotros', 'Asesoría gratis', 'Sin compromiso']
+          : isInstagramDM
+          ? ['Envía un mensaje', 'Te respondemos ya', 'Escríbenos por DM', 'Consulta gratis', 'Respuesta rápida']
+          : linkUrl?.includes('instagram.com')
+          ? ['Síguenos ahora', 'Ver perfil completo', 'Contenido exclusivo', 'Únete a la comunidad', 'No te lo pierdas']
+          : ['Descúbrelo aquí', 'Ver más detalles', 'Conoce más', 'No te lo pierdas', 'Aprovecha ahora'];
+        console.warn(`Descriptions too similar to bodies (avgLen: ${Math.round(avgDescLen)}, dup: ${descsDuplicate}). Using short originals.`);
+        finalDescriptions = shortDescs;
       }
 
       // Asset Feed Spec - Dynamic Creative (5+5+5 en 1 solo anuncio)
