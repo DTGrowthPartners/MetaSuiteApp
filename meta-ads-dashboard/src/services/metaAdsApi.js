@@ -4286,9 +4286,9 @@ class MetaAdsService {
       // Paso B: Si no hay IG conectada al ad account → intentar auto-conectar
       // (necesario para TODAS las campañas, no solo INSTAGRAM_PROFILE)
       if (!igConnected && igActorId) {
-        console.log('No IG connected to ad account. Attempting to auto-connect...');
+        console.log(`No IG connected to ad account. Attempting to auto-connect IG ${igActorId}...`);
 
-        // B1: Obtener instagram_business_account de la página
+        // B1: Obtener instagram_business_account de la página (ID real de IG)
         let realIgId = null;
         try {
           const pageResp = await axios.get(`${META_API_BASE_URL}/${pageId}`, {
@@ -4317,60 +4317,95 @@ class MetaAdsService {
           console.warn('Could not get ad account business:', bizErr.response?.data?.error?.message || bizErr.message);
         }
 
-        // B3: Intentar conectar el IG al ad account vía business
-        if (realIgId && businessId) {
-          // Primero: reclamar IG para el business (si no lo está ya)
+        // B3: Intentar conectar la IG al ad account (múltiples estrategias)
+        const igIdToConnect = realIgId || igActorId;
+
+        // Estrategia 1: Conectar IG directamente al ad account
+        if (!igConnected) {
           try {
-            console.log(`Attempting to claim IG ${realIgId} to business ${businessId}...`);
-            await axios.post(`${META_API_BASE_URL}/${businessId}/instagram_accounts`, null, {
-              params: { access_token: this.accessToken, instagram_actor_id: realIgId }
+            console.log(`Strategy 1: POST /${normalizedAdAccount}/instagram_accounts with ig ${igIdToConnect}...`);
+            await axios.post(`${META_API_BASE_URL}/${normalizedAdAccount}/instagram_accounts`, null, {
+              params: { access_token: this.accessToken, instagram_actor_id: igIdToConnect }
             });
-            console.log(`✅ IG ${realIgId} claimed to business ${businessId}`);
+            igConnected = true;
+            igActorId = igIdToConnect;
+            console.log(`✅ Strategy 1 success: IG ${igIdToConnect} connected to ad account`);
+          } catch (e1) {
+            const msg = e1.response?.data?.error?.message || e1.message;
+            if (msg.includes('already')) {
+              igConnected = true;
+              igActorId = igIdToConnect;
+              console.log(`IG ${igIdToConnect} already connected to ad account`);
+            } else {
+              console.warn(`Strategy 1 failed: ${msg}`);
+            }
+          }
+        }
+
+        // Estrategia 2: Reclamar IG vía business y luego asignar al ad account
+        if (!igConnected && businessId && igIdToConnect) {
+          try {
+            console.log(`Strategy 2: Claim IG ${igIdToConnect} to business ${businessId}...`);
+            await axios.post(`${META_API_BASE_URL}/${businessId}/instagram_accounts`, null, {
+              params: { access_token: this.accessToken, instagram_actor_id: igIdToConnect }
+            });
+            console.log(`IG claimed to business`);
           } catch (claimErr) {
             const msg = claimErr.response?.data?.error?.message || claimErr.message;
-            // Si ya está reclamado, no es error real
-            if (msg.includes('already') || msg.includes('duplicate')) {
-              console.log(`IG ${realIgId} already claimed by business`);
-            } else {
+            if (!msg.includes('already') && !msg.includes('duplicate')) {
               console.warn(`Could not claim IG to business: ${msg}`);
             }
           }
 
-          // Segundo: asignar IG al ad account vía business
+          // Asignar IG al ad account vía business
           try {
-            console.log(`Attempting to assign IG ${realIgId} to ad account ${normalizedAdAccount} via business...`);
-            await axios.post(`${META_API_BASE_URL}/${realIgId}/assigned_users`, null, {
-              params: { access_token: this.accessToken, business: businessId }
+            await axios.post(`${META_API_BASE_URL}/${businessId}/ad_accounts`, null, {
+              params: { access_token: this.accessToken, adaccount_id: normalizedAdAccount }
             });
-            console.log(`✅ IG ${realIgId} assigned to ad account`);
-          } catch (assignErr) {
-            console.warn('Could not assign IG to ad account:', assignErr.response?.data?.error?.message || assignErr.message);
-          }
+          } catch (e) { /* ignorar si ya está asignado */ }
 
-          // Verificar si ahora está conectada
+          // Re-verificar conexión
           try {
             const recheck = await axios.get(`${META_API_BASE_URL}/${normalizedAdAccount}/instagram_accounts`, {
               params: { access_token: this.accessToken, fields: 'id,username' }
             });
             const nowConnected = recheck.data?.data || [];
-            console.log(`After auto-connect attempt: ${nowConnected.length} IG accounts`, nowConnected.map(a => `${a.username}(${a.id})`));
             if (nowConnected.length > 0) {
-              igActorId = nowConnected[0].id;
+              const match = nowConnected.find(a => a.id === igIdToConnect) || nowConnected[0];
+              igActorId = match.id;
               igConnected = true;
-              console.log(`✅ Auto-connected IG: ${igActorId}`);
+              console.log(`✅ Strategy 2 success: IG ${igActorId} now connected`);
             }
           } catch (recheckErr) {
-            console.warn('Error rechecking IG accounts:', recheckErr.response?.data?.error?.message || recheckErr.message);
+            console.warn('Error rechecking:', recheckErr.response?.data?.error?.message || recheckErr.message);
+          }
+        }
+
+        // Estrategia 3: Usar page_backed_instagram_accounts (siempre disponible)
+        if (!igConnected) {
+          try {
+            console.log(`Strategy 3: Getting page_backed_instagram_accounts from page ${pageId}...`);
+            const pbResp = await axios.get(`${META_API_BASE_URL}/${pageId}/page_backed_instagram_accounts`, {
+              params: { access_token: this.accessToken, fields: 'id,username' }
+            });
+            const pbAccounts = pbResp.data?.data || [];
+            if (pbAccounts.length > 0) {
+              igActorId = pbAccounts[0].id;
+              igConnected = true;
+              console.log(`✅ Strategy 3: Using page-backed IG: ${pbAccounts[0].username} (${igActorId})`);
+            }
+          } catch (pbErr) {
+            console.warn('Could not get page_backed_instagram_accounts:', pbErr.response?.data?.error?.message || pbErr.message);
           }
         }
       }
 
-      // Paso C: Si aún no hay IG conectada
+      // Paso C: Log resultado final
       if (!igConnected && igActorId) {
-        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account.`);
-        console.warn('💡 Para que aparezca correctamente, conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
-        // NO anulamos destinationType ni igActorId — el creative y adset lo necesitan
-        // Meta puede funcionar con instagram_user_id en el creative aunque no esté conectada formalmente
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. Ads may fail if IG is required.`);
+        console.warn('💡 Conecta manualmente: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > asignar al Ad Account.');
+      } else if (igConnected) {
+        console.log(`✅ IG account ready: ${igActorId}`);
       }
 
       // promoted_object según destino
