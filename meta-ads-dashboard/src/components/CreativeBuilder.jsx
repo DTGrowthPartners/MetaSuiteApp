@@ -651,11 +651,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     e.target.value = '';
 
     const metaService = new MetaAdsService(accessToken);
-    setMultiUploadProgress(`Subiendo ${files.length} archivo(s) a biblioteca...`);
+    setMultiUploadProgress(`Subiendo ${files.length} archivo(s) a la biblioteca de Meta...`);
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setMultiUploadProgress(`Subiendo ${i + 1}/${files.length}: ${file.name}`);
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setMultiUploadProgress(`Subiendo ${i + 1}/${files.length}: ${file.name} (${sizeMB} MB)`);
       const isVideo = file.type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(file.name.toLowerCase().split('.').pop());
       try {
         if (isVideo) {
@@ -669,8 +670,11 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       if (i < files.length - 1) await new Promise(r => setTimeout(r, 300));
     }
 
-    setMultiUploadProgress(`${files.length} archivo(s) subido(s) a biblioteca`);
-    setTimeout(() => setMultiUploadProgress(''), 4000);
+    setMultiUploadProgress(`✓ ${files.length} archivo(s) subido(s) correctamente`);
+    setTimeout(() => {
+      setMultiUploadProgress('Los archivos pueden tardar 1-2 min en aparecer en la biblioteca de Meta. Recarga si no los ves.');
+      setTimeout(() => setMultiUploadProgress(''), 10000);
+    }, 3000);
     // Recargar biblioteca para mostrar los nuevos archivos
     handleLoadMediaLibrary();
   };
@@ -2610,7 +2614,24 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               Subir archivos
             </button>
             {multiUploadProgress && (
-              <span className="text-accent" style={{ fontSize: '12px' }}>
+              <span
+                className={multiUploadProgress.startsWith('✓') ? 'text-success' : multiUploadProgress.startsWith('Los archivos') ? 'text-warning' : 'text-accent'}
+                style={{
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  background: multiUploadProgress.startsWith('✓') ? 'rgba(34, 197, 94, 0.1)'
+                    : multiUploadProgress.startsWith('Los archivos') ? 'rgba(251, 191, 36, 0.1)'
+                    : 'rgba(99, 102, 241, 0.1)',
+                  animation: 'none'
+                }}
+              >
+                {multiUploadProgress.startsWith('Subiendo') && (
+                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: '14px' }}>⟳</span>
+                )}
                 {multiUploadProgress}
               </span>
             )}
