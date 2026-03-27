@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import confetti from 'canvas-confetti';
 import MetaAdsService from '../services/metaAdsApi';
 import {
   CAMPAIGN_TEMPLATES,
@@ -411,6 +412,62 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       }
     } catch (err) {
       updateFlexGroup(groupIndex, { analyzingMedia: false, uploadProgress: `Error IA: ${err.message}` });
+    }
+  };
+
+  // Regenerar 5+5+5 para un anuncio estándar/dinámico (no flexible)
+  const regenerateAdContent = async (adIndex) => {
+    const ad = ads[adIndex];
+    if (!ad) return;
+    // Construir payload de media del anuncio
+    const mediaItems = [];
+    if (ad.videoId && ad.videoSourceUrl) {
+      mediaItems.push({ type: 'video', url: ad.thumbnailUrl || ad.imageUrl || '', thumbnailUrl: ad.thumbnailUrl || '', sourceUrl: ad.videoSourceUrl, name: ad.adName || '' });
+    } else if (ad.imageUrl || ad.imageHash) {
+      mediaItems.push({ type: 'image', url: ad.imageUrl || '', thumbnailUrl: '', sourceUrl: '', name: ad.adName || '' });
+    }
+    if (mediaItems.length === 0) {
+      // Sin media, generar con contexto vacío
+      mediaItems.push({ type: 'image', url: '', thumbnailUrl: '', sourceUrl: '', name: '' });
+    }
+    const hasVideos = mediaItems.some(i => i.type === 'video' && i.sourceUrl);
+    updateAd(adIndex, { analyzingMedia: true, uploadProgress: `Regenerando 5+5+5 con IA${hasVideos ? ' (extrayendo frames...)' : ''}...` });
+    try {
+      const metaService = new MetaAdsService(accessToken);
+      const category = selectedTemplate?.category || '';
+      const objective = selectedTemplate?.objective || '';
+      const templateName = selectedTemplate?.name || '';
+      const destType = templateAdConfig.destinationConfig?.type || '';
+      const result = await metaService.analyzeMediaUrlBatch(
+        mediaItems, adIndex, category, objective, templateName, destType, textLength,
+        campaignContext ? campaignContext : (campaignName ? `Campaña: ${campaignName}` : '')
+      );
+      if (result.success && result.data) {
+        const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+        const isWhatsApp = effectiveDestination === 'WHATSAPP';
+        const isMessenger = effectiveDestination === 'MESSENGER';
+        const isIgDirect = effectiveDestination === 'INSTAGRAM_DIRECT';
+        const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
+        const isMessaging = isMessenger || isIgDirect;
+        const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        updateAd(adIndex, {
+          headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
+          descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions?.length ? result.data.linkDescriptions : ['', '', '', '', ''],
+          ctas: (isWhatsApp || isMessaging || isIgProfile)
+            ? [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]
+            : (result.data.ctas?.length ? result.data.ctas : [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta]),
+          contentGenerated: true,
+          analyzingMedia: false,
+          uploadProgress: 'Contenido regenerado con IA ✓',
+          showEditContent: true
+        });
+      } else {
+        updateAd(adIndex, { analyzingMedia: false, uploadProgress: `Error IA: ${result.error || 'Error desconocido'}` });
+      }
+    } catch (err) {
+      updateAd(adIndex, { analyzingMedia: false, uploadProgress: `Error IA: ${err.message}` });
     }
   };
 
@@ -3147,6 +3204,19 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 )}
               </div>
 
+              {/* Regenerate 5+5+5 button */}
+              <div className="mt-sm" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => regenerateAdContent(adIndex)}
+                  disabled={ad.analyzingMedia}
+                  className="toggle-btn active"
+                  style={{ fontSize: '12px', padding: '6px 14px', opacity: ad.analyzingMedia ? 0.6 : 1 }}
+                >
+                  {ad.analyzingMedia ? 'Generando...' : (ad.contentGenerated ? 'Regenerar 5+5+5 con IA' : 'Generar 5+5+5 con IA')}
+                </button>
+              </div>
+
               {/* Content Summary & Edit Toggle */}
               <div className="mt-sm">
                 <button
@@ -3159,7 +3229,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px' }}>IA</span>
                     )}
                     <span className={ad.contentGenerated ? 'text-success' : 'text-muted'} style={{ fontSize: '13px', fontWeight: '500' }}>
-                      {ad.contentGenerated 
+                      {ad.contentGenerated
                         ? '5 Títulos + 5 Descripciones (CTAs de la plantilla)'
                         : `${ad.headlines.filter(h => h.trim()).length} Títulos + ${ad.descriptions.filter(d => d.trim()).length} Descripciones`}
                     </span>
@@ -3918,6 +3988,15 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           advantageAudience: job.advantageAudience
         });
         setCreated(true);
+
+        // Confetti celebration
+        const end = Date.now() + 2000;
+        const colors = ['#6366f1', '#a5b4fc', '#22c55e', '#fbbf24', '#f472b6'];
+        (function frame() {
+          confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors });
+          confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors });
+          if (Date.now() < end) requestAnimationFrame(frame);
+        })();
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);

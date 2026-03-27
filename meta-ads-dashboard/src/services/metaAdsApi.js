@@ -4252,6 +4252,12 @@ class MetaAdsService {
       : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
+    // Para tráfico a perfil de IG: usar VISIT_INSTAGRAM_PROFILE como optimization_goal
+    if (conversionLocation === 'INSTAGRAM_PROFILE' && objective === 'OUTCOME_TRAFFIC') {
+      optimizationGoal = 'VISIT_INSTAGRAM_PROFILE';
+      console.log('Optimization goal set to VISIT_INSTAGRAM_PROFILE for Instagram Profile traffic');
+    }
+
     // promoted_object se construye DESPUÉS de resolver igActorId (ver abajo)
     let promotedObject = null;
 
@@ -4277,8 +4283,9 @@ class MetaAdsService {
         console.warn('Error checking ad account IG accounts:', checkErr.response?.data?.error?.message || checkErr.message);
       }
 
-      // Paso B: Si no hay IG conectada y necesitamos INSTAGRAM_PROFILE → intentar auto-conectar
-      if (!igConnected && destinationType === 'INSTAGRAM_PROFILE') {
+      // Paso B: Si no hay IG conectada al ad account → intentar auto-conectar
+      // (necesario para TODAS las campañas, no solo INSTAGRAM_PROFILE)
+      if (!igConnected && igActorId) {
         console.log('No IG connected to ad account. Attempting to auto-connect...');
 
         // B1: Obtener instagram_business_account de la página
@@ -4358,14 +4365,14 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Si aún no hay IG conectada → fallback sin destination_type
+      // Paso C: Si aún no hay IG conectada → fallback
       if (!igConnected) {
-        igActorId = null;
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. IG may not appear selected in Meta Ads Manager.`);
+        console.warn('💡 Para que aparezca como "Instagram o Facebook", conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
         if (destinationType === 'INSTAGRAM_PROFILE') {
-          console.warn('⚠️ Could not auto-connect IG. Falling back to generic traffic (link URL points to IG profile).');
-          console.warn('💡 Para que aparezca como "Instagram o Facebook", conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
-          destinationType = null;
+          destinationType = null; // fallback a tráfico genérico
         }
+        // NO anulamos igActorId — el creative aún lo necesita para instagram_user_id
       }
 
       // promoted_object según destino
