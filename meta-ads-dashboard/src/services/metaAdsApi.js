@@ -4365,18 +4365,16 @@ class MetaAdsService {
         }
       }
 
-      // Paso C: Si aún no hay IG conectada → fallback
-      if (!igConnected) {
-        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account. IG may not appear selected in Meta Ads Manager.`);
-        console.warn('💡 Para que aparezca como "Instagram o Facebook", conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
-        if (destinationType === 'INSTAGRAM_PROFILE') {
-          destinationType = null; // fallback a tráfico genérico
-        }
-        // NO anulamos igActorId — el creative aún lo necesita para instagram_user_id
+      // Paso C: Si aún no hay IG conectada
+      if (!igConnected && igActorId) {
+        console.warn(`⚠️ Could not auto-connect IG (${igActorId}) to ad account.`);
+        console.warn('💡 Para que aparezca correctamente, conecta manualmente tu Instagram en: Meta Business Suite > Configuración > Cuentas de Instagram > Agregar > luego asignarla al Ad Account.');
+        // NO anulamos destinationType ni igActorId — el creative y adset lo necesitan
+        // Meta puede funcionar con instagram_user_id en el creative aunque no esté conectada formalmente
       }
 
       // promoted_object según destino
-      if (destinationType === 'INSTAGRAM_PROFILE' && igConnected) {
+      if (destinationType === 'INSTAGRAM_PROFILE' && igActorId) {
         promotedObject = { page_id: pageId, instagram_profile_id: igActorId };
         console.log(`promoted_object: INSTAGRAM_PROFILE with instagram_profile_id: ${igActorId}`);
       } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'].includes(destinationType)) {

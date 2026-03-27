@@ -421,16 +421,21 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     if (!ad) return;
     // Construir payload de media del anuncio
     const mediaItems = [];
-    if (ad.videoId && ad.videoSourceUrl) {
-      mediaItems.push({ type: 'video', url: ad.thumbnailUrl || ad.imageUrl || '', thumbnailUrl: ad.thumbnailUrl || '', sourceUrl: ad.videoSourceUrl, name: ad.adName || '' });
-    } else if (ad.imageUrl || ad.imageHash) {
-      mediaItems.push({ type: 'image', url: ad.imageUrl || '', thumbnailUrl: '', sourceUrl: '', name: ad.adName || '' });
+    if (ad.videoId) {
+      // Video: usar thumbnailUrl como imagen para análisis visual
+      const thumbUrl = ad.videoThumbnailUrl || ad.thumbnailUrl || ad.imageUrl || '';
+      if (thumbUrl) {
+        mediaItems.push({ type: 'image', url: thumbUrl, thumbnailUrl: thumbUrl, sourceUrl: '', name: ad.adName || '' });
+      }
+    } else if (ad.imageUrl) {
+      mediaItems.push({ type: 'image', url: ad.imageUrl, thumbnailUrl: '', sourceUrl: '', name: ad.adName || '' });
     }
+    // Si no hay media disponible, no podemos analizar — generar solo con contexto
     if (mediaItems.length === 0) {
-      // Sin media, generar con contexto vacío
-      mediaItems.push({ type: 'image', url: '', thumbnailUrl: '', sourceUrl: '', name: '' });
+      updateAd(adIndex, { analyzingMedia: false, uploadProgress: 'Agrega una imagen o video primero para generar contenido con IA' });
+      return;
     }
-    const hasVideos = mediaItems.some(i => i.type === 'video' && i.sourceUrl);
+    const hasVideos = false; // Usamos thumbnail como imagen para simplificar
     updateAd(adIndex, { analyzingMedia: true, uploadProgress: `Regenerando 5+5+5 con IA${hasVideos ? ' (extrayendo frames...)' : ''}...` });
     try {
       const metaService = new MetaAdsService(accessToken);
