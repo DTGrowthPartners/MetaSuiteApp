@@ -2312,11 +2312,22 @@ class MetaAdsService {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
+      // Validar que descriptions (link descriptions) sean CORTAS y DIFERENTES de bodies (textos principales)
+      // Si son iguales o muy largas, reemplazar con títulos (que son cortos por naturaleza)
+      let finalDescriptions = descriptions.slice(0, 5);
+      const avgDescLen = finalDescriptions.filter(d => d?.trim()).reduce((s, d) => s + d.length, 0) / (finalDescriptions.filter(d => d?.trim()).length || 1);
+      const bodiesSet = new Set(bodies.map(b => b?.trim()?.substring(0, 50)));
+      const descsDuplicate = finalDescriptions.filter(d => d?.trim()).some(d => bodiesSet.has(d.trim().substring(0, 50)));
+      if (avgDescLen > 40 || descsDuplicate) {
+        console.warn(`Descriptions too similar to bodies (avgLen: ${Math.round(avgDescLen)}, duplicate: ${descsDuplicate}). Using titles instead.`);
+        finalDescriptions = titles.slice(0, 5);
+      }
+
       // Asset Feed Spec - Dynamic Creative (5+5+5 en 1 solo anuncio)
       const assetFeedSpec = {
         bodies: bodies.slice(0, 5).map(text => ({ text })),
         titles: titles.slice(0, 5).map(text => ({ text })),
-        descriptions: descriptions.slice(0, 5).map(text => ({ text })),
+        descriptions: finalDescriptions.map(text => ({ text })),
       };
 
       // CTA types en asset_feed_spec (requerido por Meta para dynamic creative)
