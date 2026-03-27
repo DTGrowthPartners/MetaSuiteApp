@@ -1509,11 +1509,17 @@ JSON exacto:
       parsed.ctas.push(next);
     }
   }
-  // Ensure exactly 5 linkDescriptions
-  if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
-    parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
-    while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
+  // Ensure exactly 5 linkDescriptions — must be SHORT and DIFFERENT from descriptions
+  parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+  // If linkDescriptions are too long (>40 chars avg), they're probably duplicates of descriptions — truncate headlines
+  const avgLDLen = parsed.linkDescriptions.length > 0
+    ? parsed.linkDescriptions.reduce((s, d) => s + d.length, 0) / parsed.linkDescriptions.length
+    : 0;
+  if (avgLDLen > 40 && parsed.headlines) {
+    console.log(`linkDescriptions too long (avg ${Math.round(avgLDLen)} chars), using truncated headlines instead`);
+    parsed.linkDescriptions = (parsed.headlines || []).map(h => h.substring(0, 30));
   }
+  while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
   return parsed;
 }
 
@@ -1563,17 +1569,22 @@ ${templateName ? `Tipo de campaña: ${templateName}` : ''}
 ${campaignContext ? `\nCONTEXTO DE LA CAMPAÑA (proporcionado por el anunciante, PRIORIZA esta información):\n"${campaignContext}"\n` : ''}
 Instrucción de ángulo: ${angle}
 
-Genera exactamente en JSON:
+Genera exactamente en JSON estos 4 campos DIFERENTES entre sí:
+- "descriptions": 5 TEXTOS PRINCIPALES largos y persuasivos (${len.descMin}-${len.descMax} chars). Son el cuerpo del anuncio.
+- "headlines": 5 TÍTULOS cortos y llamativos (máx ${len.headlineMax} chars). Van en negrita.
+- "linkDescriptions": 5 FRASES MUY CORTAS (máx 25 chars cada una) que aparecen debajo del título. Ejemplos: "Ver ofertas", "Envío gratis", "Solo hoy", "Agenda tu cita", "Descúbrelo aquí". NO deben parecerse a descriptions.
+- "ctas": 5 CTAs variados de esta lista: ${ctx.ctas}
+
+⚠️ linkDescriptions DEBEN ser COMPLETAMENTE DIFERENTES a descriptions. Son frases de 2-4 palabras, NO párrafos.
+
 {
-  "headlines": ["título (máx ${len.headlineMax} chars)", "título", "título", "título", "título"],
-  "descriptions": ["descripción persuasiva (${len.descMin}-${len.descMax} chars)...", "otra descripción...", "...", "...", "..."],
-  "linkDescriptions": ["detalle corto (máx 30 chars)", "detalle corto", "detalle corto", "detalle corto", "detalle corto"],
+  "descriptions": ["texto principal largo y persuasivo...", "otro texto principal...", "...", "...", "..."],
+  "headlines": ["título corto", "título", "título", "título", "título"],
+  "linkDescriptions": ["frase corta", "otra frase", "detalle", "beneficio", "acción"],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
-Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.
-linkDescriptions: detalles adicionales breves que complementan el título (ej: "Envío gratis", "Ver colección", "Disponible ahora").
-CTAs variados de esta lista: ${ctx.ctas}`
+Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses de emojis.`
           }
         ]
       }
@@ -1594,11 +1605,17 @@ CTAs variados de esta lista: ${ctx.ctas}`
       parsed.ctas.push(next);
     }
   }
-  // Ensure exactly 5 linkDescriptions
-  if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
-    parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
-    while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
+  // Ensure exactly 5 linkDescriptions — must be SHORT and DIFFERENT from descriptions
+  parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+  // If linkDescriptions are too long (>40 chars avg), they're probably duplicates of descriptions — truncate headlines
+  const avgLDLen = parsed.linkDescriptions.length > 0
+    ? parsed.linkDescriptions.reduce((s, d) => s + d.length, 0) / parsed.linkDescriptions.length
+    : 0;
+  if (avgLDLen > 40 && parsed.headlines) {
+    console.log(`linkDescriptions too long (avg ${Math.round(avgLDLen)} chars), using truncated headlines instead`);
+    parsed.linkDescriptions = (parsed.headlines || []).map(h => h.substring(0, 30));
   }
+  while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
   return parsed;
 }
 
@@ -1941,15 +1958,22 @@ IMPORTANTE:${transcripts.length > 0 ? '\n- La transcripción de audio muestra EX
 - Si hay contexto del negocio, el copy DEBE ser 100% sobre ese negocio.${hasVisual ? '\n- Las imágenes muestran el contenido visual del anuncio — úsalas para entender el estilo.' : ''}
 - El tipo de negocio lo define el contexto textual, no las imágenes.
 
-Genera exactamente en JSON:
+Genera exactamente en JSON estos 4 campos DIFERENTES entre sí:
+- "descriptions": 5 TEXTOS PRINCIPALES largos y persuasivos (${len.descMin}-${len.descMax} chars). Son el cuerpo del anuncio.
+- "headlines": 5 TÍTULOS cortos y llamativos (máx ${len.headlineMax} chars). Van en negrita.
+- "linkDescriptions": 5 FRASES MUY CORTAS (máx 25 chars cada una) que aparecen debajo del título. Ejemplos: "Ver ofertas", "Envío gratis", "Solo hoy", "Agenda tu cita", "Descúbrelo aquí". NO deben parecerse a descriptions.
+- "ctas": 5 CTAs variados de esta lista: ${ctx.ctas}
+
+⚠️ linkDescriptions DEBEN ser COMPLETAMENTE DIFERENTES a descriptions. Son frases de 2-4 palabras, NO párrafos.
+
 {
-  "headlines": ["título (máx ${len.headlineMax} chars)", "título", "título", "título", "título"],
-  "descriptions": ["descripción persuasiva (${len.descMin}-${len.descMax} chars)...", "otra descripción...", "...", "...", "..."],
-  "linkDescriptions": ["detalle corto (máx 30 chars)", "detalle corto", "detalle corto", "detalle corto", "detalle corto"],
+  "descriptions": ["texto principal largo y persuasivo...", "otro texto principal...", "...", "...", "..."],
+  "headlines": ["título corto", "título", "título", "título", "título"],
+  "linkDescriptions": ["frase corta", "otra frase", "detalle", "beneficio", "acción"],
   "ctas": ["CTA1", "CTA2", "CTA3", "CTA4", "CTA5"]
 }
 
-Máximo 1 emoji por elemento. CTAs variados de esta lista: ${ctx.ctas}`
+Máximo 1 emoji por elemento.`
     });
 
     const completion = await anthropic.messages.create({
@@ -1972,10 +1996,16 @@ Máximo 1 emoji por elemento. CTAs variados de esta lista: ${ctx.ctas}`
         parsed.ctas.push(next);
       }
     }
-    if (!parsed.linkDescriptions || parsed.linkDescriptions.length < 5) {
-      parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
-      while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
+    // Ensure linkDescriptions are SHORT and DIFFERENT from descriptions
+    parsed.linkDescriptions = (parsed.linkDescriptions || []).filter(d => d && d.trim());
+    const batchAvgLDLen = parsed.linkDescriptions.length > 0
+      ? parsed.linkDescriptions.reduce((s, d) => s + d.length, 0) / parsed.linkDescriptions.length
+      : 0;
+    if (batchAvgLDLen > 40 && parsed.headlines) {
+      console.log(`Batch: linkDescriptions too long (avg ${Math.round(batchAvgLDLen)} chars), using truncated headlines`);
+      parsed.linkDescriptions = (parsed.headlines || []).map(h => h.substring(0, 30));
     }
+    while (parsed.linkDescriptions.length < 5) parsed.linkDescriptions.push('');
 
     const method = transcripts.length > 0 && framesToSend.length > 0 ? 'whisper+vision' : transcripts.length > 0 ? 'whisper' : 'vision-batch';
     console.log(`Batch done [${method}]: ${framesToSend.length} frames + ${transcripts.length} transcripts from ${itemsToProcess.length} items`);
