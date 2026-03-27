@@ -49,7 +49,7 @@ export const CTA_OPTIONS = [
   { value: 'CALL_NOW', label: 'Llamar ahora' },
   { value: 'GET_DIRECTIONS', label: 'Cómo llegar' },
   { value: 'BOOK_TRAVEL', label: 'Reservar' },
-  { value: 'VISIT_INSTAGRAM_PROFILE', label: 'Ir al perfil de Instagram' }
+  { value: 'VIEW_INSTAGRAM_PROFILE', label: 'Ir al perfil de Instagram' }
 ];
 
 // Ubicaciones por plataforma
@@ -566,8 +566,8 @@ export const CAMPAIGN_TEMPLATES = [
       allowedFormats: ['SINGLE_IMAGE', 'SINGLE_VIDEO', 'CAROUSEL'],
       defaultFormat: 'SINGLE_VIDEO',
       destinationConfig: { type: 'INSTAGRAM_PROFILE', requiresUrl: false, requiresInstagram: true },
-      allowedCtas: ['VISIT_INSTAGRAM_PROFILE', 'LEARN_MORE', 'CONTACT_US', 'SHOP_NOW', 'GET_QUOTE'],
-      defaultCta: 'VISIT_INSTAGRAM_PROFILE',
+      allowedCtas: ['VIEW_INSTAGRAM_PROFILE', 'LEARN_MORE', 'CONTACT_US', 'SHOP_NOW', 'GET_QUOTE'],
+      defaultCta: 'VIEW_INSTAGRAM_PROFILE',
       trackingConfig: { requiresPixel: false }
     },
     creativeContent: {
@@ -592,7 +592,7 @@ export const CAMPAIGN_TEMPLATES = [
         'Si te gustó este anuncio, espera a ver nuestro perfil completo. Contenido fresco todos los días. Síguenos.',
         'Todo lo mejor lo compartimos primero en Instagram. Visita nuestro perfil y no te pierdas ninguna novedad.'
       ],
-      ctas: ['VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE', 'VISIT_INSTAGRAM_PROFILE']
+      ctas: ['VIEW_INSTAGRAM_PROFILE', 'VIEW_INSTAGRAM_PROFILE', 'VIEW_INSTAGRAM_PROFILE', 'VIEW_INSTAGRAM_PROFILE', 'VIEW_INSTAGRAM_PROFILE']
     }
   },
 

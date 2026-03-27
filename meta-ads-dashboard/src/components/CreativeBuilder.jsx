@@ -306,7 +306,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     ctas: templateContent.ctas || (() => {
       const dc = templateAdConfig?.defaultCta
         || (templateAdSetConfig?.conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
-          : templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+          : templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE' ? 'VIEW_INSTAGRAM_PROFILE'
           : templateAdSetConfig?.conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
           : templateAdSetConfig?.conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'
           : 'LEARN_MORE');
@@ -394,7 +394,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
         const isMessaging = isMessenger || isIgDirect;
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        const defaultCta = isIgProfile ? 'VIEW_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateFlexGroup(groupIndex, {
           headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
           descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
@@ -455,7 +455,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
         const isMessaging = isMessenger || isIgDirect;
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        const defaultCta = isIgProfile ? 'VIEW_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
           descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
@@ -840,7 +840,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const isMessaging = isMessenger || isIgDirect;
         // CTAs correctos por destino según Meta API
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        const defaultCta = isIgProfile ? 'VIEW_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
           descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
@@ -1001,7 +1001,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         const isMessaging = isMessenger || isIgDirect;
         // CTAs correctos por destino según Meta API
         const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        const defaultCta = isIgProfile ? 'VISIT_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        const defaultCta = isIgProfile ? 'VIEW_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
         updateAd(adIndex, {
           headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
           descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
@@ -1875,7 +1875,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     setSelectedDestination(opt.id);
                     const newCta = opt.id === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
                       : opt.id === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
-                      : opt.id === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+                      : opt.id === 'INSTAGRAM_PROFILE' ? 'VIEW_INSTAGRAM_PROFILE'
                       : opt.id === 'MESSENGER' ? 'MESSAGE_PAGE'
                       : opt.id === 'WEBSITE' ? 'LEARN_MORE'
                       : 'LEARN_MORE';
@@ -3786,8 +3786,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               const adHeadlines = (ad.headlines || []).filter(h => h?.trim());
               const adDescriptions = (ad.descriptions || []).filter(d => d?.trim());
               const AWARENESS_VALID_CTAS = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'SUBSCRIBE', 'CONTACT_US', 'WATCH_MORE', 'MESSAGE_PAGE', 'WHATSAPP_MESSAGE', 'INSTAGRAM_MESSAGE'];
-              // VISIT_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — reemplazar con LEARN_MORE
-              let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))].map(c => c === 'VISIT_INSTAGRAM_PROFILE' ? 'LEARN_MORE' : c);
+              // VIEW_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — reemplazar con LEARN_MORE
+              let validCTAs = [...new Set((ad.ctas || [defaultCta]).filter(c => c))].map(c => c === 'VIEW_INSTAGRAM_PROFILE' ? 'LEARN_MORE' : c);
               if (objective === 'OUTCOME_AWARENESS') {
                 validCTAs = validCTAs.filter(c => AWARENESS_VALID_CTAS.includes(c));
                 if (validCTAs.length === 0) validCTAs = [defaultCta];
@@ -3929,7 +3929,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
             videoThumbnailUrl: job.videoThumbnailUrl,
             headlines: job.headlines || [],
             descriptions: job.descriptions || [],
-            ctas: job.ctas || [conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+            ctas: job.ctas || [conversionLocation === 'INSTAGRAM_PROFILE' ? 'VIEW_INSTAGRAM_PROFILE'
               : conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
               : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
               : conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'

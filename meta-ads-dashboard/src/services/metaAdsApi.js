@@ -4196,19 +4196,19 @@ class MetaAdsService {
       'DOWNLOAD', 'GET_OFFER', 'APPLY_NOW', 'CONTACT_US', 'GET_QUOTE',
       'BUY_NOW', 'ORDER_NOW', 'BOOK_TRAVEL',
       'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE',
-      'CALL_NOW', 'GET_DIRECTIONS', 'VISIT_INSTAGRAM_PROFILE'
+      'CALL_NOW', 'GET_DIRECTIONS', 'VIEW_INSTAGRAM_PROFILE'
     ];
 
     // Determinar CTA default según destino
-    // NOTA: VISIT_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — usar LEARN_MORE para IG Profile en DC
+    // NOTA: VIEW_INSTAGRAM_PROFILE NO es válido en asset_feed_spec (DC) — usar LEARN_MORE para IG Profile en DC
     const defaultCTAForDestination = conversionLocation === 'INSTAGRAM_PROFILE' ? 'LEARN_MORE'
       : conversionLocation === 'WHATSAPP' ? 'WHATSAPP_MESSAGE'
       : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_MESSAGE'
       : conversionLocation === 'MESSENGER' ? 'MESSAGE_PAGE'
       : 'LEARN_MORE';
 
-    // CTA para standard creatives (INSTAGRAM_PROFILE usa VISIT_INSTAGRAM_PROFILE ahí sí)
-    const defaultCTAForStandard = conversionLocation === 'INSTAGRAM_PROFILE' ? 'VISIT_INSTAGRAM_PROFILE'
+    // CTA para standard creatives (INSTAGRAM_PROFILE usa VIEW_INSTAGRAM_PROFILE ahí sí)
+    const defaultCTAForStandard = conversionLocation === 'INSTAGRAM_PROFILE' ? 'VIEW_INSTAGRAM_PROFILE'
       : defaultCTAForDestination;
 
     // OUTCOME_AWARENESS + DC: solo permite estos CTAs (GET_OFFER, APPLY_NOW, etc. dan error 1885396)
@@ -4219,7 +4219,7 @@ class MetaAdsService {
 
     // CTAs que NO funcionan en asset_feed_spec (DC) pero sí en standard creatives
     const DC_CTA_REPLACEMENTS = {
-      'VISIT_INSTAGRAM_PROFILE': 'LEARN_MORE'
+      'VIEW_INSTAGRAM_PROFILE': 'LEARN_MORE'
     };
 
     const sanitizeCTAs = (ctas, forDC = true) => {
@@ -4252,7 +4252,8 @@ class MetaAdsService {
       : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
-    // Para tráfico a perfil de IG: usar VISIT_INSTAGRAM_PROFILE como optimization_goal
+    // Para tráfico a perfil de IG: optimization_goal sigue siendo VISIT_INSTAGRAM_PROFILE (AdSet lo acepta)
+    // NOTA: el CTA cambió a VIEW_INSTAGRAM_PROFILE pero el optimization_goal sigue con VISIT_
     if (conversionLocation === 'INSTAGRAM_PROFILE' && objective === 'OUTCOME_TRAFFIC') {
       optimizationGoal = 'VISIT_INSTAGRAM_PROFILE';
       console.log('Optimization goal set to VISIT_INSTAGRAM_PROFILE for Instagram Profile traffic');
@@ -4569,8 +4570,11 @@ class MetaAdsService {
 
         // ====== FALLBACK: Error de IG — recrear creative sin IG ======
         if (!adResult.success && isIgError(adResult.error)) {
-          console.warn(`Ad ${adIndex + 1}: IG error at Ad level (DC). Falling back to standard creative without IG...`);
+          console.warn(`Ad ${adIndex + 1}: IG error at Ad level (DC). Retrying standard creative WITHOUT igActorId...`);
+          const savedIg = igActorId;
+          igActorId = null; // Anular temporalmente para que el creative no use IG
           const stdSuccess = await createStandardCreativeAndAd(ad, adIndex, adSetId);
+          igActorId = savedIg; // Restaurar
           return stdSuccess;
         }
 
