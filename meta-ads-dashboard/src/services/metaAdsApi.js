@@ -4568,14 +4568,24 @@ class MetaAdsService {
           return stdSuccess;
         }
 
-        // ====== FALLBACK: Error de IG — recrear creative sin IG ======
+        // ====== FALLBACK: Error de IG — recrear DC creative sin igActorId ======
         if (!adResult.success && isIgError(adResult.error)) {
-          console.warn(`Ad ${adIndex + 1}: IG error at Ad level (DC). Retrying standard creative WITHOUT igActorId...`);
-          const savedIg = igActorId;
-          igActorId = null; // Anular temporalmente para que el creative no use IG
-          const stdSuccess = await createStandardCreativeAndAd(ad, adIndex, adSetId);
-          igActorId = savedIg; // Restaurar
-          return stdSuccess;
+          console.warn(`Ad ${adIndex + 1}: IG error at Ad level (DC). Retrying DC creative WITHOUT igActorId...`);
+          const retryCreativeParams = { ...creativeParams, igActorId: null };
+          let retryCreative = await this.createAdCreativeWithAssetFeedSpec(adAccountId, retryCreativeParams);
+          if (retryCreative.success) {
+            results.creatives.push(retryCreative.data);
+            adResult = await this.createAd(adAccountId, {
+              name: `${adIndex + 1}`,
+              adsetId: adSetId,
+              creativeId: retryCreative.data.id,
+              status: 'ACTIVE'
+            });
+            if (adResult.success) {
+              results.ads.push(adResult.data);
+              return true;
+            }
+          }
         }
 
         if (!adResult.success) {
