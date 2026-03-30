@@ -4055,21 +4055,37 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 40, gravity: 0.8, ticks: 250 }), 250);
         setTimeout(() => confetti({ particleCount: 40, spread: 130, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 30, gravity: 0.6, ticks: 200, scalar: 0.8 }), 500);
 
-        // Sonido de celebración (archivo mp3)
+        // Sonido de celebración (Web Audio API)
         try {
-          const audio = new Audio('/success.mp3');
-          audio.volume = 0.5;
-          audio.play().catch(() => {});
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const playTone = (freq, start, dur, vol = 0.15) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+            gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(ctx.currentTime + start);
+            osc.stop(ctx.currentTime + start + dur);
+          };
+          playTone(523, 0, 0.12, 0.15);
+          playTone(659, 0.08, 0.12, 0.15);
+          playTone(784, 0.16, 0.12, 0.15);
+          playTone(1047, 0.24, 0.4, 0.18);
+          setTimeout(() => ctx.close(), 2000);
         } catch (e) { /* Audio not available */ }
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);
         setError(errorMessages);
+        try { new Audio('/error.mp3').play().catch(() => {}); } catch (e) {}
       }
 
     } catch (err) {
       addLog(`❌ Error: ${err.message}`);
       setError(err.message || 'Error creando la campaña');
+      try { new Audio('/error.mp3').play().catch(() => {}); } catch (e) {}
     } finally {
       setCreating(false);
     }
