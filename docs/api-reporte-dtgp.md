@@ -163,8 +163,8 @@ print(msg)
 Reporte SIMPLE para el cliente. Sin CPM, impresiones ni alcance:
 
 ```
-📊 Reporte de DT Growth Partners
-{Día de la semana} {día} de {mes}
+*📊 Reporte de DT Growth Partners*
+_{Día de la semana} {día} de {mes}_
 
 📢 Campañas activas ayer:
 
@@ -173,12 +173,12 @@ Reporte SIMPLE para el cliente. Sin CPM, impresiones ni alcance:
 
 (repetir para cada campaña con mensajes > 0)
 
-RESUMEN DEL DÍA:
+*RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
 💵 Costo promedio x msg: ${costo_promedio}
 👥 Cuentas alcanzadas: {accountReachYesterday}
-📱 Impresiones totales: ~{accountImpressionsYesterday}
+📱 Impresiones totales: {accountImpressionsYesterday}
 ```
 
 ### Reglas modo cliente:

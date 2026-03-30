@@ -176,8 +176,8 @@ El reporte para el **cliente** debe ser SIMPLE. Sin CPM, impresiones ni alcance.
 ```
 👋 Buenos días {nombre_contacto}, ¿cómo estás?
 
-📊 Reporte de ACB Fit
-{Día de la semana} {día} de {mes}
+*📊 Reporte de ACB Fit*
+_{Día de la semana} {día} de {mes}_
 
 📢 Campañas activas ayer:
 
@@ -186,12 +186,12 @@ El reporte para el **cliente** debe ser SIMPLE. Sin CPM, impresiones ni alcance.
 
 (repetir para cada campaña con mensajes > 0)
 
-RESUMEN DEL DÍA:
+*RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
 💵 Costo promedio x msg: ${costo_promedio}
 👥 Cuentas alcanzadas: {accountReachYesterday}
-📱 Impresiones totales: ~{accountImpressionsYesterday}
+📱 Impresiones totales: {accountImpressionsYesterday}
 ```
 
 ### Reglas modo cliente:

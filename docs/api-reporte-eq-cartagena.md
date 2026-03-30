@@ -114,8 +114,8 @@ El reporte para el **cliente** debe ser SIMPLE. Se envía como saludo + reporte 
 ```
 👋 Buenos días {nombre_contacto}, ¿cómo estás?
 
-📊 Reporte de {businessName}
-{Día de la semana} {día} de {mes}
+*📊 Reporte de {businessName}*
+_{Día de la semana} {día} de {mes}_
 
 📢 Campañas activas ayer:
 
@@ -127,12 +127,12 @@ El reporte para el **cliente** debe ser SIMPLE. Se envía como saludo + reporte 
 
 (repetir para cada campaña con gasto > 0 y mensajes > 0)
 
-RESUMEN DEL DÍA:
+*RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
 💵 Costo promedio x msg: ${costo_promedio}
 👥 Cuentas alcanzadas: {accountReachYesterday}
-📱 Impresiones totales: ~{accountImpressionsYesterday}
+📱 Impresiones totales: {accountImpressionsYesterday}
 ```
 
 ### Reglas del modo cliente:
@@ -150,8 +150,8 @@ RESUMEN DEL DÍA:
 ```
 👋 Buenos días Jenifer, ¿cómo estás?
 
-📊 Reporte de Equilibrio Clinic
-Domingo 29 de marzo
+*📊 Reporte de Equilibrio Clinic*
+_Domingo 29 de marzo_
 
 📢 Campañas activas ayer:
 
@@ -188,12 +188,12 @@ Domingo 29 de marzo
 🟥VENTAS LASER BOCAGRANDE TESTIMONIOS
 10 msg x $7.436
 
-RESUMEN DEL DÍA:
+*RESUMEN DEL DÍA:*
 💰 Gasto total: $1.099.491
 💬 Mensajes totales: 166
 💵 Costo promedio x msg: $6.623
 👥 Cuentas alcanzadas: 107.923
-📱 Impresiones totales: ~146.956
+📱 Impresiones totales: 146.956
 ```
 
 ### Contactos por negocio (para el saludo)
