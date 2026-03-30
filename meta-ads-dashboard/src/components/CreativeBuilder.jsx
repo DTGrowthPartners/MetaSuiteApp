@@ -3469,10 +3469,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
   };
 
   const handleCreateDraft = async () => {
-    // Pre-crear AudioContext en el gesto del usuario (antes de los awaits)
-    let audioCtx = null;
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
-
     setCreating(true);
     setError('');
     setLogs([]);
@@ -4059,28 +4055,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 40, gravity: 0.8, ticks: 250 }), 250);
         setTimeout(() => confetti({ particleCount: 40, spread: 130, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 30, gravity: 0.6, ticks: 200, scalar: 0.8 }), 500);
 
-        // Sonido de celebración (AudioContext creado al inicio del handler)
-        if (audioCtx) {
-          try {
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-            const playTone = (freq, start, dur, vol = 0.15) => {
-              const osc = audioCtx.createOscillator();
-              const gain = audioCtx.createGain();
-              osc.type = 'triangle';
-              osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
-              gain.gain.setValueAtTime(vol, audioCtx.currentTime + start);
-              gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + dur);
-              osc.connect(gain).connect(audioCtx.destination);
-              osc.start(audioCtx.currentTime + start);
-              osc.stop(audioCtx.currentTime + start + dur);
-            };
-            playTone(523, 0, 0.12, 0.15);    // C5
-            playTone(659, 0.08, 0.12, 0.15);  // E5
-            playTone(784, 0.16, 0.12, 0.15);  // G5
-            playTone(1047, 0.24, 0.4, 0.18);  // C6 — nota final larga
-            setTimeout(() => audioCtx.close(), 2000);
-          } catch (e) { /* Audio error */ }
-        }
+        // Sonido de celebración (archivo mp3)
+        try {
+          const audio = new Audio('/success.mp3');
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch (e) { /* Audio not available */ }
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);
