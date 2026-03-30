@@ -2289,6 +2289,14 @@ const REPORT_ACCOUNTS = {
     locations: [],
     resultMetric: 'conversations',
     resultLabel: 'Mensajes'
+  },
+  'tennis': {
+    accountId: 'act_660842485358224',
+    name: 'Tennis Cartagena',
+    businessName: 'Tennis Cartagena',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
   }
 };
 
