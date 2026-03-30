@@ -64,15 +64,13 @@ Esto significa que si el bot consulta a las 7am, `insightsYesterday` contiene lo
 
 Cada campaña tiene `insightsYesterday` e `insightsToday`. Para obtener el resultado relevante:
 
-### Mensajes (campañas WhatsApp/Messenger/Instagram)
-Buscar en `actions` el tipo:
-```
-onsite_conversion.messaging_conversation_started_7d
-```
-Si no existe, buscar:
-```
-onsite_conversion.messaging_first_reply
-```
+### Contactos de mensajes totales (campañas WhatsApp/Messenger/Instagram)
+Buscar en `actions` en este orden de prioridad:
+1. `onsite_conversion.total_messaging_connection` (Contactos de mensajes totales — PREFERIDO)
+2. `onsite_conversion.messaging_conversation_started_7d` (fallback)
+3. `onsite_conversion.messaging_first_reply` (último fallback)
+
+**Costo por mensaje = spend / contactos_de_mensajes_totales**
 
 ### Clicks (campañas de web)
 Buscar en `actions`:
@@ -165,22 +163,31 @@ print(msg)
 Reporte SIMPLE para el cliente. Sin CPM, impresiones ni alcance:
 
 ```
-📊 *Reporte DTGP Cartagena* — {día} de {mes}
+📊 Reporte de DT Growth Partners
+{Día de la semana} {día} de {mes}
 
-💬 {total_msgs} mensajes | 💰 ${total_gasto} invertido | 💵 ${costo_promedio} x msg
+📢 Campañas activas ayer:
 
-📢 Campañas:
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
-(todas las campañas con gasto > 0)
+{emoji}{NOMBRE CAMPAÑA}
+{msgs} msg x ${costo_x_msg}
+
+(repetir para cada campaña con mensajes > 0)
+
+RESUMEN DEL DÍA:
+💰 Gasto total: ${total_gasto}
+💬 Mensajes totales: {total_msgs}
+💵 Costo promedio x msg: ${costo_promedio}
+👥 Cuentas alcanzadas: {total_reach}
+📱 Impresiones totales: ~{total_impressions}
 ```
 
 ### Reglas modo cliente:
-1. NO mostrar: CPM, impresiones, alcance, clicks, views
-2. SÍ mostrar: cada campaña con su gasto, mensajes y costo por mensaje
-3. Mostrar TODAS las campañas con gasto > 0
-4. Si tiene leads, agregar 🎯 {leads} leads
-5. Si tiene 0 mensajes, mostrar solo el gasto (sin costo x msg)
-6. Resumen con costo promedio general: total_gasto / total_msgs
+1. DTGP no tiene saludo (es para uso interno de Edgardo/Dairo)
+2. Emoji del cuadro según tipo de campaña: 🟥 ventas/mensajes, 🟦 reconocimiento, 🟩 tráfico, 🟨 leads
+3. Solo 2 datos por campaña: mensajes + costo por mensaje
+4. Si tiene 0 mensajes, NO mostrar en la lista
+5. Costo por mensaje = spend / contactos_de_mensajes_totales
+6. Resumen con gasto, mensajes, costo promedio, alcance e impresiones
 
 ## Formato del reporte — MODO DETALLADO (solo Edgardo o Dairo)
 

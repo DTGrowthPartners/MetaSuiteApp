@@ -76,12 +76,17 @@ Cada campaña tiene `insightsYesterday` e `insightsToday`. Para generar el repor
 ### Métricas de acciones (dentro del array `actions`)
 | Métrica | `action_type` | Icono |
 |---------|---------------|-------|
-| Mensajes | `onsite_conversion.messaging_conversation_started_7d` | 💬 |
+| Contactos de mensajes | `onsite_conversion.total_messaging_connection` | 💬 |
 | Leads | `lead` | 🎯 |
 | Clicks | `link_click` | 🖱️ |
 | Video views | `video_view` | 🎬 |
 
-Si `messaging_conversation_started_7d` no existe, buscar `onsite_conversion.messaging_first_reply` como fallback para mensajes.
+**Prioridad para mensajes:** buscar en este orden:
+1. `onsite_conversion.total_messaging_connection` (Contactos de mensajes totales — PREFERIDO)
+2. `onsite_conversion.messaging_conversation_started_7d` (fallback)
+3. `onsite_conversion.messaging_first_reply` (último fallback)
+
+**El costo por mensaje se calcula:** `spend / contactos_de_mensajes_totales`
 
 ### Métricas calculadas
 | Métrica | Fórmula | Descripción |
@@ -92,48 +97,111 @@ Si `messaging_conversation_started_7d` no existe, buscar `onsite_conversion.mess
 
 ## Formato del reporte — MODO CLIENTE (por defecto)
 
-El reporte para el **cliente** debe ser SIMPLE y fácil de entender. Sin métricas técnicas como CPM, impresiones o alcance. Solo lo que le importa al dueño del negocio: cuánto gastó, cuántos mensajes/leads recibió y cuál campaña funciona mejor.
+El reporte para el **cliente** debe ser SIMPLE. Se envía como saludo + reporte por WhatsApp. El emoji del cuadro al lado del nombre de la campaña depende del tipo de campaña (ver tabla abajo).
+
+### Emojis por tipo de campaña (según objective y nombre)
+| Tipo | Emoji | Cómo detectar |
+|------|-------|---------------|
+| Ventas / WhatsApp / Mensajes | 🟥 | `objective` = OUTCOME_SALES, o nombre contiene: venta, ventas, whatsapp, wp, wasap, tensamax, laser |
+| Reconocimiento / ThruPlay | 🟦 | `objective` = OUTCOME_AWARENESS, o nombre contiene: reconocimiento, thruplay, awareness |
+| Tráfico | 🟩 | `objective` = OUTCOME_TRAFFIC, o nombre contiene: trafico, tráfico, traffic, perfil ig |
+| Leads | 🟨 | `objective` = OUTCOME_LEADS, o nombre contiene: lead, clientes potenciales |
+| Engagement | 🟪 | `objective` = OUTCOME_ENGAGEMENT |
+| Otro | ⬜ | Cualquier otro |
+
+### Estructura del reporte cliente:
 
 ```
-Reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
+👋 Buenos días {nombre_contacto}, ¿cómo estás?
 
-💬 {total_msgs} mensajes | 🎯 {total_leads} leads | 💰 ${total_gasto} invertido | 💵 ${costo_promedio} x msg
+📊 Reporte de {businessName}
+{Día de la semana} {día} de {mes}
 
-📢 Campañas:
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
-(todas las campañas con gasto > 0)
+📢 Campañas activas ayer:
+
+{emoji}{NOMBRE CAMPAÑA}
+{msgs} msg x ${costo_x_msg}
+
+{emoji}{NOMBRE CAMPAÑA}
+{msgs} msg x ${costo_x_msg}
+
+(repetir para cada campaña con gasto > 0 y mensajes > 0)
+
+RESUMEN DEL DÍA:
+💰 Gasto total: ${total_gasto}
+💬 Mensajes totales: {total_msgs}
+💵 Costo promedio x msg: ${costo_promedio}
+👥 Cuentas alcanzadas: {total_reach}
+📱 Impresiones totales: ~{total_impressions}
 ```
 
 ### Reglas del modo cliente:
-1. **NO mostrar:** CPM, impresiones, alcance, clicks, views
-2. **SÍ mostrar:** cada campaña con su gasto, mensajes y costo por mensaje
-3. Mostrar TODAS las campañas con gasto > 0 (no agrupar)
-4. Si una campaña tiene leads, agregar 🎯 {leads} leads
-5. Si una campaña tiene 0 mensajes, mostrar solo el gasto: `💰 ${gasto}` (sin costo x msg)
-6. Resumen arriba con totales + costo promedio por mensaje (total_gasto / total_msgs)
-7. Tono sencillo, como un recibo de gastos del día
+1. **Saludo personalizado** con el nombre del contacto del negocio
+2. **Emoji del cuadro** según tipo de campaña (tabla arriba)
+3. **Nombre de campaña** tal cual viene de Meta (en mayúsculas)
+4. **Solo 2 datos por campaña:** cantidad de mensajes + costo por mensaje
+5. Si una campaña tiene 0 mensajes, NO mostrarla en la lista individual
+6. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
+7. El resumen incluye: gasto total, mensajes totales, costo promedio, alcance e impresiones
+8. **Día de la semana** en español: Lunes, Martes, etc.
 
 ### Ejemplo modo cliente:
 
 ```
-Reporte de ayer *29 de marzo* — Equilibrio Clinic 📊
+👋 Buenos días Jenifer, ¿cómo estás?
 
-💬 166 mensajes | 🎯 14 leads | 💰 $1.099.491 invertido | 💵 $6.623 x msg
+📊 Reporte de Equilibrio Clinic
+Domingo 29 de marzo
 
-📢 Campañas:
-🔵 Venta Semana Santa Castellana — 💰 $212.199 | 💬 20 msgs | 💵 $10.610 x msg
-🔵 Venta Semana Santa Bocagrande — 💰 $192.335 | 💬 12 msgs | 💵 $16.028 x msg | 🎯 2 leads
-🔵 Tensamax Castellana — 💰 $100.126 | 💬 29 msgs | 💵 $3.453 x msg | 🎯 2 leads
-🔵 Tensamax Bocagrande — 💰 $93.626 | 💬 17 msgs | 💵 $5.507 x msg | 🎯 2 leads
-🔵 Láser Bocagrande — 💰 $107.554 | 💬 12 msgs | 💵 $8.963 x msg | 🎯 3 leads
-🔵 Láser Similares Castellana — 💰 $86.500 | 💬 20 msgs | 💵 $4.325 x msg | 🎯 1 lead
-🔵 Láser Tibios Castellana — 💰 $86.069 | 💬 9 msgs | 💵 $9.563 x msg
-🔵 Láser Calientes Castellana — 💰 $28.197 | 💬 11 msgs | 💵 $2.563 x msg
-🔵 Calientes Potenciales Castellana — 💰 $26.547 | 💬 4 msgs | 💵 $6.637 x msg | 🎯 2 leads
-🔵 Láser Testimonios Castellana — 💰 $91.983 | 💬 22 msgs | 💵 $4.181 x msg | 🎯 1 lead
-🔵 Láser Testimonios Bocagrande — 💰 $74.355 | 💬 10 msgs | 💵 $7.436 x msg | 🎯 1 lead
+📢 Campañas activas ayer:
+
+🟥DTGP - VENTA SEMANA SANTA CASTELLANA
+20 msg x $10.610
+
+🟥DTGP - WP VENT SEMANA SANTA BOCAGRANDE
+12 msg x $16.028
+
+🟥DTGP - TENSAMAX CASTELLANA
+29 msg x $3.453
+
+🟥DTGP - TENSAMAX BOCAGRANDE
+17 msg x $5.507
+
+🟥DTGP | VENTAS | LASER | BOCAGRANDE
+12 msg x $8.963
+
+🟥VENTAS SIMILARES LASER CASTELLANA
+20 msg x $4.325
+
+🟥VENTAS | TIBIOS | LASER | CASTELLANA
+9 msg x $9.563
+
+🟥VENTAS CALIENTES LASER CASTELLANA
+11 msg x $2.563
+
+🟥CALIENTES CLIENTES POT. LASER CASTELLANA
+4 msg x $6.637
+
+🟥VENTAS LASER CASTELLANA TESTIMONIOS
+22 msg x $4.181
+
+🟥VENTAS LASER BOCAGRANDE TESTIMONIOS
+10 msg x $7.436
+
+RESUMEN DEL DÍA:
+💰 Gasto total: $1.099.491
+💬 Mensajes totales: 166
+💵 Costo promedio x msg: $6.623
+👥 Cuentas alcanzadas: 107.923
+📱 Impresiones totales: ~146.956
 ```
+
+### Contactos por negocio (para el saludo)
+| Negocio | Contacto | Saludo |
+|---------|----------|--------|
+| Equilibrio Clinic | Jenifer | Buenos días Jenifer |
+| ACB Fit | (definir) | Buenos días |
+| DT Growth Partners | Edgardo / Dairo | (no se envía modo cliente, solo detallado) |
 
 ---
 
