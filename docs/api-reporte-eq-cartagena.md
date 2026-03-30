@@ -131,8 +131,8 @@ RESUMEN DEL DÍA:
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
 💵 Costo promedio x msg: ${costo_promedio}
-👥 Cuentas alcanzadas: {total_reach}
-📱 Impresiones totales: ~{total_impressions}
+👥 Cuentas alcanzadas: {accountReachYesterday}
+📱 Impresiones totales: ~{accountImpressionsYesterday}
 ```
 
 ### Reglas del modo cliente:

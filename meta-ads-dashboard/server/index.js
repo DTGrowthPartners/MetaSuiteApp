@@ -2437,7 +2437,7 @@ async function getReportData(accountId, token) {
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
 
   // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
-  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth] = await Promise.all([
+  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountYesterdayInsights] = await Promise.all([
     // Ayer/hoy por campaña
     Promise.all(campaigns.map(async (campaign) => {
       let insightsYesterday = {};
@@ -2462,7 +2462,17 @@ async function getReportData(accountId, token) {
     getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast),
     // Reach a nivel de adset (más preciso que campaign-level)
     getAdsetReachSum(normalizedId, token, lastMonth),
-    getAdsetReachSum(normalizedId, token, monthBeforeLast)
+    getAdsetReachSum(normalizedId, token, monthBeforeLast),
+    // Reach + impresiones de AYER a nivel de CUENTA (deduplicado, cuentas únicas reales)
+    (async () => {
+      try {
+        const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/insights`, {
+          params: { access_token: token, fields: 'reach,impressions', time_range: JSON.stringify({ since: yesterday, until: yesterday }) }
+        });
+        const d = resp.data.data?.[0] || {};
+        return { reach: parseInt(d.reach || 0), impressions: parseInt(d.impressions || 0) };
+      } catch (e) { return { reach: 0, impressions: 0 }; }
+    })()
   ]);
 
   const withInsights = dailyInsights;
@@ -2514,6 +2524,9 @@ async function getReportData(accountId, token) {
       lastMonth: { since: lastMonth.since, until: lastMonth.until, label: lastMonth.label },
       monthBeforeLast: { since: monthBeforeLast.since, until: monthBeforeLast.until, label: monthBeforeLast.label }
     },
+    // Reach e impresiones de ayer a nivel de cuenta (deduplicado — cuentas únicas reales)
+    accountReachYesterday: accountYesterdayInsights.reach,
+    accountImpressionsYesterday: accountYesterdayInsights.impressions,
     adsetReachLastMonth: adsetReachLastMonth,
     prevMonthTotals,
     fetchedAt: new Date().toISOString(),
