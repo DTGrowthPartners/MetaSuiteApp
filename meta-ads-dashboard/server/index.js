@@ -326,7 +326,7 @@ const LEGAL_STYLE = `
 `;
 
 // Privacy Policy
-app.get('/privacy', (req, res) => {
+app.get('/api/legal/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Política de Privacidad - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
   <div class="container">
@@ -414,7 +414,7 @@ app.get('/privacy', (req, res) => {
 });
 
 // Terms of Service
-app.get('/terms', (req, res) => {
+app.get('/api/legal/terms', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Términos de Servicio - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
   <div class="container">
@@ -487,7 +487,7 @@ app.get('/terms', (req, res) => {
 });
 
 // Data Deletion Callback & Instructions Page
-app.get('/data-deletion', (req, res) => {
+app.get('/api/legal/data-deletion', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Eliminación de Datos - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
   <div class="container">
@@ -525,7 +525,7 @@ app.get('/data-deletion', (req, res) => {
 });
 
 // Data Deletion Callback (POST) — Meta sends this when a user removes the app
-app.post('/data-deletion', (req, res) => {
+app.post('/api/legal/data-deletion', (req, res) => {
   const { signed_request } = req.body;
   console.log('Data deletion request received from Meta:', signed_request ? 'signed_request present' : 'no signed_request');
 

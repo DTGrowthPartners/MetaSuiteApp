@@ -224,6 +224,24 @@ function App() {
 
   // Detectar si es una ruta de reporte (ej: /eq-cartagena)
   const pathname = window.location.pathname;
+
+  // Legal pages — cargar desde el servidor y renderizar
+  const legalPages = ['/privacy', '/terms', '/data-deletion'];
+  const isLegalPage = legalPages.includes(pathname);
+  const [legalHtml, setLegalHtml] = useState(null);
+  useEffect(() => {
+    if (!isLegalPage) return;
+    const apiBase = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
+    fetch(`${apiBase}${pathname.replace('/', '/legal/')}`)
+      .then(r => r.text())
+      .then(html => setLegalHtml(html))
+      .catch(() => setLegalHtml('<p>Error cargando la página</p>'));
+  }, [isLegalPage, pathname]);
+  if (isLegalPage) {
+    if (!legalHtml) return <div style={{ background: '#0f172a', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0' }}>Cargando...</div>;
+    return <div dangerouslySetInnerHTML={{ __html: legalHtml }} />;
+  }
+
   const reportSlug = pathname !== '/' && !pathname.startsWith('/assets') && !pathname.startsWith('/api')
     ? pathname.replace(/^\//, '').replace(/\/$/, '')
     : null;
