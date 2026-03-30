@@ -97,22 +97,21 @@ El reporte para el **cliente** debe ser SIMPLE y fácil de entender. Sin métric
 ```
 Reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
 
-💬 {total_msgs} mensajes | 🎯 {total_leads} leads | 💰 ${total_gasto} invertido
+💬 {total_msgs} mensajes | 🎯 {total_leads} leads | 💰 ${total_gasto} invertido | 💵 ${costo_promedio} x msg
 
 📢 Campañas:
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
 (todas las campañas con gasto > 0)
 ```
 
 ### Reglas del modo cliente:
-1. **NO mostrar:** CPM, impresiones, alcance, clicks, views, costo por mensaje
-2. **SÍ mostrar:** cada campaña con su gasto y mensajes recibidos
+1. **NO mostrar:** CPM, impresiones, alcance, clicks, views
+2. **SÍ mostrar:** cada campaña con su gasto, mensajes y costo por mensaje
 3. Mostrar TODAS las campañas con gasto > 0 (no agrupar)
 4. Si una campaña tiene leads, agregar 🎯 {leads} leads
-5. Si una campaña tiene 0 mensajes, mostrar solo el gasto: `💰 ${gasto}`
-6. Resumen arriba con totales
+5. Si una campaña tiene 0 mensajes, mostrar solo el gasto: `💰 ${gasto}` (sin costo x msg)
+6. Resumen arriba con totales + costo promedio por mensaje (total_gasto / total_msgs)
 7. Tono sencillo, como un recibo de gastos del día
 
 ### Ejemplo modo cliente:
@@ -120,20 +119,20 @@ Reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
 ```
 Reporte de ayer *29 de marzo* — Equilibrio Clinic 📊
 
-💬 166 mensajes | 🎯 14 leads | 💰 $1.099.491 invertido
+💬 166 mensajes | 🎯 14 leads | 💰 $1.099.491 invertido | 💵 $6.623 x msg
 
 📢 Campañas:
-🔵 Venta Semana Santa Castellana — 💰 $212.199 | 💬 20 msgs
-🔵 Venta Semana Santa Bocagrande — 💰 $192.335 | 💬 12 msgs | 🎯 2 leads
-🔵 Tensamax Castellana — 💰 $100.126 | 💬 29 msgs | 🎯 2 leads
-🔵 Tensamax Bocagrande — 💰 $93.626 | 💬 17 msgs | 🎯 2 leads
-🔵 Láser Bocagrande — 💰 $107.554 | 💬 12 msgs | 🎯 3 leads
-🔵 Láser Similares Castellana — 💰 $86.500 | 💬 20 msgs | 🎯 1 lead
-🔵 Láser Tibios Castellana — 💰 $86.069 | 💬 9 msgs
-🔵 Láser Calientes Castellana — 💰 $28.197 | 💬 11 msgs
-🔵 Calientes Potenciales Castellana — 💰 $26.547 | 💬 4 msgs | 🎯 2 leads
-🔵 Láser Testimonios Castellana — 💰 $91.983 | 💬 22 msgs | 🎯 1 lead
-🔵 Láser Testimonios Bocagrande — 💰 $74.355 | 💬 10 msgs | 🎯 1 lead
+🔵 Venta Semana Santa Castellana — 💰 $212.199 | 💬 20 msgs | 💵 $10.610 x msg
+🔵 Venta Semana Santa Bocagrande — 💰 $192.335 | 💬 12 msgs | 💵 $16.028 x msg | 🎯 2 leads
+🔵 Tensamax Castellana — 💰 $100.126 | 💬 29 msgs | 💵 $3.453 x msg | 🎯 2 leads
+🔵 Tensamax Bocagrande — 💰 $93.626 | 💬 17 msgs | 💵 $5.507 x msg | 🎯 2 leads
+🔵 Láser Bocagrande — 💰 $107.554 | 💬 12 msgs | 💵 $8.963 x msg | 🎯 3 leads
+🔵 Láser Similares Castellana — 💰 $86.500 | 💬 20 msgs | 💵 $4.325 x msg | 🎯 1 lead
+🔵 Láser Tibios Castellana — 💰 $86.069 | 💬 9 msgs | 💵 $9.563 x msg
+🔵 Láser Calientes Castellana — 💰 $28.197 | 💬 11 msgs | 💵 $2.563 x msg
+🔵 Calientes Potenciales Castellana — 💰 $26.547 | 💬 4 msgs | 💵 $6.637 x msg | 🎯 2 leads
+🔵 Láser Testimonios Castellana — 💰 $91.983 | 💬 22 msgs | 💵 $4.181 x msg | 🎯 1 lead
+🔵 Láser Testimonios Bocagrande — 💰 $74.355 | 💬 10 msgs | 💵 $7.436 x msg | 🎯 1 lead
 ```
 
 ---

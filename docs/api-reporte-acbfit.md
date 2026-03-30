@@ -178,20 +178,20 @@ El reporte para el **cliente** debe ser SIMPLE. Sin CPM, impresiones ni alcance.
 ```
 📊 *Reporte ACB Fit* — {día} de {mes}
 
-💬 {total_msgs} mensajes | 💰 ${total_gasto} invertido
+💬 {total_msgs} mensajes | 💰 ${total_gasto} invertido | 💵 ${costo_promedio} x msg
 
 📢 Campañas:
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
-🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs | 💵 ${costo_x_msg} x msg
 (todas las campañas con gasto > 0)
 ```
 
 ### Reglas modo cliente:
-1. NO mostrar: CPM, impresiones, alcance, clicks, views, costo por mensaje
-2. SÍ mostrar: cada campaña con su gasto y mensajes
+1. NO mostrar: CPM, impresiones, alcance, clicks, views
+2. SÍ mostrar: cada campaña con su gasto, mensajes y costo por mensaje
 3. Mostrar TODAS las campañas con gasto > 0
 4. Si tiene leads, agregar 🎯 {leads} leads
-5. Si tiene 0 mensajes, mostrar solo el gasto
+5. Si tiene 0 mensajes, mostrar solo el gasto (sin costo x msg)
+6. Resumen con costo promedio general: total_gasto / total_msgs
 
 ## Formato del reporte — MODO DETALLADO (solo Edgardo o Dairo)
 
