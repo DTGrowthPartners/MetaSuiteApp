@@ -179,6 +179,12 @@ _{Día de la semana} {día} de {mes}_
 💵 Costo promedio x msg: ${costo_promedio}
 👥 Cuentas alcanzadas: {accountReachYesterday}
 📱 Impresiones totales: {accountImpressionsYesterday}
+
+📋 Reporte preparado por
+DT Growth Partners
+
+¿Dudas o solicitudes?
+📱 Dairo Traslaviña: +57 300 718 9383
 ```
 
 ### Reglas modo cliente:
