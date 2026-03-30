@@ -172,7 +172,7 @@ function LoginScreen({ onLogin }) {
       }
       setLoading(false);
     }, {
-      scope: 'ads_management,pages_show_list,business_management,pages_read_engagement,ads_read,whatsapp_business_management,instagram_basic,instagram_manage_insights'
+      scope: 'ads_management,pages_show_list,business_management,pages_read_engagement,ads_read,whatsapp_business_management,instagram_basic'
     });
   };
 
