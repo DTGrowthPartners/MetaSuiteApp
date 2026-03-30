@@ -156,17 +156,59 @@ for c in campaigns:
     total_spend += spend
     total_msgs += msgs
 
-# Armar mensaje
-msg = f"""📊 *Reporte ACB Fit*
-📅 {fecha} (24 horas)
+# Armar mensaje — MODO CLIENTE (por defecto, simple)
+# Ordenar por costo por mensaje (menor primero)
+lines_sorted = sorted([(l, s, m) for l, s, m in zip(lines, spends, msgs_list)], key=lambda x: x[1]/x[2] if x[2] > 0 else 999999)
 
-{chr(10).join(lines)}
+msg = f"""📊 *Reporte ACB Fit* — {fecha}
 
-💰 *Total gastado:* ${int(total_spend):,}
-💬 *Total mensajes:* {total_msgs}
-📊 *Costo promedio:* ${int(total_spend / total_msgs):,}/msn""" if total_msgs > 0 else ""
+💬 {total_msgs} mensajes | 💰 ${int(total_spend):,} invertido
 
+Top campañas:
+{top 3 mejores con ✅}
+{peor con ⚠️ si costo > promedio}
+"""
 print(msg)
+```
+
+## Formato del reporte — MODO CLIENTE (por defecto)
+
+El reporte para el **cliente** debe ser SIMPLE. Sin CPM, impresiones ni alcance. Solo lo esencial:
+
+```
+📊 *Reporte ACB Fit* — {día} de {mes}
+
+💬 {total_msgs} mensajes | 💰 ${total_gasto} invertido
+
+📢 Campañas:
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+(todas las campañas con gasto > 0)
+```
+
+### Reglas modo cliente:
+1. NO mostrar: CPM, impresiones, alcance, clicks, views, costo por mensaje
+2. SÍ mostrar: cada campaña con su gasto y mensajes
+3. Mostrar TODAS las campañas con gasto > 0
+4. Si tiene leads, agregar 🎯 {leads} leads
+5. Si tiene 0 mensajes, mostrar solo el gasto
+
+## Formato del reporte — MODO DETALLADO (solo Edgardo o Dairo)
+
+Se activa cuando Edgardo o Dairo dicen "detallado", "completo" o "todas las métricas":
+
+```
+📊 *Reporte detallado ACB Fit* — {día} de {mes}
+
+*🔵 {NOMBRE CAMPAÑA}*
+💰 ${gasto} | 📱 {imp} imp | 👥 {alcance} alcance
+💬 {msgs} mensajes | 🖱️ {clicks} clicks | 🎬 {views} views
+💵 CPM ${cpm} | Costo x msg ${costo}
+
+(repetir para cada campaña)
+
+RESUMEN:
+💰 Total: ${gasto} | 💬 {msgs} msgs | 🏆 Mejor: {nombre} (${costo} x msg)
 ```
 
 ## Configuración del cron (7am Colombia)

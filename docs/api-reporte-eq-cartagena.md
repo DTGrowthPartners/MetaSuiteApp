@@ -90,12 +90,60 @@ Si `messaging_conversation_started_7d` no existe, buscar `onsite_conversion.mess
 | Costo x msg | `spend / mensajes` | Costo por cada mensaje recibido |
 | Costo x lead | `spend / leads` | Costo por cada lead |
 
-## Formato del reporte (OBLIGATORIO)
+## Formato del reporte — MODO CLIENTE (por defecto)
 
-El reporte SIEMPRE debe seguir esta estructura exacta. Cada campaña muestra TODAS sus métricas disponibles:
+El reporte para el **cliente** debe ser SIMPLE y fácil de entender. Sin métricas técnicas como CPM, impresiones o alcance. Solo lo que le importa al dueño del negocio: cuánto gastó, cuántos mensajes/leads recibió y cuál campaña funciona mejor.
 
 ```
-Aquí va el reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
+Reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
+
+💬 {total_msgs} mensajes | 🎯 {total_leads} leads | 💰 ${total_gasto} invertido
+
+📢 Campañas:
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+(todas las campañas con gasto > 0)
+```
+
+### Reglas del modo cliente:
+1. **NO mostrar:** CPM, impresiones, alcance, clicks, views, costo por mensaje
+2. **SÍ mostrar:** cada campaña con su gasto y mensajes recibidos
+3. Mostrar TODAS las campañas con gasto > 0 (no agrupar)
+4. Si una campaña tiene leads, agregar 🎯 {leads} leads
+5. Si una campaña tiene 0 mensajes, mostrar solo el gasto: `💰 ${gasto}`
+6. Resumen arriba con totales
+7. Tono sencillo, como un recibo de gastos del día
+
+### Ejemplo modo cliente:
+
+```
+Reporte de ayer *29 de marzo* — Equilibrio Clinic 📊
+
+💬 166 mensajes | 🎯 14 leads | 💰 $1.099.491 invertido
+
+📢 Campañas:
+🔵 Venta Semana Santa Castellana — 💰 $212.199 | 💬 20 msgs
+🔵 Venta Semana Santa Bocagrande — 💰 $192.335 | 💬 12 msgs | 🎯 2 leads
+🔵 Tensamax Castellana — 💰 $100.126 | 💬 29 msgs | 🎯 2 leads
+🔵 Tensamax Bocagrande — 💰 $93.626 | 💬 17 msgs | 🎯 2 leads
+🔵 Láser Bocagrande — 💰 $107.554 | 💬 12 msgs | 🎯 3 leads
+🔵 Láser Similares Castellana — 💰 $86.500 | 💬 20 msgs | 🎯 1 lead
+🔵 Láser Tibios Castellana — 💰 $86.069 | 💬 9 msgs
+🔵 Láser Calientes Castellana — 💰 $28.197 | 💬 11 msgs
+🔵 Calientes Potenciales Castellana — 💰 $26.547 | 💬 4 msgs | 🎯 2 leads
+🔵 Láser Testimonios Castellana — 💰 $91.983 | 💬 22 msgs | 🎯 1 lead
+🔵 Láser Testimonios Bocagrande — 💰 $74.355 | 💬 10 msgs | 🎯 1 lead
+```
+
+---
+
+## Formato del reporte — MODO DETALLADO (solo cuando Edgardo o Dairo lo pidan)
+
+Este formato se usa ÚNICAMENTE cuando Edgardo Meza o Dairo lo soliciten explícitamente (ej: "dame el detallado", "reporte completo", "quiero ver todas las métricas"). Incluye todas las métricas técnicas por campaña.
+
+```
+Reporte detallado de ayer *{día} de {mes}* — Equilibrio Clinic 📊
 
 ---
 
@@ -118,7 +166,7 @@ Aquí va el reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
 ⚠️ A revisar: {campaña con mayor costo x msg} (${mayor_costo} x msg)
 ```
 
-### Reglas del formato:
+### Reglas del modo detallado:
 1. Solo mostrar métricas que existan (si no hay leads, no poner 🎯; si no hay views, no poner 🎬)
 2. Si una campaña tiene mensajes > 0, mostrar "Costo x msg"
 3. Si una campaña tiene leads > 0, mostrar "Costo x lead" en vez de o además de "Costo x msg"
@@ -128,73 +176,43 @@ Aquí va el reporte de ayer *{día} de {mes}* — Equilibrio Clinic 📊
 7. Los valores en COP se formatean con puntos como separador de miles (ej: $21.593)
 8. El nombre de la campaña va en MAYÚSCULAS y en negrita
 
-## Ejemplo completo de salida
+### Ejemplo modo detallado:
 
 ```
-Aquí va el reporte de ayer *18 de marzo* — Equilibrio Clinic 📊
+Reporte detallado de ayer *29 de marzo* — Equilibrio Clinic 📊
 
 ---
 
 *📢 Campañas activas ayer:*
 
-*🔵 LASER BOCAGRANDE WP*
-💰 $194.335 | 📱 23.755 imp | 👥 16.826 alcance
-💬 9 mensajes | 🖱️ 112 clicks | 🎬 3.317 views
-💵 CPM $8.181 | Costo x msg $21.593
-
-*🔵 VENTAS LASER BOCAGRANDE (leads)*
-💰 $158.700 | 📱 34.491 imp | 👥 23.186 alcance
-💬 12 mensajes | 🎯 6 leads | 🖱️ 139 clicks
-💵 CPM $4.601 | Costo x msg $13.225
-
-*🔵 VENTAS LASER BOCAGRANDE TESTIMONIOS*
-💰 $66.262 | 📱 9.023 imp | 👥 8.367 alcance
-💬 23 mensajes | 🎯 2 leads | 🖱️ 100 clicks
-💵 CPM $7.344 | Costo x msg $2.881 ✅
-
-*🔵 VENTAS LASER CASTELLANA SIMILARES*
-💰 $137.266 | 📱 19.409 imp | 👥 15.847 alcance
-💬 16 mensajes | 🎯 4 leads | 🖱️ 81 clicks
-💵 CPM $7.072 | Costo x msg $8.579
-
-*🔵 VENTAS TIBIOS LASER CASTELLANA*
-💰 $89.446 | 📱 14.417 imp | 👥 13.187 alcance
-💬 13 mensajes | 🖱️ 66 clicks | 🎬 3.316 views
-💵 CPM $6.204 | Costo x msg $6.880
-
 *🔵 VENTAS CALIENTES LASER CASTELLANA*
-💰 $138.755 | 📱 24.298 imp | 👥 18.521 alcance
-💬 17 mensajes | 🎯 2 leads | 🖱️ 95 clicks
-💵 CPM $5.711 | Costo x msg $8.162
+💰 $28.197 | 📱 6.085 imp | 👥 5.038 alcance
+💬 11 mensajes | 🖱️ 51 clicks | 🎬 538 views
+💵 CPM $4.633 | Costo x msg $2.563 ✅
 
-*🔵 CALIENTES CLIENTES POT. LASER CASTELLANA*
-💰 $175.362 | 📱 32.594 imp | 👥 25.271 alcance
-💬 15 mensajes | 🎯 2 leads | 🖱️ 65 clicks
-💵 CPM $5.380 | Costo x msg $11.691
+*🔵 DTGP - TENSAMAX CASTELLANA*
+💰 $100.126 | 📱 9.643 imp | 👥 7.260 alcance
+💬 29 mensajes | 🎯 2 leads | 🖱️ 75 clicks | 🎬 1.957 views
+💵 CPM $10.383 | Costo x msg $3.453
 
 *🔵 VENTAS LASER CASTELLANA TESTIMONIOS*
-💰 $22.162 | 📱 5.192 imp | 👥 4.805 alcance
-💬 15 mensajes | 🖱️ 37 clicks | 🎬 1.605 views
-💵 CPM $4.268 | Costo x msg *$1.477* ✅ (mejor CPM)
+💰 $91.983 | 📱 18.132 imp | 👥 15.383 alcance
+💬 22 mensajes | 🎯 1 lead | 🖱️ 118 clicks | 🎬 4.638 views
+💵 CPM $5.073 | Costo x msg $4.181
 
-*🔵 TENSAMAX CASTELLANA*
-💰 $52.773 | 📱 4.004 imp | 👥 3.132 alcance
-💬 19 mensajes | 🎯 2 leads | 🖱️ 31 clicks | 🎬 859 views
-💵 Costo x msg $2.778
-
-*🔵 TENSAMAX BOCAGRANDE*
-💰 $69.385 | 📱 6.444 imp | 👥 4.953 alcance
-💬 21 mensajes | 🎯 2 leads | 🖱️ 46 clicks | 🎬 1.358 views
-💵 Costo x msg $3.304
+*🔵 DTGP - WP VENT SEMANA SANTA BOCAGRANDE*
+💰 $192.335 | 📱 29.379 imp | 👥 14.038 alcance
+💬 12 mensajes | 🎯 2 leads | 🖱️ 201 clicks | 🎬 1.745 views
+💵 CPM $6.547 | Costo x msg $16.028
 
 ---
 
 *RESUMEN DÍA:*
-💰 Gasto total: ~$1.104.446 COP
-💬 Mensajes totales: ~160
-🎯 Leads: ~20
-🏆 Mejor: Testimonios Castellana ($1.477 x msg)
-⚠️ A revisar: Laser Bocagrande WP ($21.593 x msg)
+💰 Gasto total: ~$1.099.491 COP
+💬 Mensajes totales: ~166
+🎯 Leads: ~14
+🏆 Mejor: Calientes Laser Castellana ($2.563 x msg)
+⚠️ A revisar: Semana Santa Bocagrande ($16.028 x msg)
 ```
 
 ## Código Python de referencia

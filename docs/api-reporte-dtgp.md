@@ -157,16 +157,47 @@ for c in campaigns:
     total_msgs += msgs
 
 # Armar mensaje
-msg = f"""📊 *Reporte DTGP Cartagena*
-📅 {fecha} (24 horas)
-
-{chr(10).join(lines)}
-
-💰 *Total gastado:* ${int(total_spend):,}
-💬 *Total mensajes:* {total_msgs}
-📊 *Costo promedio:* ${int(total_spend / total_msgs):,}/msn""" if total_msgs > 0 else ""
-
 print(msg)
+```
+
+## Formato del reporte — MODO CLIENTE (por defecto)
+
+Reporte SIMPLE para el cliente. Sin CPM, impresiones ni alcance:
+
+```
+📊 *Reporte DTGP Cartagena* — {día} de {mes}
+
+💬 {total_msgs} mensajes | 💰 ${total_gasto} invertido
+
+📢 Campañas:
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+🔵 {nombre campaña} — 💰 ${gasto} | 💬 {msgs} msgs
+(todas las campañas con gasto > 0)
+```
+
+### Reglas modo cliente:
+1. NO mostrar: CPM, impresiones, alcance, clicks, views, costo por mensaje
+2. SÍ mostrar: cada campaña con su gasto y mensajes
+3. Mostrar TODAS las campañas con gasto > 0
+4. Si tiene leads, agregar 🎯 {leads} leads
+5. Si tiene 0 mensajes, mostrar solo el gasto
+
+## Formato del reporte — MODO DETALLADO (solo Edgardo o Dairo)
+
+Se activa cuando Edgardo o Dairo dicen "detallado", "completo" o "todas las métricas":
+
+```
+📊 *Reporte detallado DTGP* — {día} de {mes}
+
+*🔵 {NOMBRE CAMPAÑA}*
+💰 ${gasto} | 📱 {imp} imp | 👥 {alcance} alcance
+💬 {msgs} mensajes | 🖱️ {clicks} clicks | 🎬 {views} views
+💵 CPM ${cpm} | Costo x msg ${costo}
+
+(repetir para cada campaña)
+
+RESUMEN:
+💰 Total: ${gasto} | 💬 {msgs} msgs | 🏆 Mejor: {nombre} (${costo} x msg)
 ```
 
 ## Configuración del cron (7am Colombia)
