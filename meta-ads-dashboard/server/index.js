@@ -304,6 +304,239 @@ const getAllAdAccountsFromBusinesses = async (token) => {
 // API ENDPOINTS
 // ============================================
 
+// ============================================
+// LEGAL PAGES (required for Meta App Review)
+// ============================================
+
+const LEGAL_STYLE = `
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+    h1 { color: #a5b4fc; font-size: 2rem; margin-bottom: 8px; }
+    h2 { color: #818cf8; font-size: 1.3rem; margin: 32px 0 12px; }
+    .subtitle { color: #94a3b8; margin-bottom: 32px; }
+    p, li { color: #cbd5e1; margin-bottom: 12px; }
+    ul { padding-left: 24px; }
+    a { color: #6366f1; }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #6366f1; margin-bottom: 24px; display: block; }
+    .card { background: #1e293b; border-radius: 12px; padding: 32px; margin: 24px 0; border: 1px solid #334155; }
+    .updated { color: #64748b; font-size: 0.85rem; }
+  </style>
+`;
+
+// Privacy Policy
+app.get('/privacy', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidad - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <span class="logo">MetaSuite</span>
+    <h1>Política de Privacidad</h1>
+    <p class="subtitle">Última actualización: 30 de marzo de 2026</p>
+
+    <div class="card">
+      <h2>1. Información que recopilamos</h2>
+      <p>MetaSuite ("la App"), desarrollada por DT Growth Partners, accede a los siguientes datos a través de la API de Meta (Facebook):</p>
+      <ul>
+        <li><strong>Información de perfil público:</strong> Nombre y foto de perfil de Facebook para identificar al usuario dentro de la App.</li>
+        <li><strong>Páginas de Facebook:</strong> Lista de páginas que administras para vincular campañas publicitarias.</li>
+        <li><strong>Cuentas publicitarias:</strong> Información de tus cuentas de anuncios (nombre, ID, métricas de rendimiento) para gestionar campañas.</li>
+        <li><strong>Datos de anuncios:</strong> Métricas de campañas (impresiones, clics, conversiones, costos) para mostrar reportes de rendimiento.</li>
+        <li><strong>Activos comerciales:</strong> Acceso a Business Managers vinculados para administrar recursos publicitarios.</li>
+        <li><strong>Cuentas de Instagram:</strong> Cuentas de Instagram vinculadas a tus páginas para crear anuncios en Instagram.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>2. Cómo usamos la información</h2>
+      <p>Usamos los datos exclusivamente para:</p>
+      <ul>
+        <li>Permitirte crear, editar y gestionar campañas publicitarias en Meta.</li>
+        <li>Mostrar reportes y métricas de rendimiento de tus anuncios.</li>
+        <li>Generar contenido publicitario (textos e imágenes) mediante inteligencia artificial.</li>
+        <li>Administrar tus activos publicitarios (páginas, cuentas, audiencias).</li>
+      </ul>
+      <p><strong>No vendemos, compartimos ni transferimos tus datos a terceros.</strong></p>
+    </div>
+
+    <div class="card">
+      <h2>3. Almacenamiento de datos</h2>
+      <ul>
+        <li>Los tokens de acceso se almacenan <strong>únicamente en el navegador del usuario</strong> (localStorage) y nunca en nuestros servidores.</li>
+        <li>No mantenemos bases de datos con información personal de los usuarios.</li>
+        <li>Los datos de campañas y métricas se obtienen en tiempo real desde la API de Meta y no se almacenan permanentemente.</li>
+        <li>Los reportes generados se cachean temporalmente (máximo 24 horas) para mejorar la velocidad de carga.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. Compartición de datos</h2>
+      <p>No compartimos datos personales con terceros. Los únicos servicios externos que procesan información son:</p>
+      <ul>
+        <li><strong>API de Meta (Facebook):</strong> Para ejecutar las operaciones publicitarias solicitadas por el usuario.</li>
+        <li><strong>API de Anthropic (Claude AI):</strong> Para generar textos publicitarios. Solo se envían las imágenes/videos del anuncio y el contexto del negocio proporcionado por el usuario. No se envían datos personales.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. Eliminación de datos</h2>
+      <p>Puedes solicitar la eliminación de tus datos en cualquier momento:</p>
+      <ul>
+        <li>Cerrando sesión en la App (esto elimina todos los tokens almacenados en tu navegador).</li>
+        <li>Revocando el acceso de la App desde tu <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank">Configuración de Facebook → Aplicaciones y sitios web</a>.</li>
+        <li>Enviando una solicitud a: <strong>contacto@dtgrowthpartners.com</strong></li>
+      </ul>
+      <p>Para más detalles, visita nuestra <a href="/data-deletion">página de eliminación de datos</a>.</p>
+    </div>
+
+    <div class="card">
+      <h2>6. Seguridad</h2>
+      <ul>
+        <li>Toda la comunicación se realiza a través de HTTPS.</li>
+        <li>Los tokens de acceso nunca se transmiten ni almacenan en servidores propios.</li>
+        <li>El acceso a la API de Meta utiliza los protocolos estándar de OAuth 2.0.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>7. Contacto</h2>
+      <p>Si tienes preguntas sobre esta política de privacidad, contáctanos:</p>
+      <ul>
+        <li><strong>Empresa:</strong> DT Growth Partners</li>
+        <li><strong>Responsable:</strong> Edgardo Meza</li>
+        <li><strong>Email:</strong> contacto@dtgrowthpartners.com</li>
+        <li><strong>Ubicación:</strong> Cartagena, Colombia</li>
+      </ul>
+    </div>
+
+    <p class="updated">Esta política puede actualizarse periódicamente. La fecha de última actualización se indica al inicio del documento.</p>
+  </div></body></html>`);
+});
+
+// Terms of Service
+app.get('/terms', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Términos de Servicio - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <span class="logo">MetaSuite</span>
+    <h1>Términos de Servicio</h1>
+    <p class="subtitle">Última actualización: 30 de marzo de 2026</p>
+
+    <div class="card">
+      <h2>1. Aceptación de los términos</h2>
+      <p>Al usar MetaSuite ("la App"), aceptas estos términos de servicio. Si no estás de acuerdo, no uses la App.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Descripción del servicio</h2>
+      <p>MetaSuite es un dashboard de gestión de campañas publicitarias desarrollado por DT Growth Partners que permite:</p>
+      <ul>
+        <li>Crear, editar y gestionar campañas publicitarias en Meta (Facebook e Instagram).</li>
+        <li>Visualizar métricas y reportes de rendimiento de anuncios.</li>
+        <li>Generar contenido publicitario mediante inteligencia artificial.</li>
+        <li>Administrar activos comerciales (páginas, cuentas publicitarias, audiencias).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>3. Requisitos de uso</h2>
+      <ul>
+        <li>Debes tener una cuenta activa de Facebook con acceso a cuentas publicitarias.</li>
+        <li>Debes autorizar la App para acceder a tus datos publicitarios mediante Facebook Login.</li>
+        <li>Eres responsable de todas las campañas y anuncios creados a través de la App.</li>
+        <li>Debes cumplir con las <a href="https://www.facebook.com/policies/ads/" target="_blank">Políticas de Publicidad de Meta</a>.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. Responsabilidades del usuario</h2>
+      <ul>
+        <li>Eres el único responsable del contenido de tus anuncios y campañas.</li>
+        <li>No debes usar la App para crear anuncios que violen las políticas de Meta o las leyes aplicables.</li>
+        <li>Eres responsable de mantener la seguridad de tu cuenta de Facebook y token de acceso.</li>
+        <li>Los presupuestos y gastos publicitarios son tu responsabilidad directa con Meta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. Contenido generado por IA</h2>
+      <p>La App utiliza inteligencia artificial para generar sugerencias de textos publicitarios. Este contenido:</p>
+      <ul>
+        <li>Son sugerencias que el usuario debe revisar y aprobar antes de publicar.</li>
+        <li>DT Growth Partners no se responsabiliza por el contenido generado por IA.</li>
+        <li>El usuario es responsable de verificar que el contenido cumple con las políticas de Meta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>6. Limitación de responsabilidad</h2>
+      <p>DT Growth Partners no se responsabiliza por:</p>
+      <ul>
+        <li>Interrupciones del servicio de Meta o cambios en su API.</li>
+        <li>Resultados de las campañas publicitarias.</li>
+        <li>Pérdida de datos debido a cambios en las políticas de Meta.</li>
+        <li>Suspensión o restricción de cuentas publicitarias por parte de Meta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>7. Contacto</h2>
+      <p><strong>DT Growth Partners</strong><br>Edgardo Meza<br>contacto@dtgrowthpartners.com<br>Cartagena, Colombia</p>
+    </div>
+  </div></body></html>`);
+});
+
+// Data Deletion Callback & Instructions Page
+app.get('/data-deletion', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eliminación de Datos - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <span class="logo">MetaSuite</span>
+    <h1>Eliminación de Datos de Usuario</h1>
+    <p class="subtitle">Cómo eliminar tus datos de MetaSuite</p>
+
+    <div class="card">
+      <h2>¿Qué datos almacena MetaSuite?</h2>
+      <p>MetaSuite almacena datos mínimos, exclusivamente en tu navegador:</p>
+      <ul>
+        <li>Token de acceso de Facebook (en localStorage de tu navegador).</li>
+        <li>Nombre y foto de perfil (para mostrar en la interfaz).</li>
+      </ul>
+      <p><strong>No almacenamos datos personales en nuestros servidores.</strong> Todos los datos de campañas y métricas se obtienen en tiempo real desde Meta.</p>
+    </div>
+
+    <div class="card">
+      <h2>Cómo eliminar tus datos</h2>
+      <p><strong>Opción 1:</strong> Cierra sesión en MetaSuite. Esto elimina inmediatamente todos los datos almacenados en tu navegador.</p>
+      <p><strong>Opción 2:</strong> Revoca el acceso desde Facebook:</p>
+      <ol>
+        <li>Ve a <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank">Configuración de Facebook → Aplicaciones y sitios web</a>.</li>
+        <li>Busca "ApiAppSuite" o "MetaSuite".</li>
+        <li>Haz clic en "Eliminar" para revocar todos los permisos.</li>
+      </ol>
+      <p><strong>Opción 3:</strong> Envía un email a <strong>contacto@dtgrowthpartners.com</strong> solicitando la eliminación de tus datos.</p>
+    </div>
+
+    <div class="card">
+      <h2>Confirmación</h2>
+      <p>Dado que no almacenamos datos personales en nuestros servidores, la eliminación es inmediata al cerrar sesión o revocar permisos. No hay datos pendientes de borrar en nuestro lado.</p>
+    </div>
+  </div></body></html>`);
+});
+
+// Data Deletion Callback (POST) — Meta sends this when a user removes the app
+app.post('/data-deletion', (req, res) => {
+  const { signed_request } = req.body;
+  console.log('Data deletion request received from Meta:', signed_request ? 'signed_request present' : 'no signed_request');
+
+  // Meta requires a JSON response with a confirmation URL and a confirmation code
+  const confirmationCode = `DEL-${Date.now()}`;
+  res.json({
+    url: `https://metasuite.dtgrowthpartners.com/data-deletion?code=${confirmationCode}`,
+    confirmation_code: confirmationCode
+  });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
