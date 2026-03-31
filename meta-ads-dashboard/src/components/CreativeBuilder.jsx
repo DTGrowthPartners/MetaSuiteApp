@@ -2290,6 +2290,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', padding: '0 4px', marginTop: '14px' }}
                     >×</button>
                   </div>
+                  {/* Advantage+ toggle por conjunto */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', padding: '5px 10px', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px' }}>
+                    <label className="switch" style={{ flexShrink: 0, transform: 'scale(0.8)' }}>
+                      <input type="checkbox" checked={aud.advantageAudience !== false} onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, advantageAudience: e.target.checked } : a))} />
+                      <span className="slider round"></span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: aud.advantageAudience !== false ? '#a5b4fc' : '#64748b' }}>
+                      Advantage+ {aud.advantageAudience !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
                 </div>
               ))}
 
@@ -2298,7 +2308,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 value=""
                 onChange={(e) => {
                   const aud = allAudiences.find(a => a.id === e.target.value);
-                  if (aud) setMultiAudiences(prev => [...prev, { id: aud.id, name: aud.name, targeting: aud.targeting, audienceType: aud.audienceType }]);
+                  if (aud) setMultiAudiences(prev => [...prev, { id: aud.id, name: aud.name, targeting: aud.targeting, audienceType: aud.audienceType, advantageAudience: true }]);
                 }}
                 style={{ marginTop: '4px' }}
               >
@@ -3521,28 +3531,37 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       }
 
       // Advantage+ Audience
-      const useAdvantage = job.advantageAudience !== false; // true por defecto
-      if (useAdvantage) {
-        // Máximo Rendimiento: custom_audiences van como sugerencias, IA puede expandir
-        const customAudiences = targeting.custom_audiences || [];
-        const excludedAudiences = targeting.excluded_custom_audiences || [];
-        if (customAudiences.length > 0) {
-          // Mover custom_audiences a audience_suggestions
-          targeting.audience_suggestions = { custom_audiences: customAudiences };
-          delete targeting.custom_audiences;
+      // Función para aplicar Advantage+ a cualquier targeting
+      const applyAdvantageAudience = (t, isAdvantage, label = '') => {
+        if (isAdvantage) {
+          const customAudiences = t.custom_audiences || [];
+          const excludedAudiences = t.excluded_custom_audiences || [];
+          if (customAudiences.length > 0) {
+            t.audience_suggestions = { custom_audiences: customAudiences };
+            delete t.custom_audiences;
+          }
+          t.targeting_automation = { advantage_audience: 1 };
+          if (excludedAudiences.length > 0) t.excluded_custom_audiences = excludedAudiences;
+          if (label) addLog(`${label}: Advantage+ ON`);
+        } else {
+          t.targeting_automation = { advantage_audience: 0 };
+          t.targeting_relaxation_types = { custom_audience: 0 };
+          if (label) addLog(`${label}: Advantage+ OFF (estricto)`);
         }
-        targeting.targeting_automation = { advantage_audience: 1 };
-        // Mantener excluded_custom_audiences (exclusiones siempre se respetan)
-        if (excludedAudiences.length > 0) {
-          targeting.excluded_custom_audiences = excludedAudiences;
-        }
-        addLog('Advantage+ Público: Activado (IA puede expandir audiencia)');
-      } else {
-        // Audiencia Estricta: solo las personas de la lista, sin expansión
-        targeting.targeting_automation = { advantage_audience: 0 };
-        targeting.targeting_relaxation_types = { custom_audience: 0 };
-        addLog('Advantage+ Público: Desactivado (solo público seleccionado)');
-      }
+        return t;
+      };
+
+      applyAdvantageAudience(targeting, job.advantageAudience !== false, 'Conjunto 1');
+
+      // Aplicar Advantage+ a cada público adicional
+      const processedMultiAudiences = (job.multiAudiences || []).map((aud, i) => {
+        const audTargeting = { ...(aud.targeting || { geo_locations: { countries: ['CO'] } }) };
+        audTargeting.age_min = job.ageMin || 18;
+        audTargeting.age_max = job.ageMax || 65;
+        if (job.gender && job.gender !== 'all') audTargeting.genders = job.gender === 'male' ? [1] : [2];
+        applyAdvantageAudience(audTargeting, aud.advantageAudience !== false, `Conjunto ${i + 2}`);
+        return { ...aud, targeting: audTargeting };
+      });
 
       console.log('TARGETING FINAL:', JSON.stringify(targeting, null, 2));
       addLog(`Targeting: ${job.audienceMode === 'custom' ? 'Personalizado' : 'Guardado'} — ${JSON.stringify(targeting.geo_locations || {})}`);
@@ -3637,7 +3656,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           endTime: job.endDate || null,
           pageWelcomeMessage: null,
           audienceName: job.savedAudienceName || null,
-          multiAudiences: job.multiAudiences || [],
+          multiAudiences: processedMultiAudiences,
           flexibleAdGroups: job.flexibleAdGroups || []
         });
 
@@ -3687,7 +3706,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           const errors = [];
 
           // Construir array de públicos a procesar (principal + adicionales)
-          const multiAuds = job.multiAudiences || [];
+          const multiAuds = processedMultiAudiences;
           const primaryAud = {
             name: job.savedAudienceName || 'Principal',
             targeting: targeting
@@ -4035,7 +4054,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           budgetLevel: job.budgetLevel || 'campaign',
           adSetMode: job.adSetMode || 'single',
           audienceName: job.savedAudienceName || null,
-          multiAudiences: job.multiAudiences || [],
+          multiAudiences: processedMultiAudiences,
           flexibleAdGroups: job.flexibleAdGroups || [],
           ads: job.ads || [{
             adName: job.adName,
