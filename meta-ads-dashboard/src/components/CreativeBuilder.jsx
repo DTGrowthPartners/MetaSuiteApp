@@ -48,7 +48,8 @@ const ICON_MAP = {
 // Prefijo dinámico según objetivo de campaña
 function getCampaignPrefix(objective) {
   if (objective === 'OUTCOME_LEADS') return '🟨 DTGP - ';
-  if (objective === 'OUTCOME_SALES' || objective === 'OUTCOME_ENGAGEMENT') return '🟥 DTGP - ';
+  if (objective === 'OUTCOME_SALES') return '🟥 DTGP - ';
+  if (objective === 'OUTCOME_ENGAGEMENT') return '🟦 DTGP - ';
   // OUTCOME_TRAFFIC, OUTCOME_AWARENESS (ThruPlay), etc.
   return '🟦 DTGP - ';
 }
@@ -56,7 +57,8 @@ function getCampaignPrefix(objective) {
 // Color por objetivo (misma nomenclatura que los prefijos 🟨🟥🟦)
 function getObjectiveColor(objective) {
   if (objective === 'OUTCOME_LEADS') return '#f0b429'; // amarillo
-  if (objective === 'OUTCOME_SALES' || objective === 'OUTCOME_ENGAGEMENT') return '#e53e3e'; // rojo
+  if (objective === 'OUTCOME_SALES') return '#e53e3e'; // rojo
+  if (objective === 'OUTCOME_ENGAGEMENT') return '#4A9FFF'; // azul
   return '#4A9FFF'; // azul — TRAFFIC, AWARENESS, etc.
 }
 
