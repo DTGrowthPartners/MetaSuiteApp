@@ -4190,7 +4190,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '24px 0 16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', padding: '24px 0 16px' }}>
+        <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" style={{ height: '40px', objectFit: 'contain', opacity: 0.9 }} />
         <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
         <PropagateLoader color="#6366f1" size={12} speedMultiplier={0.8} />
         <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>Enviando a Meta Ads...</p>
