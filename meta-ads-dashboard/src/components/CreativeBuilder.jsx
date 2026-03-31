@@ -3602,9 +3602,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT como destination_type
-        // Usar UNDEFINED para que Meta lo infiera del CTA (INSTAGRAM_MESSAGE → IG DM)
-        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? 'UNDEFINED' : 'INSTAGRAM_DIRECT';
+        // OUTCOME_LEADS: no pasar destination_type (null) — Meta lo infiere del creative
+        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? null : 'INSTAGRAM_DIRECT';
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';
@@ -3722,7 +3721,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 };
                 if (isIgDM) {
                   creativeParams.igActorId = job.igActorId;
-                  creativeParams.appDestination = igDMDestType; // MESSENGER para OUTCOME_LEADS
+                  // Creative siempre usa INSTAGRAM_DIRECT (el AdSet controla el routing)
+                  creativeParams.appDestination = 'INSTAGRAM_DIRECT';
                 }
 
                 const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);

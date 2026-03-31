@@ -3937,7 +3937,7 @@ class MetaAdsService {
       delete cleanTargeting.targeting_optimization;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
-      formData.append('destination_type', destinationType);
+      if (destinationType) formData.append('destination_type', destinationType);
 
       if (isDynamicCreative) {
         formData.append('is_dynamic_creative', 'true');
@@ -4005,7 +4005,7 @@ class MetaAdsService {
           call_to_action: {
             type: callToAction,
             value: {
-              ...(appDestination !== 'UNDEFINED' ? { app_destination: appDestination } : {}),
+              app_destination: appDestination || 'INSTAGRAM_DIRECT',
               link: igDirectLink
             }
           }
@@ -4032,7 +4032,7 @@ class MetaAdsService {
           description: description,
           call_to_action: {
             type: callToAction,
-            value: appDestination !== 'UNDEFINED' ? { app_destination: appDestination } : {}
+            value: { app_destination: appDestination || 'INSTAGRAM_DIRECT' }
           }
         };
 
