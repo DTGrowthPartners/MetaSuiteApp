@@ -3521,6 +3521,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         geo_locations: { countries: ['CO'] }
       };
 
+      // Si el público principal es un custom audience sin targeting propio
+      if (job.audienceType === 'custom' && !targeting.custom_audiences && job.savedAudienceId) {
+        targeting.custom_audiences = [{ id: job.savedAudienceId, name: job.savedAudienceName }];
+        if (!targeting.geo_locations) targeting.geo_locations = { countries: ['CO'] };
+      }
+
       // Agregar edad personalizada
       targeting.age_min = job.ageMin || 18;
       targeting.age_max = job.ageMax || 65;
@@ -3552,7 +3558,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
       // Aplicar Advantage+ a cada público adicional
       const processedMultiAudiences = (job.multiAudiences || []).map((aud, i) => {
-        const audTargeting = { ...(aud.targeting || { geo_locations: { countries: ['CO'] } }) };
+        let audTargeting = { ...(aud.targeting || { geo_locations: { countries: ['CO'] } }) };
+        // Si es un custom audience sin targeting propio, construir targeting con custom_audiences
+        if (aud.audienceType === 'custom' && !audTargeting.custom_audiences) {
+          audTargeting = {
+            geo_locations: targeting.geo_locations || { countries: ['CO'] },
+            custom_audiences: [{ id: aud.id, name: aud.name }]
+          };
+        }
         audTargeting.age_min = job.ageMin || 18;
         audTargeting.age_max = job.ageMax || 65;
         if (job.gender && job.gender !== 'all') audTargeting.genders = job.gender === 'male' ? [1] : [2];
