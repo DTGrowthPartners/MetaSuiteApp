@@ -1924,14 +1924,23 @@ class MetaAdsService {
   }
 
   // Crear un Ad
-  async createAd(adAccountId, { name, adsetId, creativeId, status = 'ACTIVE' }) {
+  async createAd(adAccountId, { name, adsetId, creativeId, status = 'ACTIVE', creativeEnhancements = true }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
 
-      // Solo referencia al creative - degrees_of_freedom_spec se configura a nivel del AdCreative, no del Ad
       const creativeSpec = {
         creative_id: creativeId
       };
+
+      // Creative Enhancements (Advantage+ Creative): mejoras automáticas de Meta
+      if (creativeEnhancements) {
+        creativeSpec.degrees_of_freedom_spec = {
+          creative_features_spec: {
+            standard_enhancements: { enroll_status: 'OPT_IN' },
+            music_on_demand: { enroll_status: 'OPT_IN' }
+          }
+        };
+      }
 
       console.log('Creating ad:', { name, adsetId, creativeId, status });
 

@@ -3487,7 +3487,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       addLog('Iniciando creación de campaña completa...');
 
       // Construir targeting con los valores personalizados
-      let targeting = job.savedAudienceTargeting || {
+      let targeting = job.savedAudienceTargeting ? { ...job.savedAudienceTargeting } : {
         geo_locations: { countries: ['CO'] }
       };
 
@@ -3497,8 +3497,31 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
       // Agregar género si no es "todos"
       if (job.gender && job.gender !== 'all') {
-        // Meta API: 1 = male, 2 = female
         targeting.genders = job.gender === 'male' ? [1] : [2];
+      }
+
+      // Advantage+ Audience
+      const useAdvantage = job.advantageAudience !== false; // true por defecto
+      if (useAdvantage) {
+        // Máximo Rendimiento: custom_audiences van como sugerencias, IA puede expandir
+        const customAudiences = targeting.custom_audiences || [];
+        const excludedAudiences = targeting.excluded_custom_audiences || [];
+        if (customAudiences.length > 0) {
+          // Mover custom_audiences a audience_suggestions
+          targeting.audience_suggestions = { custom_audiences: customAudiences };
+          delete targeting.custom_audiences;
+        }
+        targeting.targeting_automation = { advantage_audience: 1 };
+        // Mantener excluded_custom_audiences (exclusiones siempre se respetan)
+        if (excludedAudiences.length > 0) {
+          targeting.excluded_custom_audiences = excludedAudiences;
+        }
+        addLog('Advantage+ Público: Activado (IA puede expandir audiencia)');
+      } else {
+        // Audiencia Estricta: solo las personas de la lista, sin expansión
+        targeting.targeting_automation = { advantage_audience: 0 };
+        targeting.targeting_relaxation_types = { custom_audience: 0 };
+        addLog('Advantage+ Público: Desactivado (solo público seleccionado)');
       }
 
       console.log('TARGETING FINAL:', JSON.stringify(targeting, null, 2));
