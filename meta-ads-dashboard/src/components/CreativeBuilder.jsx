@@ -3542,8 +3542,13 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         // age_range no es compatible con targeting_automation — siempre eliminarlo
         delete t.age_range;
         if (isAdvantage) {
-          // Mantener custom_audiences en su lugar (Meta los usa como sugerencia base)
-          // Solo agregar targeting_automation para que Meta pueda expandir
+          // Enviar custom_audiences en ambos campos para consistencia:
+          // - custom_audiences: para que aparezcan seleccionados en Ads Manager
+          // - audience_suggestions: para que Meta los trate como sugerencias Advantage+
+          const customAudiences = t.custom_audiences || [];
+          if (customAudiences.length > 0) {
+            t.audience_suggestions = { custom_audiences: customAudiences };
+          }
           t.targeting_automation = { advantage_audience: 1 };
           if (label) addLog(`${label}: Advantage+ ON`);
         } else {
