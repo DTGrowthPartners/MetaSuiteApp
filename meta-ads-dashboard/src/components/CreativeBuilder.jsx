@@ -3602,6 +3602,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT como destination_type, usar MESSENGER
+        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? 'MESSENGER' : 'INSTAGRAM_DIRECT';
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';
@@ -3679,7 +3681,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               campaignId: campaignResult.data.id,
               targeting: currentAudience.targeting,
               optimizationGoal,
-              promotedObject: { page_id: job.pageId }
+              promotedObject: { page_id: job.pageId },
+              ...(isIgDM ? { destinationType: igDMDestType } : {})
             });
 
             if (!adSetResult.success) {
@@ -3749,7 +3752,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               targeting: currentAudience.targeting,
               optimizationGoal,
               promotedObject: { page_id: job.pageId },
-              isDynamicCreative: false
+              isDynamicCreative: false,
+              ...(isIgDM ? { destinationType: igDMDestType } : {})
             });
 
             if (!adSetResult.success) {
@@ -3830,7 +3834,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                 targeting: adTargeting,
                 optimizationGoal,
                 promotedObject: { page_id: job.pageId },
-                isDynamicCreative: true
+                isDynamicCreative: true,
+                ...(isIgDM ? { destinationType: igDMDestType } : {})
               });
 
               if (!adSetResult.success) {

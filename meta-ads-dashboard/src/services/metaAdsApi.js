@@ -3920,7 +3920,8 @@ class MetaAdsService {
     billingEvent = 'IMPRESSIONS',
     status = 'ACTIVE',
     promotedObject = null,
-    isDynamicCreative = false
+    isDynamicCreative = false,
+    destinationType = 'INSTAGRAM_DIRECT' // OUTCOME_LEADS usa 'MESSENGER' porque Meta no acepta INSTAGRAM_DIRECT para leads
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -3936,7 +3937,7 @@ class MetaAdsService {
       delete cleanTargeting.targeting_optimization;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
-      formData.append('destination_type', 'INSTAGRAM_DIRECT');
+      formData.append('destination_type', destinationType);
 
       if (isDynamicCreative) {
         formData.append('is_dynamic_creative', 'true');
@@ -3948,7 +3949,7 @@ class MetaAdsService {
 
       console.log('Creating Instagram DM AdSet with params:', {
         name, campaignId, billingEvent, optimizationGoal, status,
-        destination_type: 'INSTAGRAM_DIRECT',
+        destination_type: destinationType,
         promotedObject
       });
 
