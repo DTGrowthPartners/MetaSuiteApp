@@ -3469,6 +3469,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
   };
 
   const handleCreateDraft = async () => {
+    // Pre-crear AudioContext en el gesto del usuario (ANTES de cualquier await)
+    let successAudioCtx = null;
+    try { successAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+
     setCreating(true);
     setError('');
     setLogs([]);
@@ -4055,26 +4059,28 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 40, gravity: 0.8, ticks: 250 }), 250);
         setTimeout(() => confetti({ particleCount: 40, spread: 130, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 30, gravity: 0.6, ticks: 200, scalar: 0.8 }), 500);
 
-        // Sonido de celebración (Web Audio API)
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const playTone = (freq, start, dur, vol = 0.15) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-            gain.gain.setValueAtTime(vol, ctx.currentTime + start);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
-            osc.connect(gain).connect(ctx.destination);
-            osc.start(ctx.currentTime + start);
-            osc.stop(ctx.currentTime + start + dur);
-          };
-          playTone(523, 0, 0.12, 0.15);
-          playTone(659, 0.08, 0.12, 0.15);
-          playTone(784, 0.16, 0.12, 0.15);
-          playTone(1047, 0.24, 0.4, 0.18);
-          setTimeout(() => ctx.close(), 2000);
-        } catch (e) { /* Audio not available */ }
+        // Sonido de celebración (AudioContext pre-creado al inicio del click)
+        if (successAudioCtx) {
+          try {
+            if (successAudioCtx.state === 'suspended') await successAudioCtx.resume();
+            const playTone = (freq, start, dur, vol = 0.15) => {
+              const osc = successAudioCtx.createOscillator();
+              const gain = successAudioCtx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(freq, successAudioCtx.currentTime + start);
+              gain.gain.setValueAtTime(vol, successAudioCtx.currentTime + start);
+              gain.gain.exponentialRampToValueAtTime(0.001, successAudioCtx.currentTime + start + dur);
+              osc.connect(gain).connect(successAudioCtx.destination);
+              osc.start(successAudioCtx.currentTime + start);
+              osc.stop(successAudioCtx.currentTime + start + dur);
+            };
+            playTone(523, 0, 0.12, 0.15);
+            playTone(659, 0.08, 0.12, 0.15);
+            playTone(784, 0.16, 0.12, 0.15);
+            playTone(1047, 0.24, 0.4, 0.18);
+            setTimeout(() => successAudioCtx.close(), 2000);
+          } catch (e) { /* Audio not available */ }
+        }
       } else {
         const errorMessages = result.errors?.join(', ') || 'Error desconocido';
         addLog(`Error: ${errorMessages}`);
