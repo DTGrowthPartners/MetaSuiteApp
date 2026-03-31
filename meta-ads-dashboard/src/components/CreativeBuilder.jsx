@@ -3602,8 +3602,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT como destination_type, usar MESSENGER
-        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? 'MESSENGER' : 'INSTAGRAM_DIRECT';
+        // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT como destination_type
+        // Usar UNDEFINED para que Meta lo infiera del CTA (INSTAGRAM_MESSAGE → IG DM)
+        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? 'UNDEFINED' : 'INSTAGRAM_DIRECT';
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';

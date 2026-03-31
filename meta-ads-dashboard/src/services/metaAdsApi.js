@@ -4005,7 +4005,7 @@ class MetaAdsService {
           call_to_action: {
             type: callToAction,
             value: {
-              app_destination: appDestination,
+              ...(appDestination !== 'UNDEFINED' ? { app_destination: appDestination } : {}),
               link: igDirectLink
             }
           }
@@ -4032,7 +4032,7 @@ class MetaAdsService {
           description: description,
           call_to_action: {
             type: callToAction,
-            value: { app_destination: appDestination }
+            value: appDestination !== 'UNDEFINED' ? { app_destination: appDestination } : {}
           }
         };
 
