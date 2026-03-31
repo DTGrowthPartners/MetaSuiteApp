@@ -81,6 +81,7 @@ Cada campaña tiene `insightsYesterday` e `insightsToday`. Extraer de cada campa
 | Leads | `lead` | 🎯 |
 | Clicks | `link_click` | 🖱️ |
 | Video views | `video_view` | 🎬 |
+| ThruPlays | `video_thruplay_watched_actions[0].value` | 🎬 |
 
 **Prioridad para mensajes:** buscar en este orden:
 1. `onsite_conversion.total_messaging_connection` (Contactos de mensajes totales — PREFERIDO)
@@ -128,7 +129,7 @@ _{Día de la semana} {día} de {mes}_
 
 (mostrar TODAS las campañas con gasto > 0)
 (campañas de mensajes: msgs + costo x msg)
-(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {video_views} reproducciones)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays)
 (campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*
@@ -152,7 +153,7 @@ DT Growth Partners
 4. **Solo 2 datos por campaña:** cantidad de mensajes + costo por mensaje
 5. Mostrar TODAS las campañas con gasto > 0 (no solo las de mensajes)
 6. Campañas de mensajes: mostrar msgs + costo x msg
-7. Campañas de reconocimiento/ThruPlay: mostrar gasto + video_views
+7. Campañas de reconocimiento/ThruPlay: mostrar gasto + ThruPlays (de `video_thruplay_watched_actions[0].value`, NO `video_view`)
 8. Campañas de tráfico: mostrar gasto + visitas o clicks
 9. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
 7. El resumen incluye: gasto total, mensajes totales, costo promedio, alcance e impresiones

@@ -186,7 +186,7 @@ _{Día de la semana} {día} de {mes}_
 
 (mostrar TODAS las campañas con gasto > 0)
 (campañas de mensajes: msgs + costo x msg)
-(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {video_views} reproducciones)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays)
 (campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*
@@ -208,7 +208,7 @@ DT Growth Partners
 2. Emoji del cuadro según tipo de campaña: 🟥 ventas/mensajes, 🟦 reconocimiento, 🟩 tráfico, 🟨 leads
 3. Mostrar TODAS las campañas con gasto > 0 (no solo las de mensajes)
 4. Campañas de mensajes (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_ENGAGEMENT): mostrar msgs + costo x msg
-5. Campañas de reconocimiento/ThruPlay (OUTCOME_AWARENESS): mostrar gasto + video_views
+5. Campañas de reconocimiento/ThruPlay (OUTCOME_AWARENESS): mostrar gasto + ThruPlays (de `video_thruplay_watched_actions[0].value`, NO `video_view`)
 6. Campañas de tráfico (OUTCOME_TRAFFIC): mostrar gasto + visitas o clicks
 7. Costo por mensaje = spend / contactos_de_mensajes_totales
 8. Resumen con gasto, mensajes, costo promedio, alcance e impresiones

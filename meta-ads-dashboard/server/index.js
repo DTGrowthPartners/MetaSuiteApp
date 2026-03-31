@@ -2350,7 +2350,7 @@ function getMonthBeforeLastRange() { return getMonthRange(-2); }
 
 // Helper: obtener insights a nivel de cuenta por rango de fechas (incluye campañas eliminadas/archivadas)
 async function getAccountInsightsByCampaign(accountId, token, dateRange) {
-  const insightsFields = 'campaign_id,campaign_name,spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
+  const insightsFields = 'campaign_id,campaign_name,spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
   const allResults = [];
   let url = `${META_API_BASE_URL}/${accountId}/insights`;
   let params = {
@@ -2442,7 +2442,7 @@ async function getReportData(accountId, token) {
   });
   const campaigns = campaignsResp.data.data || [];
 
-  const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks';
+  const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
 
   // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
   const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountYesterdayInsights] = await Promise.all([
