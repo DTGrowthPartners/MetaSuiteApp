@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import confetti from 'canvas-confetti';
 import MetaAdsService from '../services/metaAdsApi';
-import DNALoader from './DNALoader';
+import { Atom } from 'react-loading-indicators';
 import {
   CAMPAIGN_TEMPLATES,
   CTA_OPTIONS,
@@ -4188,11 +4188,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '12px 0 8px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '20px 0 12px' }}>
+        <Atom color="#6366f1" size="medium" />
         <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
         <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>Enviando a Meta Ads...</p>
       </div>
-      <DNALoader height={50} colorA="#6366f1" colorB="#22c55e" speed={1.2} />
 
       <div className="campaign-type-badge">
         {job.conversionLocation === 'WHATSAPP' ? (
