@@ -2199,6 +2199,26 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '2px 0 0' }}>${formatCOP(dailyBudget)} COP/día</p>
           )}
 
+          {/* Advantage+ Audience Toggle */}
+          {selectedAudience && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.12)' }}>
+              <label className="switch" style={{ flexShrink: 0 }}>
+                <input type="checkbox" checked={advantageAudience} onChange={(e) => setAdvantageAudience(e.target.checked)} />
+                <span className="slider round"></span>
+              </label>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: advantageAudience ? '#a5b4fc' : '#94a3b8' }}>
+                  Advantage+ Público
+                </span>
+                <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0' }}>
+                  {advantageAudience
+                    ? 'La IA de Meta puede expandir la audiencia para encontrar mejores resultados fuera del público seleccionado.'
+                    : 'Solo se mostrará a las personas del público seleccionado, sin expansión.'}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Multi-Audience Selector (oculto en per-ad mode) */}
           {adSetMode !== 'per-ad' && selectedAudience && allAudiences.length > 1 && (
             <div className="mt-sm">
