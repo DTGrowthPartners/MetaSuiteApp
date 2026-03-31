@@ -3602,8 +3602,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        // OUTCOME_LEADS: no pasar destination_type (null) — Meta lo infiere del creative
-        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? null : 'INSTAGRAM_DIRECT';
+        // Siempre INSTAGRAM_DIRECT para IG DM (incluyendo OUTCOME_LEADS)
+        const igDMDestType = 'INSTAGRAM_DIRECT';
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';
