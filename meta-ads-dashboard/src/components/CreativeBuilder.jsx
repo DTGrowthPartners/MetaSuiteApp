@@ -3599,11 +3599,14 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         });
 
       } else if (conversionLocation === 'MESSENGER' || conversionLocation === 'INSTAGRAM_DIRECT') {
-        const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT';
+        // Detectar IG DM real: conversionLocation es INSTAGRAM_DIRECT, O es MESSENGER pero la plantilla apunta a IG
+        const templateDestType = job.templateId === 'leads_instagram' ? 'INSTAGRAM_DIRECT' : null;
+        const isIgDM = conversionLocation === 'INSTAGRAM_DIRECT' || templateDestType === 'INSTAGRAM_DIRECT';
         const destLabel = isIgDM ? 'Instagram Direct' : 'Messenger';
         const defaultCta = isIgDM ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
-        // Siempre INSTAGRAM_DIRECT para IG DM (incluyendo OUTCOME_LEADS)
-        const igDMDestType = 'INSTAGRAM_DIRECT';
+        // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT en AdSet, usa MESSENGER
+        // El creative con app_destination:INSTAGRAM_DIRECT + CTA:INSTAGRAM_MESSAGE redirige a IG DM
+        const igDMDestType = (isIgDM && objective === 'OUTCOME_LEADS') ? 'MESSENGER' : 'INSTAGRAM_DIRECT';
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';

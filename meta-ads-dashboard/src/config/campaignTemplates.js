@@ -390,7 +390,7 @@ export const CAMPAIGN_TEMPLATES = [
     specialAdCategories: [],
     buyingType: 'AUCTION',
     adSetConfig: {
-      conversionLocation: 'INSTAGRAM_DIRECT',
+      conversionLocation: 'MESSENGER',
       optimizationGoal: 'LEAD_GENERATION',
       billingEvent: 'IMPRESSIONS',
       bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
