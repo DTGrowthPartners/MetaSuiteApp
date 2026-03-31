@@ -3607,9 +3607,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         const adsArray = job.ads?.length > 0 ? job.ads : [job];
         const totalAds = adsArray.length;
         const mode = job.adSetMode || 'dynamic';
-        // OUTCOME_ENGAGEMENT + IG DM + DC no es soportado por Meta
-        // Error: "INSTAGRAM_MESSAGE no es compatible con OUTCOME_ENGAGEMENT en conjunto de anuncios con contenido dinámico"
-        const dcBlockedObjectives = ['OUTCOME_ENGAGEMENT', 'OUTCOME_SALES'];
+        // DC no soportado para IG DM con estos objetivos:
+        // OUTCOME_ENGAGEMENT: "INSTAGRAM_MESSAGE no es compatible con OUTCOME_ENGAGEMENT en DC"
+        // OUTCOME_SALES: error 1885392
+        // OUTCOME_LEADS + MESSENGER: "El contenido dinámico no es compatible con el tipo de destino de Messenger"
+        const dcBlockedObjectives = ['OUTCOME_ENGAGEMENT', 'OUTCOME_SALES', 'OUTCOME_LEADS'];
         const dcBlocked = isIgDM && dcBlockedObjectives.includes(objective);
         // Flexible mode bypasses DC restrictions (no isDynamicCreative needed)
         const effectiveMode = mode === 'flexible' ? 'flexible' : (dcBlocked ? 'single' : mode);
