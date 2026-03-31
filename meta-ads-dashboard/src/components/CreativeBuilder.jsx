@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import confetti from 'canvas-confetti';
 import MetaAdsService from '../services/metaAdsApi';
-import { Atom } from 'react-loading-indicators';
+import PropagateLoader from 'react-spinners/PropagateLoader';
 import {
   CAMPAIGN_TEMPLATES,
   CTA_OPTIONS,
@@ -4190,9 +4190,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '20px 0 12px' }}>
-        <Atom color="#6366f1" size="medium" />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '24px 0 16px' }}>
         <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
+        <PropagateLoader color="#6366f1" size={12} speedMultiplier={0.8} />
         <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>Enviando a Meta Ads...</p>
       </div>
 
