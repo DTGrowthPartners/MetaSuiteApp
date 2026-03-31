@@ -3719,7 +3719,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
                   description: adDescriptions[1] || adHeadlines[1] || '',
                   callToAction: adCta
                 };
-                if (isIgDM) creativeParams.igActorId = job.igActorId;
+                if (isIgDM) {
+                  creativeParams.igActorId = job.igActorId;
+                  creativeParams.appDestination = igDMDestType; // MESSENGER para OUTCOME_LEADS
+                }
 
                 const creativeResult = await metaService[creativeMethod](job.adAccountId, creativeParams);
 

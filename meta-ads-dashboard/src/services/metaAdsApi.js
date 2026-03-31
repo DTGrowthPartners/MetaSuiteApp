@@ -3979,7 +3979,8 @@ class MetaAdsService {
     primaryText,
     headline,
     description,
-    callToAction = 'INSTAGRAM_MESSAGE'
+    callToAction = 'INSTAGRAM_MESSAGE',
+    appDestination = 'INSTAGRAM_DIRECT' // OUTCOME_LEADS usa 'MESSENGER'
   }) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
@@ -4004,7 +4005,7 @@ class MetaAdsService {
           call_to_action: {
             type: callToAction,
             value: {
-              app_destination: 'INSTAGRAM_DIRECT',
+              app_destination: appDestination,
               link: igDirectLink
             }
           }
@@ -4031,7 +4032,7 @@ class MetaAdsService {
           description: description,
           call_to_action: {
             type: callToAction,
-            value: { app_destination: 'INSTAGRAM_DIRECT' }
+            value: { app_destination: appDestination }
           }
         };
 
