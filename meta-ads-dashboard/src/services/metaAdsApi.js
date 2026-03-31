@@ -4452,7 +4452,7 @@ class MetaAdsService {
           promotedObject = { page_id: pageId };
           console.log(`promoted_object: INSTAGRAM_PROFILE with page_id only (IG not connected to ad account)`);
         }
-      } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'].includes(destinationType)) {
+      } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER_WHATSAPP', 'MESSAGING_INSTAGRAM_DIRECT_WHATSAPP', 'MESSAGING_MESSENGER_WHATSAPP'].includes(destinationType)) {
         promotedObject = { page_id: pageId };
         console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
       } else if (destinationType === 'WEBSITE' && objective === 'OUTCOME_SALES') {
