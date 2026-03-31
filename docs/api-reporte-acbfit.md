@@ -186,7 +186,7 @@ _{Día de la semana} {día} de {mes}_
 
 (mostrar TODAS las campañas con gasto > 0)
 (campañas de mensajes: msgs + costo x msg)
-(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays | 💵 ${costo_x_thruplay} x ThruPlay)
 (campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*

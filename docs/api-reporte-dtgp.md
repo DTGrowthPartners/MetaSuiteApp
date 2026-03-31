@@ -172,7 +172,7 @@ _{Día de la semana} {día} de {mes}_
 {msgs} msg x ${costo_x_msg}
 
 🟦{NOMBRE CAMPAÑA THRUPLAY/RECONOCIMIENTO}
-💰 ${gasto} | 🎬 {thruplay} ThruPlays
+💰 ${gasto} | 🎬 {thruplay} ThruPlays | 💵 ${costo_x_thruplay} x ThruPlay
 
 (mostrar TODAS las campañas con gasto > 0)
 (campañas de mensajes: msgs + costo x msg)

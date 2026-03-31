@@ -96,6 +96,7 @@ Cada campaña tiene `insightsYesterday` e `insightsToday`. Extraer de cada campa
 | CPM | `(spend / impressions) * 1000` | Costo por mil impresiones |
 | Costo x msg | `spend / mensajes` | Costo por cada mensaje recibido |
 | Costo x lead | `spend / leads` | Costo por cada lead |
+| Costo x ThruPlay | `spend / video_thruplay_watched_actions[0].value` | Costo por cada reproducción completa (15+ seg) |
 
 ## Formato del reporte — MODO CLIENTE (por defecto)
 
@@ -129,7 +130,7 @@ _{Día de la semana} {día} de {mes}_
 
 (mostrar TODAS las campañas con gasto > 0)
 (campañas de mensajes: msgs + costo x msg)
-(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {thruplay} ThruPlays | 💵 ${costo_x_thruplay} x ThruPlay)
 (campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*
