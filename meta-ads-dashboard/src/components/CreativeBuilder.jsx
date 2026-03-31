@@ -4188,11 +4188,11 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
   return (
     <div className="draft-step">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0' }}>
-        <DNALoader width={60} height={120} colorA="#6366f1" colorB="#22c55e" speed={1.2} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '12px 0 8px' }}>
         <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
         <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>Enviando a Meta Ads...</p>
       </div>
+      <DNALoader height={50} colorA="#6366f1" colorB="#22c55e" speed={1.2} />
 
       <div className="campaign-type-badge">
         {job.conversionLocation === 'WHATSAPP' ? (
