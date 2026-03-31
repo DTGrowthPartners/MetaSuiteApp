@@ -4014,6 +4014,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         }
 
         setDraftData({
+          adAccountId: job.adAccountId,
           campaignId: result.campaign?.id,
           campaignName: job.campaignName,
           adSetId: result.adSets?.[0]?.id || result.adSet?.id,
@@ -4168,12 +4169,12 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
           {/* Botones */}
           <div className="success-view-actions">
             <a
-              href="https://business.facebook.com/adsmanager"
+              href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${draftData?.adAccountId?.replace('act_', '') || ''}&campaign_id=${draftData?.campaignId || ''}`}
               target="_blank"
               rel="noopener noreferrer"
               className="success-view-btn-secondary"
             >
-              <Globe size={16} /> Abrir Ads Manager
+              <Globe size={16} /> Abrir en Ads Manager
             </a>
             <button className="success-view-btn-primary" onClick={onComplete}>
               <Plus size={16} /> Crear Otra Campaña
