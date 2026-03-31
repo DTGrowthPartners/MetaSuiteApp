@@ -184,7 +184,10 @@ _{Día de la semana} {día} de {mes}_
 {emoji}{NOMBRE CAMPAÑA}
 {msgs} msg x ${costo_x_msg}
 
-(repetir para cada campaña con mensajes > 0)
+(mostrar TODAS las campañas con gasto > 0)
+(campañas de mensajes: msgs + costo x msg)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {video_views} reproducciones)
+(campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
@@ -203,10 +206,12 @@ DT Growth Partners
 ### Reglas modo cliente:
 1. Saludo personalizado con nombre del contacto
 2. Emoji del cuadro según tipo de campaña: 🟥 ventas/mensajes, 🟦 reconocimiento, 🟩 tráfico, 🟨 leads
-3. Solo 2 datos por campaña: mensajes + costo por mensaje
-4. Si tiene 0 mensajes, NO mostrar en la lista
-5. Costo por mensaje = spend / contactos_de_mensajes_totales
-6. Resumen con gasto, mensajes, costo promedio, alcance e impresiones
+3. Mostrar TODAS las campañas con gasto > 0 (no solo las de mensajes)
+4. Campañas de mensajes (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_ENGAGEMENT): mostrar msgs + costo x msg
+5. Campañas de reconocimiento/ThruPlay (OUTCOME_AWARENESS): mostrar gasto + video_views
+6. Campañas de tráfico (OUTCOME_TRAFFIC): mostrar gasto + visitas o clicks
+7. Costo por mensaje = spend / contactos_de_mensajes_totales
+8. Resumen con gasto, mensajes, costo promedio, alcance e impresiones
 
 ## Formato del reporte — MODO DETALLADO (solo Edgardo o Dairo)
 

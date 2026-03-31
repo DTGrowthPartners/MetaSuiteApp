@@ -125,7 +125,10 @@ _{Día de la semana} {día} de {mes}_
 {emoji}{NOMBRE CAMPAÑA}
 {msgs} msg x ${costo_x_msg}
 
-(repetir para cada campaña con gasto > 0 y mensajes > 0)
+(mostrar TODAS las campañas con gasto > 0)
+(campañas de mensajes: msgs + costo x msg)
+(campañas de reconocimiento/ThruPlay: 💰 ${gasto} | 🎬 {video_views} reproducciones)
+(campañas de tráfico: 💰 ${gasto} | 🖱️ {clicks} visitas)
 
 *RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
@@ -146,8 +149,11 @@ DT Growth Partners
 2. **Emoji del cuadro** según tipo de campaña (tabla arriba)
 3. **Nombre de campaña** tal cual viene de Meta (en mayúsculas)
 4. **Solo 2 datos por campaña:** cantidad de mensajes + costo por mensaje
-5. Si una campaña tiene 0 mensajes, NO mostrarla en la lista individual
-6. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
+5. Mostrar TODAS las campañas con gasto > 0 (no solo las de mensajes)
+6. Campañas de mensajes (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_ENGAGEMENT): mostrar msgs + costo x msg
+7. Campañas de reconocimiento/ThruPlay (OUTCOME_AWARENESS): mostrar gasto + video_views
+8. Campañas de tráfico (OUTCOME_TRAFFIC): mostrar gasto + visitas o clicks
+9. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
 7. El resumen incluye: gasto total, mensajes totales, costo promedio, alcance e impresiones
 8. **Día de la semana** en español: Lunes, Martes, etc.
 
