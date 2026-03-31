@@ -3536,14 +3536,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
         // age_range no es compatible con targeting_automation — siempre eliminarlo
         delete t.age_range;
         if (isAdvantage) {
-          const customAudiences = t.custom_audiences || [];
-          const excludedAudiences = t.excluded_custom_audiences || [];
-          if (customAudiences.length > 0) {
-            t.audience_suggestions = { custom_audiences: customAudiences };
-            delete t.custom_audiences;
-          }
+          // Mantener custom_audiences en su lugar (Meta los usa como sugerencia base)
+          // Solo agregar targeting_automation para que Meta pueda expandir
           t.targeting_automation = { advantage_audience: 1 };
-          if (excludedAudiences.length > 0) t.excluded_custom_audiences = excludedAudiences;
           if (label) addLog(`${label}: Advantage+ ON`);
         } else {
           t.targeting_automation = { advantage_audience: 0 };
