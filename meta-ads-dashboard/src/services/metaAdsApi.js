@@ -1936,8 +1936,7 @@ class MetaAdsService {
       if (creativeEnhancements) {
         creativeSpec.degrees_of_freedom_spec = {
           creative_features_spec: {
-            standard_enhancements: { enroll_status: 'OPT_IN' },
-            music_on_demand: { enroll_status: 'OPT_IN' }
+            standard_enhancements: { enroll_status: 'OPT_IN' }
           }
         };
       }

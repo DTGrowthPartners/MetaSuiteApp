@@ -3533,6 +3533,8 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
       // Advantage+ Audience
       // Función para aplicar Advantage+ a cualquier targeting
       const applyAdvantageAudience = (t, isAdvantage, label = '') => {
+        // age_range no es compatible con targeting_automation — siempre eliminarlo
+        delete t.age_range;
         if (isAdvantage) {
           const customAudiences = t.custom_audiences || [];
           const excludedAudiences = t.excluded_custom_audiences || [];
