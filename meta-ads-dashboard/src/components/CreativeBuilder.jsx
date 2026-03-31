@@ -69,8 +69,8 @@ function TemplateSelector({ onSelectTemplate }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   const categories = getCategories();
-  // Orden: 🟨 amarillo (leads) → 🟦 azul (traffic, awareness, engagement) → 🟥 rojo (sales)
-  const colorOrder = { OUTCOME_LEADS: 0, OUTCOME_TRAFFIC: 1, OUTCOME_AWARENESS: 1, OUTCOME_ENGAGEMENT: 1, OUTCOME_SALES: 2 };
+  // Orden: 🟦 azul (traffic, awareness, engagement) → 🟨 amarillo (leads) → 🟥 rojo (sales)
+  const colorOrder = { OUTCOME_TRAFFIC: 0, OUTCOME_AWARENESS: 0, OUTCOME_ENGAGEMENT: 0, OUTCOME_LEADS: 1, OUTCOME_SALES: 2 };
   const filteredTemplates = getTemplatesByCategory(selectedCategory)
     .slice()
     .sort((a, b) => (colorOrder[a.objective] ?? 1) - (colorOrder[b.objective] ?? 1));
