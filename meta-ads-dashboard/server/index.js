@@ -2741,8 +2741,77 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       reportCache[slug] = { data, timestamp: Date.now() };
     }
 
-    const html = generatePdfHtml(accountConfig, data);
-    res.send(html);
+    // Build campaign data for Python script
+    const campaigns = data.campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
+    const lastMonth = data.dateRange?.lastMonth || {};
+    const monthsArr = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const monthName = lastMonth.label?.split(' ')[0] || monthsArr[new Date().getMonth() - 1] || 'Mes';
+    const yearStr = lastMonth.label?.split(' ')[1] || String(new Date().getFullYear());
+
+    const campData = campaigns.map(c => {
+      const ins = c.insightsLastMonth || {};
+      const spend = parseFloat(ins.spend || 0);
+      const reach = parseInt(ins.reach || 0);
+      const impressions = parseInt(ins.impressions || 0);
+      let conv = 0, first = 0, clicks = 0, views = 0, thruplay = 0;
+      for (const a of (ins.actions || [])) {
+        if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conv = parseInt(a.value);
+        if (a.action_type === 'onsite_conversion.messaging_first_reply') first = parseInt(a.value);
+        if (a.action_type === 'link_click') clicks = parseInt(a.value);
+        if (a.action_type === 'video_view') views = parseInt(a.value);
+      }
+      thruplay = parseInt(ins.video_thruplay_watched_actions?.[0]?.value || 0);
+      const nl = c.name.toLowerCase();
+      let type = 'Mensajes', result = conv;
+      if (c.objective === 'OUTCOME_AWARENESS' || nl.includes('reconocimiento') || nl.includes('thruplay') || nl.includes('true play')) {
+        type = 'Video'; result = thruplay || views;
+      } else if (c.objective === 'OUTCOME_TRAFFIC' || nl.includes('trafico') || nl.includes('perfil ig')) {
+        type = 'Trafico'; result = clicks;
+      } else if (conv === 0 && clicks > 0) {
+        type = 'Clics'; result = clicks;
+      }
+      return { name: c.name, type, spend, result, reach, impressions, conversations: conv, firstReplies: first, clicks, cpr: result > 0 ? spend / result : 0 };
+    });
+
+    const outputPath = path.join(os.tmpdir(), 'report_' + slug + '_' + Date.now() + '.pdf');
+    const inputJson = JSON.stringify({
+      clientName: accountConfig.businessName,
+      month: monthName,
+      year: yearStr,
+      outputPath,
+      adsetReach: data.adsetReachLastMonth || 0,
+      campaigns: campData
+    });
+
+    // Execute Python script
+    const scriptPath = path.join(__dirname_server, 'generate_pdf_report.py');
+    const assetsDir = path.join(__dirname_server, 'report-assets', 'brand');
+
+    let pdfGenerated = false;
+    try {
+      const { execSync: execSyncFn } = await import('child_process');
+      execSyncFn('python3 "' + scriptPath + '"', {
+        input: inputJson,
+        timeout: 30000,
+        env: { ...process.env, ASSETS_DIR: assetsDir }
+      });
+      pdfGenerated = fs.existsSync(outputPath);
+    } catch (pyErr) {
+      console.error('Python PDF error:', pyErr.stderr?.toString() || pyErr.message);
+    }
+
+    if (pdfGenerated) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="Informe_' + accountConfig.businessName.replace(/\s+/g, '_') + '_' + monthName + '_' + yearStr + '.pdf"');
+      const pdfData = fs.readFileSync(outputPath);
+      res.send(pdfData);
+      fs.unlinkSync(outputPath);
+    } else {
+      // Fallback to HTML version
+      console.log('PDF generation failed, falling back to HTML');
+      const html = generatePdfHtml(accountConfig, data);
+      res.send(html);
+    }
   } catch (error) {
     console.error('PDF report error:', error.message);
     res.status(500).json({ success: false, error: error.message });
