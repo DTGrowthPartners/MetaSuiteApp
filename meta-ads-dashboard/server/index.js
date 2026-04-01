@@ -2829,6 +2829,41 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
 });
 
 
+// ============================================
+// EQ CARTAGENA — VENTAS CSV UPLOAD + CUSTOM PDF
+// ============================================
+
+// Storage for uploaded sales data (in-memory, persists until server restart)
+const salesDataStore = {};
+
+// Upload sales CSV for a specific slug/month
+app.post('/api/report/:slug/ventas', upload.single('file'), (req, res) => {
+  try {
+    const { slug } = req.params;
+    const month = req.query.month || 'current';
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+    const csvContent = req.file.buffer.toString('utf-8');
+    const key = slug + '_' + month;
+    salesDataStore[key] = { csv: csvContent, uploadedAt: new Date().toISOString(), filename: req.file.originalname };
+    console.log('Sales CSV uploaded for ' + key + ': ' + req.file.originalname + ' (' + csvContent.length + ' bytes)');
+
+    res.json({ success: true, message: 'CSV de ventas guardado', key, filename: req.file.originalname });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get uploaded sales data
+app.get('/api/report/:slug/ventas', (req, res) => {
+  const { slug } = req.params;
+  const month = req.query.month || 'current';
+  const key = slug + '_' + month;
+  const data = salesDataStore[key];
+  if (!data) return res.json({ success: true, data: null, message: 'No sales data uploaded for this period' });
+  res.json({ success: true, data });
+});
+
 // Endpoint: generar CSV de insights para una cuenta publicitaria
 app.get('/api/csv/:accountId', async (req, res) => {
   try {
