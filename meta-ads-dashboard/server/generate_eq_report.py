@@ -174,7 +174,7 @@ def insight_box(title, content, styles, bg=None):
 
 
 def classify_sede(name):
-    nl = name.lower()
+    nl = str(name).lower()
     if any(k in nl for k in ['castellana', 'cast']): return 'Castellana'
     if any(k in nl for k in ['bocagrande', 'bocag']): return 'Bocagrande'
     return 'General'
@@ -204,17 +204,23 @@ def main():
     YEAR = input_data['year']
     OUTPUT_PATH = input_data['outputPath']
     campaigns = input_data['campaigns']
-    adset_reach = int(input_data.get('adsetReach', 0))
+    adsets = input_data.get('adsets', [])
+    adset_reach = int(input_data.get('adsetReach', 0) or 0)
     ventas_csv = input_data.get('ventasCsv', None)
 
-    # Classify campaigns by sede
-    castellana_camps = [c for c in campaigns if classify_sede(c['name']) == 'Castellana']
-    bocagrande_camps = [c for c in campaigns if classify_sede(c['name']) == 'Bocagrande']
-    general_camps = [c for c in campaigns if classify_sede(c['name']) == 'General']
+    # Classify by sede using ADSET names (more accurate than campaign names)
+    # because a campaign like "ventas castellana" can have adsets for both sedes
+    use_adsets = len(adsets) > 0
+    items = adsets if use_adsets else campaigns
+    name_field = 'adsetName' if use_adsets else 'name'
 
-    cast_totals = aggregate_sede(castellana_camps)
-    boca_totals = aggregate_sede(bocagrande_camps)
-    gen_totals = aggregate_sede(general_camps)
+    castellana_items = [c for c in items if classify_sede(c.get(name_field, '')) == 'Castellana']
+    bocagrande_items = [c for c in items if classify_sede(c.get(name_field, '')) == 'Bocagrande']
+    general_items = [c for c in items if classify_sede(c.get(name_field, '')) == 'General']
+
+    cast_totals = aggregate_sede(castellana_items)
+    boca_totals = aggregate_sede(bocagrande_items)
+    gen_totals = aggregate_sede(general_items)
 
     total_spend = sum(c['spend'] for c in campaigns)
     total_imp = sum(c['impressions'] for c in campaigns)
@@ -261,7 +267,7 @@ def main():
     elements.append(Spacer(1, 8))
 
     row1 = [
-        {'value': f_cur(total_spend), 'label': 'INVERSION TOTAL', 'bg': PASTEL_BLUE},
+        {'value': f_num(total_spend), 'label': 'INVERSION TOTAL', 'bg': PASTEL_BLUE},
         {'value': f_num(total_conv), 'label': 'CONVERSACIONES WP', 'bg': PASTEL_GREEN},
         {'value': f_cur(msg_cpr), 'label': 'CPR MENSAJES', 'bg': PASTEL_YELLOW},
         {'value': f_num(total_first), 'label': 'CONTACTOS NUEVOS', 'bg': PASTEL_GREEN},
@@ -325,14 +331,19 @@ def main():
     elements.append(data_table(eng_headers, eng_rows, [1.2*inch, 1.2*inch, 1.1*inch, 1.1*inch, 1.1*inch]))
     elements.append(Spacer(1, 12))
 
-    # Campaign table by sede
-    for sede_name, sede_camps in [('Castellana', castellana_camps), ('Bocagrande', bocagrande_camps), ('General', general_camps)]:
+    # Campaign table by sede (uses adsets if available for accurate sede split)
+    sede_items_map = [('Castellana', castellana_items), ('Bocagrande', bocagrande_items), ('General', general_items)]
+    first_sede = True
+    for sede_name, sede_camps in sede_items_map:
         if not sede_camps: continue
+        if not first_sede:
+            elements.append(PageBreak())
+        first_sede = False
         elements.append(Paragraph('Campanas ' + sede_name, styles['SubSection']))
         ch = ['Campana', 'Tipo', 'Inversion', 'Resultados', 'CPR', 'Alcance']
         cr = []
         for c in sorted(sede_camps, key=lambda x: -x['spend']):
-            name = clean_name(c['name'])
+            name = clean_name(c.get(name_field, c.get('name', '')))
             if len(name) > 22: name = name[:20] + '..'
             tp = classify_type(c['name'], c.get('objective', ''))
             res = c.get('result', c.get('conversations', 0))
@@ -365,22 +376,40 @@ def main():
 
         elements.append(PageBreak())
 
-    # === BUSINESS RESULTS (empty for client to fill) ===
+    # === BUSINESS RESULTS ===
+    elements.append(PageBreak())
     elements.append(Paragraph('RESULTADOS DE NEGOCIO', styles['SectionTitle']))
     elements.append(SectionBar())
-    elements.append(Paragraph('Esta seccion refleja los resultados reportados por el cliente:', styles['BodyText']))
     elements.append(Spacer(1, 6))
-    biz_h = ['Metrica', 'Castellana', 'Bocagrande', 'Total']
-    biz_r = [
-        ['Ventas Realizadas', '____', '____', '____'],
-        ['Meta de Ventas', '$150,000,000', '$150,000,000', '$300,000,000'],
-        ['% Cumplimiento', '____%', '____%', '____%'],
-        ['Pacientes Nuevos', '____', '____', '____'],
-    ]
-    elements.append(data_table(biz_h, biz_r, [2*inch, 1.5*inch, 1.5*inch, 1.5*inch]))
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph('* Datos a completar por el cliente para calcular ROAS real', styles['SmallText']))
-    elements.append(PageBreak())
+
+    # Try to parse ventas data if available
+    ventas_parsed = input_data.get('ventasParsed', None)
+    if ventas_parsed:
+        # Use parsed ventas data
+        elements.append(Paragraph('Datos de cierre proporcionados por el cliente:', styles['SmallText']))
+        elements.append(Spacer(1, 6))
+        biz_h = ['Metrica', 'Castellana', 'Bocagrande', 'Total']
+        vp = ventas_parsed
+        biz_r = [
+            ['Ventas Realizadas', f_cur(vp.get('castellana_ventas', 0)), f_cur(vp.get('bocagrande_ventas', 0)), f_cur(vp.get('total_ventas', 0))],
+            ['Meta de Ventas', f_cur(vp.get('castellana_meta', 150000000)), f_cur(vp.get('bocagrande_meta', 150000000)), f_cur(vp.get('total_meta', 300000000))],
+            ['% Cumplimiento', str(vp.get('castellana_pct', '____')) + '%', str(vp.get('bocagrande_pct', '____')) + '%', str(vp.get('total_pct', '____')) + '%'],
+            ['Pacientes Nuevos', str(vp.get('castellana_nuevos', '____')), str(vp.get('bocagrande_nuevos', '____')), str(vp.get('total_nuevos', '____'))],
+        ]
+        elements.append(data_table(biz_h, biz_r, [2*inch, 1.5*inch, 1.5*inch, 1.5*inch]))
+    else:
+        elements.append(Paragraph('Esta seccion refleja los resultados reportados por el cliente:', styles['BodyText']))
+        elements.append(Spacer(1, 6))
+        biz_h = ['Metrica', 'Castellana', 'Bocagrande', 'Total']
+        biz_r = [
+            ['Ventas Realizadas', '____', '____', '____'],
+            ['Meta de Ventas', '$150,000,000', '$150,000,000', '$300,000,000'],
+            ['% Cumplimiento', '____%', '____%', '____%'],
+            ['Pacientes Nuevos', '____', '____', '____'],
+        ]
+        elements.append(data_table(biz_h, biz_r, [2*inch, 1.5*inch, 1.5*inch, 1.5*inch]))
+        elements.append(Spacer(1, 4))
+        elements.append(Paragraph('* Datos a completar por el cliente para calcular ROAS real', styles['SmallText']))
 
     # === INSIGHTS ===
     elements.append(Paragraph('INSIGHTS Y APRENDIZAJES', styles['SectionTitle']))
@@ -418,6 +447,8 @@ def main():
     elements.append(SectionBar())
     elements.append(Spacer(1, 6))
     recs = [
+        'Distribuir mejor el presupuesto entre Castellana y Bocagrande para equilibrar resultados en ambas sedes.',
+        'Crear diferentes angulos de videos creativos para no cansar a la audiencia con los mismos videos. Testimonios, antes/despues, proceso del tratamiento, tips de cuidado.',
         'Responder los mensajes de WhatsApp en menos de 5 minutos. Cada minuto de demora reduce la conversion.',
         'Compartir testimonios y fotos/videos de clientes reales para generar confianza y reducir el costo de adquisicion.',
         'Reportar ventas cerradas para calcular el retorno real de la inversion (ROAS) y optimizar campanas.',

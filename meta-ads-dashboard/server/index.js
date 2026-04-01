@@ -2751,6 +2751,32 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       reportCache[slug] = { data, timestamp: Date.now() };
     }
 
+    // For EQ Cartagena: fetch adset-level insights for sede classification
+    let adsetData = null;
+    if (slug === 'eq-cartagena') {
+      try {
+        const adsetInsights = [];
+        let adsetUrl = META_API_BASE_URL + '/' + normalizeAccountId(accountConfig.accountId) + '/insights';
+        let adsetParams = {
+          access_token: getToken(req),
+          fields: 'adset_name,campaign_name,spend,impressions,reach,actions,video_thruplay_watched_actions',
+          level: 'adset',
+          time_range: JSON.stringify({ since: data.dateRange.lastMonth.since, until: data.dateRange.lastMonth.until }),
+          limit: 500
+        };
+        while (adsetUrl) {
+          const resp = await axios.get(adsetUrl, { params: adsetParams });
+          adsetInsights.push(...(resp.data.data || []));
+          adsetUrl = resp.data.paging?.next || null;
+          adsetParams = {};
+        }
+        adsetData = adsetInsights;
+        console.log('EQ adset-level insights: ' + adsetInsights.length + ' rows');
+      } catch (e) {
+        console.warn('Could not fetch adset insights for EQ:', e.message);
+      }
+    }
+
     // Build campaign data for Python script
     const campaigns = data.campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
     const lastMonth = data.dateRange?.lastMonth || {};
@@ -2817,16 +2843,35 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
     let pdfGenerated = false;
     try {
       const { execSync: execSyncFn } = await import('child_process');
-      // For EQ, inject ventas CSV into the JSON
+      // For EQ, inject ventas CSV + adset data into the JSON
       let finalJson = inputJson;
       if (isEQ) {
+        const parsed = JSON.parse(inputJson);
+        // Ventas CSV
         const ventasKey = slug + '_current';
         const ventasData = salesDataStore[ventasKey];
-        if (ventasData) {
-          const parsed = JSON.parse(inputJson);
-          parsed.ventasCsv = ventasData.csv;
-          finalJson = JSON.stringify(parsed);
+        if (ventasData) parsed.ventasCsv = ventasData.csv;
+        // Adset-level data for sede classification
+        if (adsetData) {
+          parsed.adsets = adsetData.map(a => {
+            const spend = parseFloat(a.spend || 0);
+            const imp = parseInt(a.impressions || 0);
+            const reach = parseInt(a.reach || 0);
+            let conv = 0, first = 0, clicks = 0, reactions = 0, comments = 0, saves = 0, shares = 0;
+            for (const ac of (a.actions || [])) {
+              if (ac.action_type === 'onsite_conversion.messaging_conversation_started_7d') conv = parseInt(ac.value);
+              if (ac.action_type === 'onsite_conversion.messaging_first_reply') first = parseInt(ac.value);
+              if (ac.action_type === 'link_click') clicks = parseInt(ac.value);
+              if (ac.action_type === 'post_reaction') reactions = parseInt(ac.value);
+              if (ac.action_type === 'comment') comments = parseInt(ac.value);
+              if (ac.action_type === 'onsite_conversion.post_save') saves = parseInt(ac.value);
+              if (ac.action_type === 'post') shares = parseInt(ac.value);
+            }
+            const thruplay = parseInt(a.video_thruplay_watched_actions?.[0]?.value || 0);
+            return { adsetName: a.adset_name, campaignName: a.campaign_name, spend, impressions: imp, reach, conversations: conv, firstReplies: first, clicks, reactions, comments, saves, shares, thruplay };
+          });
         }
+        finalJson = JSON.stringify(parsed);
       }
       execSyncFn('python3 "' + scriptPath + '"', {
         input: finalJson,
