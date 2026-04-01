@@ -2297,6 +2297,30 @@ const REPORT_ACCOUNTS = {
     locations: [],
     resultMetric: 'conversations',
     resultLabel: 'Mensajes'
+  },
+  'autoexpress': {
+    accountId: 'act_1243999697726589',
+    name: 'Auto Express',
+    businessName: 'Auto Express Detailing',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
+  },
+  'importaciones': {
+    accountId: 'act_1365259718367004',
+    name: 'Importaciones CTG',
+    businessName: 'Importaciones CTG',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
+  },
+  'barbershop': {
+    accountId: 'act_1480303013602887',
+    name: 'Master Barber Shop',
+    businessName: 'Master Barber Shop',
+    locations: [],
+    resultMetric: 'conversations',
+    resultLabel: 'Mensajes'
   }
 };
 
