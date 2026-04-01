@@ -135,7 +135,7 @@ _{Día de la semana} {día} de {mes}_
 *RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
-💵 Costo promedio x msg: ${costo_promedio}
+💵 Costo promedio x msg: ${costo_promedio_solo_mensajes}
 👥 Cuentas alcanzadas: {accountReachYesterday}
 📱 Impresiones totales: {accountImpressionsYesterday}
 
@@ -155,7 +155,8 @@ DT Growth Partners
 6. Campañas de mensajes (OUTCOME_SALES, OUTCOME_LEADS, OUTCOME_ENGAGEMENT): mostrar msgs + costo x msg
 7. Campañas de reconocimiento/ThruPlay (OUTCOME_AWARENESS): mostrar gasto + ThruPlays (de `video_thruplay_watched_actions[0].value`, NO `video_view`)
 8. Campañas de tráfico (OUTCOME_TRAFFIC): mostrar gasto + visitas o clicks
-9. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
+9. **Costo por mensaje por campaña** = `spend / contactos_de_mensajes_totales`
+10. **Costo promedio x msg del RESUMEN** = SOLO sumar el gasto de campañas que tienen mensajes > 0 / total de mensajes. NO incluir el gasto de campañas de reconocimiento/ThruPlay ni tráfico que no generan mensajes. Ejemplo: si hay 3 campañas de ventas que gastaron $100K y generaron 20 msgs + 1 campaña ThruPlay que gastó $50K y 0 msgs → costo promedio = $100K / 20 = $5K (NO $150K / 20)
 7. El resumen incluye: gasto total, mensajes totales, costo promedio, alcance e impresiones
 8. **Día de la semana** en español: Lunes, Martes, etc.
 

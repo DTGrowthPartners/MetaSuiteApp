@@ -136,7 +136,7 @@ _{Día de la semana} {día} de {mes}_
 *RESUMEN DEL DÍA:*
 💰 Gasto total: ${total_gasto}
 💬 Mensajes totales: {total_msgs}
-💵 Costo promedio x msg: ${costo_promedio}
+💵 Costo promedio x msg: ${costo_promedio_solo_mensajes}
 👥 Cuentas alcanzadas: {accountReachYesterday}
 📱 Impresiones totales: {accountImpressionsYesterday}
 
@@ -156,7 +156,8 @@ DT Growth Partners
 6. Campañas de mensajes: mostrar msgs + costo x msg
 7. Campañas de reconocimiento/ThruPlay: mostrar gasto + ThruPlays (de `video_thruplay_watched_actions[0].value`, NO `video_view`)
 8. Campañas de tráfico: mostrar gasto + visitas o clicks
-9. **Costo por mensaje** = `spend / contactos_de_mensajes_totales`
+9. **Costo por mensaje por campaña** = `spend / contactos_de_mensajes_totales`
+10. **Costo promedio x msg del RESUMEN** = SOLO sumar gasto de campañas con mensajes > 0 / total mensajes. NO incluir gasto de ThruPlay/reconocimiento/tráfico sin mensajes
 7. El resumen incluye: gasto total, mensajes totales, costo promedio, alcance e impresiones
 8. **Día de la semana** en español: Lunes, Martes, etc.
 
