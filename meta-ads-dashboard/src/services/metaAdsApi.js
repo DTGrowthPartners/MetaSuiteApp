@@ -1932,16 +1932,7 @@ class MetaAdsService {
         creative_id: creativeId
       };
 
-      // Creative Enhancements (Advantage+ Creative): mejoras automáticas de Meta
-      if (creativeEnhancements) {
-        creativeSpec.degrees_of_freedom_spec = {
-          creative_features_spec: {
-            standard_enhancements: { enroll_status: 'OPT_IN' }
-          }
-        };
-      }
-
-      console.log('Creating ad:', { name, adsetId, creativeId, status });
+      console.log('Creating ad:', { name, adsetId, creativeId, status, creativeEnhancements });
 
       const formData = new URLSearchParams();
       formData.append('access_token', this.accessToken);
@@ -1949,6 +1940,15 @@ class MetaAdsService {
       formData.append('adset_id', adsetId);
       formData.append('creative', JSON.stringify(creativeSpec));
       formData.append('status', status);
+
+      // Creative Enhancements (Advantage+ Creative) — campo separado del Ad
+      if (creativeEnhancements) {
+        formData.append('degrees_of_freedom_spec', JSON.stringify({
+          creative_features_spec: {
+            standard_enhancements: { enroll_status: 'OPT_IN' }
+          }
+        }));
+      }
 
       const response = await axios.post(
         `${META_API_BASE_URL}/${normalizedId}/ads`,
