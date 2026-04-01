@@ -2610,6 +2610,136 @@ app.get('/api/report/:slug', async (req, res) => {
   }
 });
 
+// Endpoint: generar CSV de insights para una cuenta publicitaria
+app.get('/api/csv/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ success: false, error: 'Token requerido' });
+
+    const normalizedId = normalizeAccountId(accountId);
+    const since = req.query.since || getLastMonthRange().since;
+    const until = req.query.until || getLastMonthRange().until;
+    const level = req.query.level || 'campaign'; // campaign, adset, ad
+
+    console.log(`CSV export: ${normalizedId} | ${since} to ${until} | level: ${level}`);
+
+    const insightsFields = [
+      'campaign_name', 'campaign_id',
+      'adset_name', 'adset_id',
+      'ad_name', 'ad_id',
+      'objective',
+      'spend', 'impressions', 'reach',
+      'frequency',
+      'cpm', 'cpp', 'cpc', 'ctr',
+      'actions', 'cost_per_action_type',
+      'video_thruplay_watched_actions',
+      'inline_link_clicks',
+      'inline_link_click_ctr'
+    ].join(',');
+
+    // Paginar todos los resultados
+    const allRows = [];
+    let url = `${META_API_BASE_URL}/${normalizedId}/insights`;
+    let params = {
+      access_token: token,
+      fields: insightsFields,
+      level,
+      time_range: JSON.stringify({ since, until }),
+      limit: 500
+    };
+
+    while (url) {
+      const resp = await axios.get(url, { params });
+      const data = resp.data.data || [];
+      allRows.push(...data);
+      url = resp.data.paging?.next || null;
+      params = {};
+    }
+
+    if (allRows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Sin datos para el periodo seleccionado' });
+    }
+
+    // Extraer action types para columnas dinámicas
+    const actionTypes = new Set();
+    const costActionTypes = new Set();
+    for (const row of allRows) {
+      for (const a of (row.actions || [])) actionTypes.add(a.action_type);
+      for (const a of (row.cost_per_action_type || [])) costActionTypes.add(a.action_type);
+    }
+
+    // Construir cabeceras CSV
+    const baseHeaders = [
+      'campaign_name', 'campaign_id',
+      'adset_name', 'adset_id',
+      'ad_name', 'ad_id',
+      'objective',
+      'spend', 'impressions', 'reach',
+      'frequency', 'cpm', 'cpp', 'cpc', 'ctr',
+      'inline_link_clicks', 'inline_link_click_ctr',
+      'thruplay'
+    ];
+    const actionHeaders = [...actionTypes].sort().map(t => `action_${t}`);
+    const costHeaders = [...costActionTypes].sort().map(t => `cost_per_${t}`);
+    const allHeaders = [...baseHeaders, ...actionHeaders, ...costHeaders];
+
+    // Construir filas CSV
+    const csvRows = [allHeaders.join(',')];
+
+    for (const row of allRows) {
+      const actionsMap = {};
+      for (const a of (row.actions || [])) actionsMap[a.action_type] = a.value;
+      const costMap = {};
+      for (const a of (row.cost_per_action_type || [])) costMap[a.action_type] = a.value;
+      const thruplay = row.video_thruplay_watched_actions?.[0]?.value || '';
+
+      const values = [
+        `"${(row.campaign_name || '').replace(/"/g, '""')}"`,
+        row.campaign_id || '',
+        `"${(row.adset_name || '').replace(/"/g, '""')}"`,
+        row.adset_id || '',
+        `"${(row.ad_name || '').replace(/"/g, '""')}"`,
+        row.ad_id || '',
+        row.objective || '',
+        row.spend || '0',
+        row.impressions || '0',
+        row.reach || '0',
+        row.frequency || '0',
+        row.cpm || '0',
+        row.cpp || '0',
+        row.cpc || '0',
+        row.ctr || '0',
+        row.inline_link_clicks || '0',
+        row.inline_link_click_ctr || '0',
+        thruplay
+      ];
+
+      // Actions
+      for (const t of [...actionTypes].sort()) {
+        values.push(actionsMap[t] || '0');
+      }
+      // Cost per action
+      for (const t of [...costActionTypes].sort()) {
+        values.push(costMap[t] || '0');
+      }
+
+      csvRows.push(values.join(','));
+    }
+
+    const csvContent = csvRows.join('\n');
+    const filename = `meta_insights_${normalizedId}_${since}_${until}_${level}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('\uFEFF' + csvContent); // BOM for Excel UTF-8
+
+  } catch (error) {
+    console.error('CSV export error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, error: error.response?.data?.error?.message || error.message });
+  }
+});
+
 // Auto-refresh cache a las 7am Colombia (UTC-5 = 12:00 UTC)
 function scheduleReportRefresh() {
   const refreshReports = async () => {
