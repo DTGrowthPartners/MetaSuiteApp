@@ -700,9 +700,25 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
 
       <footer className="report-footer">
         <span>Meta Suite — DT Growth Partners</span>
-        <button onClick={fetchReport} className="report-refresh-btn" disabled={loading}>
-          {loading ? 'Actualizando...' : 'Actualizar'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => {
+              const accountId = data?.accountId;
+              if (!accountId || !accessToken) return;
+              const since = dateRange?.lastMonth?.since || '';
+              const until = dateRange?.lastMonth?.until || '';
+              window.open(`${API_BASE}/csv/${accountId}?accessToken=${encodeURIComponent(accessToken)}&since=${since}&until=${until}&level=campaign`, '_blank');
+            }}
+            className="report-refresh-btn"
+            disabled={!data?.accountId}
+            title="Descargar CSV del mes pasado"
+          >
+            CSV Mes
+          </button>
+          <button onClick={fetchReport} className="report-refresh-btn" disabled={loading}>
+            {loading ? 'Actualizando...' : 'Actualizar'}
+          </button>
+        </div>
       </footer>
     </div>
   );
