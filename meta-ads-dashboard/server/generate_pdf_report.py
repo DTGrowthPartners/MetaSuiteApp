@@ -234,8 +234,11 @@ def insight_box(title, content, styles, bg_color=None):
     ]))
     return t
 
-def fmt_currency(v): return f"${v:,.0f}"
+def fmt_currency(v):
+    v = float(v) if not isinstance(v, (int, float)) else v
+    return f"${v:,.0f}"
 def fmt_number(v):
+    v = float(v) if not isinstance(v, (int, float)) else v
     if v >= 1000000: return f"{v/1000000:.1f}M"
     if v >= 1000: return f"{v/1000:.1f}K"
     return f"{v:,.0f}"

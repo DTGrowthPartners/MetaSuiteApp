@@ -2789,7 +2789,7 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       month: monthName,
       year: yearStr,
       outputPath,
-      adsetReach: data.accountReachLastMonth || data.adsetReachLastMonth || 0,
+      adsetReach: parseInt(data.accountReachLastMonth || data.adsetReachLastMonth || 0) || 0,
       campaigns: campData
     });
 
