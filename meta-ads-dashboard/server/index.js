@@ -2469,7 +2469,7 @@ async function getReportData(accountId, token) {
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
 
   // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
-  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountYesterdayInsights] = await Promise.all([
+  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountYesterdayInsights, accountReachLastMonth] = await Promise.all([
     // Ayer/hoy por campaña
     Promise.all(campaigns.map(async (campaign) => {
       let insightsYesterday = {};
@@ -2492,9 +2492,18 @@ async function getReportData(accountId, token) {
     getAccountInsightsByCampaign(normalizedId, token, lastMonth),
     // Mes anterior al pasado (para comparativa)
     getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast),
-    // Reach a nivel de adset (más preciso que campaign-level)
+    // Reach a nivel de adset (para compatibilidad)
     getAdsetReachSum(normalizedId, token, lastMonth),
     getAdsetReachSum(normalizedId, token, monthBeforeLast),
+    // Reach REAL a nivel de cuenta (deduplicado)
+    (async () => {
+      try {
+        const resp = await axios.get(META_API_BASE_URL + '/' + normalizedId + '/insights', {
+          params: { access_token: token, fields: 'reach', time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until }) }
+        });
+        return parseInt(resp.data.data?.[0]?.reach || 0);
+      } catch (e) { return 0; }
+    })(),
     // Reach + impresiones de AYER a nivel de CUENTA (deduplicado, cuentas únicas reales)
     (async () => {
       try {
@@ -2560,6 +2569,7 @@ async function getReportData(accountId, token) {
     accountReachYesterday: accountYesterdayInsights.reach,
     accountImpressionsYesterday: accountYesterdayInsights.impressions,
     adsetReachLastMonth: adsetReachLastMonth,
+    accountReachLastMonth: accountReachLastMonth,
     prevMonthTotals,
     fetchedAt: new Date().toISOString(),
     totalCampaigns: activeCampaigns.length
@@ -2612,7 +2622,7 @@ app.get('/api/report/:slug', async (req, res) => {
 
 // Helper: generar HTML del informe PDF
 function generatePdfHtml(accountConfig, data) {
-  const { campaigns = [], dateRange, prevMonthTotals = {}, adsetReachLastMonth = 0 } = data;
+  const { campaigns = [], dateRange, prevMonthTotals = {}, adsetReachLastMonth = 0, accountReachLastMonth = 0 } = data;
   const lastMonth = dateRange?.lastMonth || {};
   const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
   const biz = accountConfig.businessName;
@@ -2688,7 +2698,7 @@ function generatePdfHtml(accountConfig, data) {
     + '<div class="mc"><div class="mv">' + totalConv.toLocaleString('es-CO') + '</div><div class="ml">Conversaciones WP</div></div>'
     + '<div class="mc"><div class="mv">' + f(avgCPR) + '</div><div class="ml">Costo por Conversación</div></div>'
     + '<div class="mc"><div class="mv">' + totalFirst.toLocaleString('es-CO') + '</div><div class="ml">Contactos Nuevos</div></div>'
-    + '<div class="mc"><div class="mv">' + fc(adsetReachLastMonth) + '</div><div class="ml">Alcance Total</div></div>'
+    + '<div class="mc"><div class="mv">' + fc(accountReachLastMonth || adsetReachLastMonth) + '</div><div class="ml">Alcance Total</div></div>'
     + '<div class="mc"><div class="mv">' + fc(totalImp) + '</div><div class="ml">Impresiones</div></div>'
     + '<div class="mc"><div class="mv">' + fc(totalClicks) + '</div><div class="ml">Clics en Enlace</div></div>'
     + '<div class="mc hl"><div class="mv">' + msgPct + '%</div><div class="ml">Inversión en Mensajes</div></div>'
@@ -2779,7 +2789,7 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       month: monthName,
       year: yearStr,
       outputPath,
-      adsetReach: data.adsetReachLastMonth || 0,
+      adsetReach: data.accountReachLastMonth || data.adsetReachLastMonth || 0,
       campaigns: campData
     });
 
