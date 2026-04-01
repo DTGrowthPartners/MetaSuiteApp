@@ -2469,7 +2469,7 @@ async function getReportData(accountId, token) {
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
 
   // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
-  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountYesterdayInsights, accountReachLastMonth] = await Promise.all([
+  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights] = await Promise.all([
     // Ayer/hoy por campaña
     Promise.all(campaigns.map(async (campaign) => {
       let insightsYesterday = {};
