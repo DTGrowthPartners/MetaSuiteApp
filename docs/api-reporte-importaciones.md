@@ -115,7 +115,7 @@ El reporte para el **cliente** debe ser SIMPLE. Se envía como saludo + reporte 
 ### Estructura del reporte cliente:
 
 ```
-👋 Buenos días (por definir), ¿cómo estás?
+👋 Buenos días Willy, ¿cómo estás?
 
 *📊 Reporte de Importaciones CTG*
 _{Día de la semana} {día} de {mes}_
@@ -148,7 +148,7 @@ DT Growth Partners
 ```
 
 ### Reglas del modo cliente:
-1. **Saludo personalizado:** "Buenos días (por definir)"
+1. **Saludo personalizado:** "Buenos días Willy"
 2. **Emoji del cuadro** según tipo de campaña (tabla arriba)
 3. **Nombre de campaña** tal cual viene de Meta (en mayúsculas)
 4. **Solo 2 datos por campaña:** cantidad de mensajes + costo por mensaje
@@ -164,7 +164,7 @@ DT Growth Partners
 ### Ejemplo modo cliente:
 
 ```
-👋 Buenos días (por definir), ¿cómo estás?
+👋 Buenos días Willy, ¿cómo estás?
 
 *📊 Reporte de Importaciones CTG*
 _Domingo 29 de marzo_
@@ -200,7 +200,7 @@ DT Growth Partners
 ### Contacto del negocio
 | Negocio | Contacto | WhatsApp |
 |---------|----------|----------|
-| Importaciones CTG | (por definir) | (por definir) |
+| Importaciones CTG | Willy | Willy |
 
 ---
 
