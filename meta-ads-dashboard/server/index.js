@@ -2610,6 +2610,305 @@ app.get('/api/report/:slug', async (req, res) => {
   }
 });
 
+// Endpoint: generar informe PDF (HTML print-ready) para una cuenta
+app.get('/api/report/:slug/pdf', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const accountConfig = REPORT_ACCOUNTS[slug];
+    if (!accountConfig) return res.status(404).json({ success: false, error: 'Cuenta no encontrada' });
+
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ success: false, error: 'Token requerido' });
+
+    // Get report data (use cache if available)
+    let data;
+    const cached = reportCache[slug];
+    const cacheTTL = 15 * 60 * 1000;
+    if (cached && (Date.now() - cached.timestamp < cacheTTL)) {
+      data = cached.data;
+    } else {
+      data = await getReportData(accountConfig.accountId, token);
+      reportCache[slug] = { data, timestamp: Date.now() };
+    }
+
+    const { campaigns = [], dateRange, prevMonthTotals = {}, adsetReachLastMonth = 0 } = data;
+    const lastMonth = dateRange?.lastMonth || {};
+    const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
+
+    // Aggregate totals
+    let totalSpend = 0, totalImpressions = 0, totalConversations = 0, totalFirstReplies = 0, totalClicks = 0;
+    const campaignRows = [];
+
+    for (const c of active) {
+      const ins = c.insightsLastMonth || {};
+      const spend = parseFloat(ins.spend || 0);
+      const impressions = parseInt(ins.impressions || 0);
+      const reach = parseInt(ins.reach || 0);
+      let conversations = 0, firstReplies = 0, clicks = 0, views = 0, thruplay = 0;
+      for (const a of (ins.actions || [])) {
+        if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conversations = parseInt(a.value);
+        if (a.action_type === 'onsite_conversion.messaging_first_reply') firstReplies = parseInt(a.value);
+        if (a.action_type === 'link_click') clicks = parseInt(a.value);
+        if (a.action_type === 'video_view') views = parseInt(a.value);
+      }
+      thruplay = parseInt(ins.video_thruplay_watched_actions?.[0]?.value || 0);
+
+      // Detect campaign type
+      const nameLower = c.name.toLowerCase();
+      let type = 'Mensajes', result = conversations, cpr = conversations > 0 ? spend / conversations : 0;
+      if (c.objective === 'OUTCOME_AWARENESS' || nameLower.includes('reconocimiento') || nameLower.includes('thruplay') || nameLower.includes('true play')) {
+        type = 'Video'; result = thruplay || views; cpr = result > 0 ? spend / result : 0;
+      } else if (c.objective === 'OUTCOME_TRAFFIC' || nameLower.includes('trafico') || nameLower.includes('tráfico') || nameLower.includes('perfil ig')) {
+        type = 'Tráfico'; result = clicks; cpr = clicks > 0 ? spend / clicks : 0;
+      } else if (conversations === 0 && clicks > 0) {
+        type = 'Clics'; result = clicks; cpr = clicks > 0 ? spend / clicks : 0;
+      }
+
+      totalSpend += spend;
+      totalImpressions += impressions;
+      if (type === 'Mensajes') { totalConversations += conversations; totalFirstReplies += firstReplies; }
+      totalClicks += clicks;
+
+      campaignRows.push({ name: c.name, type, spend, result, cpr, reach, conversations, firstReplies });
+    }
+
+    const msgSpend = campaignRows.filter(r => r.type === 'Mensajes').reduce((s, r) => s + r.spend, 0);
+    const avgCPR = totalConversations > 0 ? msgSpend / totalConversations : 0;
+    const msgPct = totalSpend > 0 ? Math.round(msgSpend / totalSpend * 100) : 0;
+    const bestCPR = campaignRows.filter(r => r.type === 'Mensajes' && r.conversations > 0).sort((a, b) => a.cpr - b.cpr)[0];
+    const bestVolume = campaignRows.filter(r => r.type === 'Mensajes').sort((a, b) => b.conversations - a.conversations)[0];
+
+    const fmtCOP = (n) => '$' + Math.round(n).toLocaleString('es-CO');
+    const fmtCompact = (n) => n >= 1000000 ? (n/1000000).toFixed(1) + 'M' : n >= 1000 ? (n/1000).toFixed(1) + 'K' : n.toString();
+
+    // Generate HTML
+    const html = \`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe \${accountConfig.businessName} | \${lastMonth.label || 'Mes'}</title>
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } .page-break { page-break-before: always; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.6; background: #fff; }
+  .header { background: #1a3a5c; color: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }
+  .header-logo { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+  .header-logo span { color: #5ba3d9; }
+  .header-right { font-size: 12px; text-align: right; color: #a0c4e8; }
+  .cover { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; }
+  .cover h1 { font-size: 36px; color: #1a3a5c; margin-bottom: 8px; }
+  .cover h2 { font-size: 18px; color: #5ba3d9; font-weight: 400; margin-bottom: 40px; }
+  .cover h3 { font-size: 28px; color: #333; font-weight: 700; }
+  .cover .prep { margin-top: 60px; color: #999; font-size: 13px; }
+  .cover .prep strong { color: #333; }
+  .section-title { font-size: 22px; font-weight: 700; color: #1a3a5c; border-bottom: 3px solid #5ba3d9; padding-bottom: 6px; margin: 30px 40px 20px; }
+  .content { padding: 0 40px; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .metric-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; text-align: center; }
+  .metric-card.highlight { background: #fff8e6; border-color: #f0c040; }
+  .metric-value { font-size: 26px; font-weight: 700; color: #1a3a5c; }
+  .metric-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .summary-text { font-size: 13px; color: #555; line-height: 1.8; margin: 16px 0; }
+  .summary-text strong { color: #333; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th { background: #1a3a5c; color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .insight-card { background: #f0f7ff; border-left: 4px solid #5ba3d9; padding: 14px 18px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+  .insight-card h4 { color: #1a3a5c; font-size: 14px; margin-bottom: 6px; }
+  .insight-card p { font-size: 13px; color: #555; }
+  .insight-card.yellow { background: #fff8e6; border-color: #f0c040; }
+  .reco { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .reco ol { padding-left: 20px; }
+  .reco li { margin-bottom: 10px; font-size: 13px; color: #555; }
+  .footer-page { text-align: center; padding: 40px; margin-top: 60px; }
+  .footer-page h3 { color: #1a3a5c; margin-bottom: 16px; }
+  .footer-page a { color: #5ba3d9; font-weight: 600; text-decoration: none; }
+  .footer-bar { font-size: 10px; color: #999; padding: 8px 40px; border-top: 1px solid #eee; display: flex; justify-content: space-between; }
+  .print-btn { position: fixed; top: 20px; right: 20px; background: #1a3a5c; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; z-index: 1000; }
+  .print-btn:hover { background: #2a5a8c; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">Descargar PDF</button>
+
+<div class="header">
+  <div class="header-logo"><span>DT</span> GROWTH PARTNERS</div>
+</div>
+
+<!-- PORTADA -->
+<div class="cover">
+  <h1>INFORME DE RESULTADOS</h1>
+  <h2>Meta Ads | \${lastMonth.label || 'Mes'}</h2>
+  <h3>\${accountConfig.businessName.toUpperCase()}</h3>
+  <div class="prep">
+    Preparado por<br>
+    <strong>DT Growth Partners</strong><br>
+    dtgrowthpartners.com | +57 300 7189383
+  </div>
+</div>
+
+<div class="page-break"></div>
+<div class="header">
+  <div class="header-logo"><span>DT</span> GROWTH PARTNERS</div>
+  <div class="header-right">\${accountConfig.businessName} | \${lastMonth.label || 'Mes'}</div>
+</div>
+
+<!-- RESUMEN EJECUTIVO -->
+<h2 class="section-title">RESUMEN EJECUTIVO</h2>
+<div class="content">
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-value">\${fmtCompact(totalSpend)}</div>
+      <div class="metric-label">Inversión Total</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${totalConversations.toLocaleString('es-CO')}</div>
+      <div class="metric-label">Conversaciones WP</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${fmtCOP(avgCPR)}</div>
+      <div class="metric-label">Costo por Conversación</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${totalFirstReplies.toLocaleString('es-CO')}</div>
+      <div class="metric-label">Contactos Nuevos</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${fmtCompact(adsetReachLastMonth || 0)}</div>
+      <div class="metric-label">Alcance Total</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${fmtCompact(totalImpressions)}</div>
+      <div class="metric-label">Impresiones</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">\${fmtCompact(totalClicks)}</div>
+      <div class="metric-label">Clics en Enlace</div>
+    </div>
+    <div class="metric-card highlight">
+      <div class="metric-value">\${msgPct}%</div>
+      <div class="metric-label">Inversión en Mensajes</div>
+    </div>
+  </div>
+
+  <p class="summary-text">
+    Durante \${lastMonth.label || 'el mes'}, se invirtieron <strong>\${fmtCOP(totalSpend)} COP</strong> en campañas de Meta Ads para
+    \${accountConfig.businessName}. Las campañas de mensajes representaron el <strong>\${msgPct}%</strong> de la inversión y
+    generaron <strong>\${totalConversations} conversaciones de WhatsApp</strong>, de las cuales <strong>\${totalFirstReplies}</strong> fueron contactos
+    completamente nuevos. El costo promedio por conversación fue de <strong>\${fmtCOP(avgCPR)} COP</strong>.
+    \${bestCPR ? \`La campaña con mejor rendimiento fue <strong>\${bestCPR.name}</strong> con un costo por conversación de <strong>\${fmtCOP(bestCPR.cpr)} COP</strong>.\` : ''}
+    \${bestVolume ? \`<strong>\${bestVolume.name}</strong> fue la de mayor volumen con <strong>\${bestVolume.conversations}</strong> conversaciones generadas.\` : ''}
+  </p>
+</div>
+
+<div class="page-break"></div>
+<div class="header">
+  <div class="header-logo"><span>DT</span> GROWTH PARTNERS</div>
+  <div class="header-right">\${accountConfig.businessName} | \${lastMonth.label || 'Mes'}</div>
+</div>
+
+<!-- RENDIMIENTO POR CAMPAÑA -->
+<h2 class="section-title">RENDIMIENTO POR CAMPAÑA</h2>
+<div class="content">
+  <table>
+    <thead>
+      <tr>
+        <th>Campaña</th>
+        <th>Tipo</th>
+        <th>Inversión</th>
+        <th>Resultados</th>
+        <th>CPR</th>
+        <th>Alcance</th>
+      </tr>
+    </thead>
+    <tbody>
+      \${campaignRows.sort((a, b) => b.spend - a.spend).map(r => \`
+      <tr>
+        <td>\${r.name}</td>
+        <td>\${r.type}</td>
+        <td>\${fmtCOP(r.spend)}</td>
+        <td>\${r.result > 0 ? (r.result >= 1000 ? fmtCompact(r.result) : r.result) : '—'}</td>
+        <td>\${r.cpr > 0 ? fmtCOP(r.cpr) : '—'}</td>
+        <td>\${fmtCompact(r.reach)}</td>
+      </tr>\`).join('')}
+    </tbody>
+  </table>
+</div>
+
+<div class="page-break"></div>
+<div class="header">
+  <div class="header-logo"><span>DT</span> GROWTH PARTNERS</div>
+  <div class="header-right">\${accountConfig.businessName} | \${lastMonth.label || 'Mes'}</div>
+</div>
+
+<!-- INSIGHTS Y APRENDIZAJES -->
+<h2 class="section-title">INSIGHTS Y APRENDIZAJES</h2>
+<div class="content">
+  \${bestCPR ? \`
+  <div class="insight-card">
+    <h4>Mejor CPR: \${bestCPR.name}</h4>
+    <p>Menor costo por conversación del mes a \${fmtCOP(bestCPR.cpr)} COP, generando \${bestCPR.conversations} conversaciones de WhatsApp con \${fmtCOP(bestCPR.spend)} COP de inversión.</p>
+  </div>\` : ''}
+
+  \${bestVolume && bestVolume !== bestCPR ? \`
+  <div class="insight-card">
+    <h4>Mayor volumen: \${bestVolume.name}</h4>
+    <p>Líder en volumen con \${bestVolume.conversations} conversaciones y \${bestVolume.firstReplies} contactos nuevos. CPR: \${fmtCOP(bestVolume.cpr)} COP.</p>
+  </div>\` : ''}
+
+  <div class="insight-card yellow">
+    <h4>\${totalFirstReplies} contactos nuevos por WhatsApp</h4>
+    <p>Las campañas de mensajes generaron \${totalConversations} conversaciones y \${totalFirstReplies} contactos nuevos. Inversión en mensajes: \${fmtCOP(msgSpend)} COP (\${msgPct}%). CPR promedio: \${fmtCOP(avgCPR)} COP.</p>
+  </div>
+
+  \${totalSpend - msgSpend > 0 ? \`
+  <div class="insight-card">
+    <h4>Reconocimiento y tráfico complementan el embudo</h4>
+    <p>\${fmtCOP(totalSpend - msgSpend)} COP (\${100 - msgPct}%) en campañas de video y tráfico generaron impactos de marca adicionales.</p>
+  </div>\` : ''}
+</div>
+
+<!-- RECOMENDACIONES -->
+<h2 class="section-title">RECOMENDACIONES PRÓXIMO MES</h2>
+<div class="content">
+  <div class="reco">
+    <ol>
+      <li>Preparar promociones o planes especiales para el próximo mes que podamos impulsar con las campañas — los resultados muestran que los contactos llegan, el siguiente paso es tener ofertas atractivas listas.</li>
+      <li>Responder los mensajes de WhatsApp lo más rápido posible (idealmente en menos de 5 minutos). Cada minuto de demora reduce la probabilidad de convertir ese contacto en cliente.</li>
+      <li>Compartir testimonios y fotos/videos de clientes reales — este tipo de contenido genera más confianza y reduce el costo de adquisición.</li>
+      <li>Reportar las ventas cerradas del mes para calcular el retorno real de la inversión (ROAS) y optimizar las campañas según lo que más genera ingresos.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="page-break"></div>
+<div class="header">
+  <div class="header-logo"><span>DT</span> GROWTH PARTNERS</div>
+  <div class="header-right">\${accountConfig.businessName} | \${lastMonth.label || 'Mes'}</div>
+</div>
+
+<div class="footer-page">
+  <h3>¡Gracias por confiar en nosotros!</h3>
+  <p>¿Tienes preguntas sobre este reporte?</p>
+  <p><a href="tel:+573007189383">+57 300 7189383</a></p>
+  <p><a href="https://dtgrowthpartners.com">dtgrowthpartners.com</a></p>
+  <br><br>
+  <p style="color:#999; font-size:13px;">Impulsamos crecimiento con estrategia, tecnología y ejecución.</p>
+</div>
+
+</body>
+</html>\`;
+
+    res.send(html);
+  } catch (error) {
+    console.error('PDF report error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Endpoint: generar CSV de insights para una cuenta publicitaria
 app.get('/api/csv/:accountId', async (req, res) => {
   try {

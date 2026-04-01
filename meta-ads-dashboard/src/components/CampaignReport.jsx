@@ -703,6 +703,16 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => {
+              window.open(`${API_BASE}/report/${slug}/pdf?accessToken=${encodeURIComponent(accessToken)}`, '_blank');
+            }}
+            className="report-refresh-btn"
+            disabled={!data?.accountId}
+            title="Generar informe PDF del mes pasado"
+          >
+            PDF Mes
+          </button>
+          <button
+            onClick={() => {
               const accountId = data?.accountId;
               if (!accountId || !accessToken) return;
               const since = dateRange?.lastMonth?.since || '';
