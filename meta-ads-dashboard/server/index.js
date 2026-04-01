@@ -2763,12 +2763,16 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       const spend = parseFloat(ins.spend || 0);
       const reach = parseInt(ins.reach || 0);
       const impressions = parseInt(ins.impressions || 0);
-      let conv = 0, first = 0, clicks = 0, views = 0, thruplay = 0;
+      let conv = 0, first = 0, clicks = 0, views = 0, thruplay = 0, reactions = 0, comments = 0, saves = 0, shares = 0;
       for (const a of (ins.actions || [])) {
         if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') conv = parseInt(a.value);
         if (a.action_type === 'onsite_conversion.messaging_first_reply') first = parseInt(a.value);
         if (a.action_type === 'link_click') clicks = parseInt(a.value);
         if (a.action_type === 'video_view') views = parseInt(a.value);
+        if (a.action_type === 'post_reaction') reactions = parseInt(a.value);
+        if (a.action_type === 'comment') comments = parseInt(a.value);
+        if (a.action_type === 'onsite_conversion.post_save') saves = parseInt(a.value);
+        if (a.action_type === 'post') shares = parseInt(a.value);
       }
       thruplay = parseInt(ins.video_thruplay_watched_actions?.[0]?.value || 0);
       const nl = c.name.toLowerCase();
@@ -2780,7 +2784,7 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       } else if (conv === 0 && clicks > 0) {
         type = 'Clics'; result = clicks;
       }
-      return { name: c.name, type, spend, result, reach, impressions, conversations: conv, firstReplies: first, clicks, cpr: result > 0 ? spend / result : 0 };
+      return { name: c.name, objective: c.objective || '', type, spend, result, reach, impressions, conversations: conv, firstReplies: first, clicks, reactions, comments, saves, shares, cpr: result > 0 ? spend / result : 0 };
     });
 
     const outputPath = path.join(os.tmpdir(), 'report_' + slug + '_' + Date.now() + '.pdf');
@@ -2793,16 +2797,40 @@ app.get('/api/report/:slug/pdf', async (req, res) => {
       campaigns: campData
     });
 
-    // Execute Python script
-    const scriptPath = path.join(__dirname_server, 'generate_pdf_report.py');
+    // Use custom EQ script if eq-cartagena, otherwise generic
+    const isEQ = slug === 'eq-cartagena';
+    const scriptPath = path.join(__dirname_server, isEQ ? 'generate_eq_report.py' : 'generate_pdf_report.py');
     const assetsDir = path.join(__dirname_server, 'report-assets', 'brand');
+
+    // For EQ, add ventas CSV if available
+    if (isEQ) {
+      const ventasKey = slug + '_current';
+      const ventasData = salesDataStore[ventasKey];
+      if (ventasData) {
+        const parsed = JSON.parse(inputJson);
+        parsed.ventasCsv = ventasData.csv;
+        // Re-stringify (can't reassign const)
+        Object.assign(JSON.parse(inputJson), parsed);
+      }
+    }
 
     let pdfGenerated = false;
     try {
       const { execSync: execSyncFn } = await import('child_process');
+      // For EQ, inject ventas CSV into the JSON
+      let finalJson = inputJson;
+      if (isEQ) {
+        const ventasKey = slug + '_current';
+        const ventasData = salesDataStore[ventasKey];
+        if (ventasData) {
+          const parsed = JSON.parse(inputJson);
+          parsed.ventasCsv = ventasData.csv;
+          finalJson = JSON.stringify(parsed);
+        }
+      }
       execSyncFn('python3 "' + scriptPath + '"', {
-        input: inputJson,
-        timeout: 30000,
+        input: finalJson,
+        timeout: 60000,
         env: { ...process.env, ASSETS_DIR: assetsDir }
       });
       pdfGenerated = fs.existsSync(outputPath);
