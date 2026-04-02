@@ -417,7 +417,7 @@ def main():
     elements.append(Spacer(1, 6))
 
     # Best CPR by sede
-    for sede_name, camps in [('Castellana', castellana_camps), ('Bocagrande', bocagrande_camps)]:
+    for sede_name, camps in [('Castellana', castellana_items), ('Bocagrande', bocagrande_items)]:
         msg_c = [c for c in camps if classify_type(c.get(name_field, c.get('name', ''))) == 'Mensajes' and c.get('conversations', 0) > 0]
         if msg_c:
             best = min(msg_c, key=lambda c: c['spend']/c['conversations'])
