@@ -423,7 +423,7 @@ def main():
             best = min(msg_c, key=lambda c: c['spend']/c['conversations'])
             cpr = best['spend'] / best['conversations']
             elements.append(insight_box(
-                'Mejor CPR ' + sede_name + ': ' + clean_name(best['name'])[:35],
+                'Mejor CPR ' + sede_name + ': ' + clean_name(best.get(name_field, best.get('name', best.get('campaignName', ''))))[:35],
                 f_cur(cpr) + ' COP por conversacion, ' + str(int(best['conversations'])) + ' conversaciones con ' + f_cur(best['spend']) + ' COP.',
                 styles, bg=PASTEL_GREEN))
             elements.append(Spacer(1, 6))
