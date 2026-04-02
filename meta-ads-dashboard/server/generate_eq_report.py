@@ -233,7 +233,7 @@ def main():
     total_shares = sum(c.get('shares', 0) for c in campaigns)
     total_cpm = (total_spend / total_imp * 1000) if total_imp > 0 else 0
 
-    msg_camps = [c for c in campaigns if classify_type(c['name'], c.get('objective', '')) == 'Mensajes']
+    msg_camps = [c for c in campaigns if classify_type(c.get('name', c.get('campaignName', '')), c.get('objective', '')) == 'Mensajes']
     msg_spend = sum(c['spend'] for c in msg_camps)
     msg_cpr = msg_spend / total_conv if total_conv > 0 else 0
     msg_pct = msg_spend / total_spend * 100 if total_spend > 0 else 0
@@ -345,10 +345,10 @@ def main():
         for c in sorted(sede_camps, key=lambda x: -x['spend']):
             name = clean_name(c.get(name_field, c.get('name', '')))
             if len(name) > 22: name = name[:20] + '..'
-            tp = classify_type(c['name'], c.get('objective', ''))
+            tp = classify_type(c.get(name_field, c.get('name', c.get('campaignName', ''))), c.get('objective', ''))
             res = c.get('result', c.get('conversations', 0))
             cpr = c['spend'] / res if res > 0 else 0
-            cr.append([name, tp, f_cur(c['spend']), f_num(res) if res > 0 else '--', f_cur(cpr) if cpr > 0 else '--', f_num(c['reach'])])
+            cr.append([name, tp, f_cur(c['spend']), f_num(res) if res > 0 else '--', f_cur(cpr) if cpr > 0 else '--', f_num(c.get('reach', 0))])
         elements.append(data_table(ch, cr, [2*inch, 0.7*inch, 0.85*inch, 0.75*inch, 0.8*inch, 0.7*inch]))
         elements.append(Spacer(1, 8))
 
@@ -418,7 +418,7 @@ def main():
 
     # Best CPR by sede
     for sede_name, camps in [('Castellana', castellana_camps), ('Bocagrande', bocagrande_camps)]:
-        msg_c = [c for c in camps if classify_type(c['name']) == 'Mensajes' and c.get('conversations', 0) > 0]
+        msg_c = [c for c in camps if classify_type(c.get(name_field, c.get('name', ''))) == 'Mensajes' and c.get('conversations', 0) > 0]
         if msg_c:
             best = min(msg_c, key=lambda c: c['spend']/c['conversations'])
             cpr = best['spend'] / best['conversations']
