@@ -122,7 +122,7 @@ function SplashScreen({ onFinish }) {
 // ============================================
 // LOGIN SCREEN - Facebook Login
 // ============================================
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, lang, setLang }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fbReady, setFbReady] = useState(false);
@@ -342,7 +342,7 @@ function App() {
 
   // Show login if no token
   if (!accessToken) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} lang={lang} setLang={setLang} />;
   }
 
   return (
