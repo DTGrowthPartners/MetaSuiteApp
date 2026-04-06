@@ -412,7 +412,7 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         {reportSlug ? (
-          <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} />
+          <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} lang={lang} />
         ) : page === 'dashboard' ? (
           <AccountDashboard
             adAccounts={adAccounts}

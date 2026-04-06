@@ -197,6 +197,31 @@ const strings = {
   media_no_image: { es: 'Sin imagen/video, usará la vista previa del link.', en: 'No image/video, will use the link preview.' },
   titles_descriptions: { es: 'Títulos + Descripciones', en: 'Headlines + Descriptions' },
 
+  // ==================== TEMPLATE PREVIEW ====================
+  config_section: { es: 'Configuración', en: 'Configuration' },
+  tpl_url_required: { es: 'URL de destino', en: 'Destination URL' },
+  tpl_optimization: { es: 'Optimización', en: 'Optimization' },
+
+  // ==================== MEDIA STATES ====================
+  video_selected: { es: 'Video seleccionado', en: 'Video selected' },
+  analyzing_video: { es: 'Analizando audio del video con IA...', en: 'Analyzing video audio with AI...' },
+  analyzing_image: { es: 'Analizando imagen con IA...', en: 'Analyzing image with AI...' },
+  add_media_first: { es: 'Agrega una imagen o video primero para generar contenido con IA', en: 'Add an image or video first to generate content with AI' },
+  media_error_format: { es: 'Error: Solo se aceptan imágenes (JPG, PNG, WebP) o videos (MP4, MOV)', en: 'Error: Only images (JPG, PNG, WebP) or videos (MP4, MOV) accepted' },
+  no_title: { es: 'Sin título', en: 'Untitled' },
+
+  // ==================== AUDIENCE EXTRAS ====================
+  no_saved_audiences: { es: 'No hay públicos guardados en esta cuenta. Puedes crear uno en Meta Ads Manager.', en: 'No saved audiences in this account. Create one in Meta Ads Manager.' },
+  same_number: { es: 'Mismo número para todos', en: 'Same number for all' },
+  per_adset_number: { es: 'Número por Ad Set', en: 'Number per Ad Set' },
+
+  // ==================== MISC VISIBLE ====================
+  all_sexes: { es: 'Todos los sexos', en: 'All genders' },
+  men_only: { es: 'Solo hombres', en: 'Men only' },
+  women_only: { es: 'Solo mujeres', en: 'Women only' },
+  download_analyzing: { es: 'Descargando y analizando video con IA...', en: 'Downloading and analyzing video with AI...' },
+  image_analyzing: { es: 'Analizando imagen con IA...', en: 'Analyzing image with AI...' },
+
   // ==================== CREATE ====================
   continue_create: { es: 'Continuar a Crear Campaña', en: 'Continue to Create Campaign' },
   processing: { es: 'Procesando...', en: 'Processing...' },

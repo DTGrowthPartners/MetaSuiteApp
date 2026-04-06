@@ -159,7 +159,7 @@ function TemplateSelector({ onSelectTemplate, lang }) {
 // ============================================
 // TEMPLATE PREVIEW COMPONENT - Vista previa del contenido
 // ============================================
-function TemplatePreview({ template, onClose }) {
+function TemplatePreview({ template, onClose, lang }) {
   const content = template.creativeContent || {};
   const headlines = content.headlines || template.headlines || [];
   const descriptions = content.descriptions || template.descriptions || [];
@@ -181,7 +181,7 @@ function TemplatePreview({ template, onClose }) {
         <div className="preview-content">
           {/* Configuración técnica */}
           <div className="preview-section">
-            <h4>Configuración</h4>
+            <h4>{tr('config_section', lang)}</h4>
             <ul className="config-list">
               <li><strong>Objetivo:</strong> {template.objective}</li>
               <li><strong>Optimización:</strong> {template.adSetConfig?.optimizationGoal}</li>
@@ -199,7 +199,7 @@ function TemplatePreview({ template, onClose }) {
                 {requirements.whatsapp && <li>Número de WhatsApp Business</li>}
                 {requirements.catalog && <li>Catálogo de productos</li>}
                 {requirements.leadForm && <li>Formulario de leads</li>}
-                {requirements.website && <li>URL de destino</li>}
+                {requirements.website && <li>{tr('tpl_url_required', lang)}</li>}
                 {requirements.phone && <li>Número de teléfono</li>}
               </ul>
             </div>
@@ -471,7 +471,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     }
     // Si no hay media disponible, no podemos analizar — generar solo con contexto
     if (mediaItems.length === 0) {
-      updateAd(adIndex, { analyzingMedia: false, uploadProgress: 'Agrega una imagen o video primero para generar contenido con IA' });
+      updateAd(adIndex, { analyzingMedia: false, uploadProgress: tr('add_media_first', lang) });
       return;
     }
     const hasVideos = false; // Usamos thumbnail como imagen para simplificar
@@ -602,7 +602,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         videoThumbnailUrl: vid.thumbnails?.data?.[0]?.uri || vid.picture || '',
         imageUrl: '',
         imageHash: '',
-        uploadProgress: `Video seleccionado: ${vid.title || 'Sin título'}`
+        uploadProgress: `Video seleccionado: ${vid.title || tr('no_title', lang)}`
       };
     }
   };
@@ -856,7 +856,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const autoAnalyzeMedia = async (adIndex, file, isVideo) => {
     updateAd(adIndex, {
       analyzingMedia: true,
-      uploadProgress: `Analizando ${isVideo ? 'audio del video' : 'imagen'} con IA...`
+      uploadProgress: tr(isVideo ? 'analyzing_video' : 'analyzing_image', lang)
     });
 
     try {
@@ -929,7 +929,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     const isImageByExt = imageExts.includes(ext);
 
     if (!isImage && !isVideo && !isVideoByExt && !isImageByExt) {
-      updateAd(adIndex, { uploadProgress: 'Error: Solo se aceptan imágenes (JPG, PNG, WebP) o videos (MP4, MOV)' });
+      updateAd(adIndex, { uploadProgress: tr('media_error_format', lang) });
       return;
     }
 
@@ -1007,7 +1007,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       videoThumbnailUrl: thumbUrl,
       imageUrl: '',
       imageHash: '',
-      uploadProgress: `Video seleccionado: ${video.title || 'Sin título'}`
+      uploadProgress: `Video seleccionado: ${video.title || tr('no_title', lang)}`
     });
     // Analyze the actual video (source URL) via backend for Whisper transcription
     // Falls back to thumbnail analysis if no source URL
@@ -1021,7 +1021,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
   // Helper: Analyze library media via backend (server-side download, no CORS issues)
   const analyzeLibraryMedia = async (adIndex, mediaUrl, mediaType = 'image') => {
-    const label = mediaType === 'video' ? 'Descargando y analizando video con IA...' : 'Analizando imagen con IA...';
+    const label = mediaType === 'video' ? tr('download_analyzing', lang) : tr('image_analyzing', lang);
     updateAd(adIndex, { analyzingMedia: true, uploadProgress: label });
     try {
       const metaService = new MetaAdsService(accessToken);
@@ -1451,7 +1451,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         if (combined.length === 0) {
           setAudienceError(result.errors.length > 0
             ? `No se encontraron públicos. ${result.errors.join(' | ')}`
-            : 'No hay públicos guardados en esta cuenta. Puedes crear uno en Meta Ads Manager.'
+            : tr('no_saved_audiences', lang)
           );
         } else {
           // Buscar y seleccionar automáticamente el público "CTG - Empresarios..."
@@ -1763,7 +1763,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       </div>
 
       {showPreview && (
-        <TemplatePreview template={selectedTemplate} onClose={() => setShowPreview(false)} />
+        <TemplatePreview template={selectedTemplate} onClose={() => setShowPreview(false)} lang={lang} />
       )}
 
       <h2>{tr('config_title', lang)}</h2>

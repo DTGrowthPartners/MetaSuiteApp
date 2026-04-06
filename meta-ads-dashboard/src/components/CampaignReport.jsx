@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import tr from '../translations';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
 
@@ -110,7 +111,7 @@ function detectCampaignType(campaignName, patterns = []) {
 }
 
 // ===================== VISTA MENSUAL (estilo PDF) =====================
-function MonthlyReportView({ data, locations }) {
+function MonthlyReportView({ data, locations, lang }) {
   const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [], adsetReachLastMonth = 0 } = data;
   const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
 
@@ -452,14 +453,14 @@ function MonthlyReportView({ data, locations }) {
       </section>
 
       {active.length === 0 && (
-        <div className="report-no-data">Sin datos para el mes pasado</div>
+        <div className="report-no-data">{tr('no_data_month', lang)}</div>
       )}
     </div>
   );
 }
 
 // ===================== VISTA DIARIA (original) =====================
-function DailyReportView({ campaigns, insightsKey, viewMode, locations }) {
+function DailyReportView({ campaigns, insightsKey, viewMode, locations, lang }) {
   const active = campaigns.filter(c => parseFloat(c[insightsKey]?.spend || 0) > 0);
 
   const grouped = {};
@@ -502,21 +503,21 @@ function DailyReportView({ campaigns, insightsKey, viewMode, locations }) {
     <>
       <section className="report-grand-summary">
         <div className="report-grand-card">
-          <span className="report-grand-label">Resultados</span>
+          <span className="report-grand-label">{tr('results', lang)}</span>
           <span className="report-grand-value">{fmtResults(grand.byLabel)}</span>
         </div>
         <div className="report-grand-card">
-          <span className="report-grand-label">Inversión Total</span>
+          <span className="report-grand-label">{tr('total_investment', lang)}</span>
           <span className="report-grand-value">{formatCOP(grand.spend)}</span>
         </div>
         <div className="report-grand-card">
-          <span className="report-grand-label">Costo Promedio</span>
+          <span className="report-grand-label">{tr('avg_cost', lang)}</span>
           <span className="report-grand-value">{grand.costPer > 0 ? formatCOP(grand.costPer) : '-'}</span>
         </div>
       </section>
 
       {active.length === 0 && (
-        <div className="report-no-data">Sin datos para {viewMode === 'yesterday' ? 'ayer' : 'hoy'}</div>
+        <div className="report-no-data">{viewMode === 'yesterday' ? tr('no_data_yesterday', lang) : tr('no_data_today', lang)}</div>
       )}
 
       {sortedLocs.map(loc => {
@@ -588,7 +589,7 @@ function DailyReportView({ campaigns, insightsKey, viewMode, locations }) {
 }
 
 // ===================== COMPONENTE PRINCIPAL =====================
-export default function CampaignReport({ slug, accessToken, adAccounts = [], loadingAccounts = false }) {
+export default function CampaignReport({ slug, accessToken, adAccounts = [], loadingAccounts = false, lang = 'es' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -635,13 +636,13 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
   }, [fetchReport, loadingAccounts, accessToken]);
 
   if (loadingAccounts || (loading && !data)) {
-    return (<div className="report-page"><div className="report-loading"><div className="report-spinner" /><p>Cargando reporte...</p></div></div>);
+    return (<div className="report-page"><div className="report-loading"><div className="report-spinner" /><p>{tr('loading_report', lang)}</p></div></div>);
   }
   if (hasAccess === false) {
-    return (<div className="report-page"><div className="report-error"><h2>Sin Acceso</h2><p>Tu cuenta de Facebook no tiene acceso a esta cuenta publicitaria.</p></div></div>);
+    return (<div className="report-page"><div className="report-error"><h2>{tr('no_access', lang)}</h2><p>{tr('no_access_msg', lang)}</p></div></div>);
   }
   if (error && !data) {
-    return (<div className="report-page"><div className="report-error"><h2>Error</h2><p>{error}</p><button onClick={fetchReport} className="report-retry-btn">Reintentar</button></div></div>);
+    return (<div className="report-page"><div className="report-error"><h2>{tr('error_label', lang)}</h2><p>{error}</p><button onClick={fetchReport} className="report-retry-btn">{tr('retry', lang)}</button></div></div>);
   }
   if (!data) return null;
 
@@ -675,26 +676,27 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
       <div className="report-day-switch-wrap">
         <div className="report-day-switch">
           <button className={`report-day-btn ${viewMode === 'yesterday' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('yesterday')}>
-            Ayer<span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
+            {tr('yesterday', lang)}<span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
           </button>
           <button className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('today')}>
-            Hoy<span className="report-day-date">{formatDate(dateRange?.today)}</span>
+            {tr('today', lang)}<span className="report-day-date">{formatDate(dateRange?.today)}</span>
           </button>
           <button className={`report-day-btn ${viewMode === 'lastMonth' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('lastMonth')}>
-            Mes pasado<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
+            {tr('last_month', lang)}<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
           </button>
         </div>
       </div>
 
       {/* Content */}
       {viewMode === 'lastMonth' ? (
-        <MonthlyReportView data={data} locations={locations} />
+        <MonthlyReportView data={data} locations={locations} lang={lang} />
       ) : (
         <DailyReportView
           campaigns={campaigns}
           insightsKey={viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday'}
           viewMode={viewMode}
           locations={locations}
+          lang={lang}
         />
       )}
 
@@ -709,7 +711,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
             disabled={!data?.accountId}
             title="Generar informe PDF del mes pasado"
           >
-            PDF Mes
+            {tr('pdf_month', lang)}
           </button>
           <button
             onClick={() => {
@@ -723,10 +725,10 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
             disabled={!data?.accountId}
             title="Descargar CSV del mes pasado"
           >
-            CSV Mes
+            {tr('csv_month', lang)}
           </button>
           <button onClick={fetchReport} className="report-refresh-btn" disabled={loading}>
-            {loading ? 'Actualizando...' : 'Actualizar'}
+            {loading ? tr('updating', lang) : tr('refresh', lang)}
           </button>
         </div>
       </footer>
