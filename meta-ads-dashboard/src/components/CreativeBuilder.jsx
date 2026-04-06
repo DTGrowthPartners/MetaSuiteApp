@@ -124,9 +124,9 @@ function TemplateSelector({ onSelectTemplate }) {
             >
               <div className="template-icon" style={{ background: `${objColor}20`, color: objColor }}>{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={24} /> : template.icon; })()}</div>
               <div className="template-content">
-                <h3>{t(template.name) || template.name}</h3>
+                <h3>{t('tpl_' + template.id) || template.name}</h3>
                 <span className="template-category">{t(template.category) || template.category}</span>
-                <p className="template-description">{lang === 'en' ? (t(template.name + '_desc') || template.description) : template.description}</p>
+                <p className="template-description">{t('tpl_' + template.id + '_desc') || template.description}</p>
 
                 {/* Badges de requisitos */}
                 {requirements.length > 0 && (
@@ -144,7 +144,7 @@ function TemplateSelector({ onSelectTemplate }) {
                     <strong>{t('tpl_budget')}:</strong> ${new Intl.NumberFormat('es-CO').format(suggestedBudget)} {t('tpl_per_day')}
                   </span>
                   <span className="meta-item">
-                    <strong>CTAs:</strong> {[...new Set(ctaList)].slice(0, 3).map(c => getCTALabel(c)).join(', ')}
+                    <strong>{t('tpl_ctas')}:</strong> {[...new Set(ctaList)].slice(0, 3).map(c => t(getCTALabel(c)) || getCTALabel(c)).join(', ')}
                   </span>
                 </div>
               </div>
