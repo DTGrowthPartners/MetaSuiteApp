@@ -3483,6 +3483,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 // DRAFT STEP COMPONENT - CREA CAMPAIGN + ADSET + CREATIVE + AD
 // ============================================
 function DraftStep({ job, onComplete, onBack, accessToken }) {
+  const { t } = useI18n();
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
   const [draftData, setDraftData] = useState(null);
