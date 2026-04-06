@@ -210,10 +210,12 @@ function LoginScreen({ onLogin, lang, setLang }) {
           {loading ? tr('login_connecting', lang) : tr('login_button', lang)}
         </button>
 
-        {/* Language Switch */}
-        <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ marginTop: '16px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-          {lang === 'es' ? '🇺🇸 English' : '🇨🇴 Español'}
-        </button>
+        {/* Language Switch — positioned at bottom of card */}
+        <div style={{ position: 'absolute', bottom: '16px', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '12px', fontWeight: 500, padding: '4px 8px' }}>
+            {lang === 'es' ? '🇺🇸 English' : '🇨🇴 Español'}
+          </button>
+        </div>
 
         {/* Error */}
         {error && <div className="login-error">{error}</div>}
