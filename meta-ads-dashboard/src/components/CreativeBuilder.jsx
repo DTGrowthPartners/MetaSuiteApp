@@ -1748,7 +1748,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
   return (
     <div className="upload-step">
-      <button className="back-button" onClick={onBackToTemplates}>← Cambiar plantilla</button>
+      <button className="back-button" onClick={onBackToTemplates}>{tr('change_template', lang)}</button>
 
       {/* Template Badge */}
       <div className="selected-template-badge">
@@ -1758,7 +1758,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <p>{selectedTemplate?.description}</p>
         </div>
         <button className="preview-btn" onClick={() => setShowPreview(true)}>
-          Ver contenido
+          {tr('view_content', lang)}
         </button>
       </div>
 
@@ -1766,8 +1766,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <TemplatePreview template={selectedTemplate} onClose={() => setShowPreview(false)} />
       )}
 
-      <h2>Configuración de Campaña</h2>
-      <p className="subtitle">Configura tu campaña siguiendo el flujo de Meta Ads Manager</p>
+      <h2>{tr('config_title', lang)}</h2>
+      <p className="subtitle">{tr('config_subtitle', lang)}</p>
 
       <form onSubmit={handleSubmit}>
 
@@ -1800,7 +1800,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Campaign Name */}
         <div className="form-group">
-          <label>Nombre de la Campaña *</label>
+          <label>{tr('campaign_name_label', lang)}</label>
           <div className="input-with-prefix">
             <span className="input-prefix">{getCampaignPrefix(selectedTemplate?.objective)}</span>
             <input
@@ -1816,7 +1816,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Ad Account Selection */}
         <div className="form-group">
-          <label>Cuenta Publicitaria *</label>
+          <label>{tr('ad_account_label', lang)}</label>
           <CustomSelect
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
@@ -1853,7 +1853,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             }))}
           />
           {pagesError && <p className="hint" style={{ color: 'var(--error)' }}>{pagesError}</p>}
-          <p className="hint">La página desde la cual se publicará el anuncio</p>
+          <p className="hint">{tr('page_hint', lang)}</p>
         </div>
 
         {/* Instagram Account Selection - cargadas desde la cuenta publicitaria + página */}
@@ -1874,7 +1874,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               ? (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
                 ? 'Se usará la cuenta de Instagram vinculada a tu página para dirigir tráfico al perfil'
                 : 'Vincula una cuenta de Instagram a tu página de Facebook para publicar en Instagram')
-              : 'El anuncio aparecerá también en Instagram con esta cuenta'}
+              : tr('ig_hint', lang)}
           </p>
         </div>
 
@@ -2057,25 +2057,25 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* ===================== SECCIÓN: PÚBLICO ===================== */}
         {/* ===================== SECCIÓN: PRESUPUESTO Y CALENDARIO ===================== */}
         <div className="section-card" id="section-presupuesto">
-          <h4><span className="section-icon"><DollarSign size={18} /></span> Presupuesto y Calendario</h4>
+          <h4><span className="section-icon"><DollarSign size={18} /></span> {tr('section_budget', lang)}</h4>
 
         {/* Budget Level Selector - siempre visible */}
         <div className="form-group">
-            <label>Nivel de Presupuesto</label>
+            <label>{tr('budget_level_label', lang)}</label>
             <div className="toggle-group">
               <button
                 type="button"
                 className={`toggle-btn ${budgetLevel === 'campaign' ? 'active' : ''}`}
                 onClick={() => setBudgetLevel('campaign')}
               >
-                Por Campaña (CBO)
+                {tr('budget_campaign_btn', lang)}
               </button>
               <button
                 type="button"
                 className={`toggle-btn ${budgetLevel === 'adset' ? 'active' : ''}`}
                 onClick={() => setBudgetLevel('adset')}
               >
-                Por Conjunto de Anuncios
+                {tr('budget_adset_btn', lang)}
               </button>
             </div>
             <p className="hint">
@@ -2112,16 +2112,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         </div>{/* fin section-card Presupuesto */}
 
         <div className="section-card" id="section-publico">
-          <h4><span className="section-icon"><Users size={18} /></span> Público por conjunto de anuncio</h4>
+          <h4><span className="section-icon"><Users size={18} /></span> {tr('section_audience', lang)}</h4>
 
         {/* Audience Mode Toggle */}
         <div className="form-group">
           <div className="toggle-group" style={{ marginBottom: '12px' }}>
             <button type="button" className={`toggle-btn ${audienceMode === 'saved' ? 'active' : ''}`} onClick={() => setAudienceMode('saved')}>
-              <Users size={14} style={{ marginRight: '4px' }} /> Público guardado
+              <Users size={14} style={{ marginRight: '4px' }} /> {tr('saved_audience', lang)}
             </button>
             <button type="button" className={`toggle-btn ${audienceMode === 'custom' ? 'active' : ''}`} onClick={() => setAudienceMode('custom')}>
-              <MapPin size={14} style={{ marginRight: '4px' }} /> Personalizado
+              <MapPin size={14} style={{ marginRight: '4px' }} /> {tr('custom_audience', lang)}
             </button>
           </div>
         </div>
@@ -2155,7 +2155,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               placeholder={
                 !selectedAccount ? 'Primero selecciona una cuenta'
                 : allAudiences.length === 0 ? 'No hay públicos disponibles'
-                : 'Selecciona un público'
+                : tr('select_audience_placeholder', lang)
               }
               options={allAudiences.map(audience => ({
                 value: audience.id,
@@ -2588,8 +2588,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 className={`ad-mode-btn ${adSetMode === 'dynamic' ? 'active' : ''}`}
                 onClick={() => setAdSetMode('dynamic')}
               >
-                <strong>Anuncio Dinámico</strong>
-                <small>1 creativo x Ad · 5-5-5 Copys</small>
+                <strong>{tr('dynamic_ad', lang)}</strong>
+                <small>{tr('dynamic_desc', lang)}</small>
               </button>
             )}
             <button
@@ -2715,7 +2715,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   {/* Group Header */}
                   <div className="ad-card-header">
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Anuncio Flexible {groupIndex + 1}
+                      {tr('flexible_label', lang)} {groupIndex + 1}
                       {group.contentGenerated && (
                         <span className="content-badge content-badge--h" style={{ background: 'var(--success)', color: '#064E3B', fontSize: '10px', fontWeight: 700 }}>IA</span>
                       )}
@@ -3026,7 +3026,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               {/* Ad Card Header */}
               <div className="ad-card-header">
                 <h4>
-                  Anuncio {adIndex + 1}
+                  {tr('ad_label', lang)} {adIndex + 1}
                 </h4>
                 {ads.length > 1 && (
                   <button
@@ -3041,7 +3041,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
               {/* Ad Name */}
               <div className="form-group">
-                <label>Nombre del anuncio</label>
+                <label>{tr('ad_name_label', lang)}</label>
                 <input
                   type="text"
                   placeholder={`Ad ${adIndex + 1}`}
@@ -3079,7 +3079,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
               {/* Media Source Tabs */}
               <div className="form-group">
-                <label>Contenido (imagen/video)</label>
+                <label>{tr('ad_content_label', lang)}</label>
                 <div className="toggle-group mb-sm">
                   <button
                     type="button"
@@ -3293,7 +3293,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   </p>
                 )}
                 {ad.mediaSource === 'none' && (
-                  <p className="hint">Sin imagen/video, usará la vista previa del link.</p>
+                  <p className="hint">{tr('media_no_image', lang)}</p>
                 )}
               </div>
 
@@ -3458,7 +3458,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             className="add-ad-btn"
             onClick={addAd}
           >
-            + Agregar Otro Anuncio
+            {tr('add_ad', lang)}
           </button>
           </>
           )}
@@ -4319,7 +4319,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
 
       {/* HIDDEN — kept for structure but replaced above */}
       <div style={{ display: 'none' }}>
-        <h3>Configuración de Campaña</h3>
+        <h3>{tr('config_title', lang)}</h3>
         <div className="summary-grid">
           <div className="summary-item">
             <label>Nombre Campaña</label>
@@ -4353,7 +4353,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
             <p>${formatCOP(job.dailyBudgetCOP)} COP</p>
           </div>
           <div className="summary-item">
-            <label>Cuenta Publicitaria</label>
+            <label>{tr('ad_account_label', lang)}</label>
             <p>{job.adAccountName}</p>
           </div>
           <div className="summary-item">
@@ -4413,7 +4413,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
             {job.adSetMode === 'flexible' ? (
               (job.flexibleAdGroups || []).map((g, i) => (
                 <p key={i} style={{ fontSize: '13px', margin: '2px 0' }}>
-                  Anuncio {i + 1}: {g.mediaItems?.length || 0} medio(s) — {g.mediaItems?.filter(m => m.type === 'image').length || 0} img · {g.mediaItems?.filter(m => m.type === 'video').length || 0} vid
+                  {tr('ad_label', lang)} {i + 1}: {g.mediaItems?.length || 0} medio(s) — {g.mediaItems?.filter(m => m.type === 'image').length || 0} img · {g.mediaItems?.filter(m => m.type === 'video').length || 0} vid
                 </p>
               ))
             ) : (
@@ -4434,7 +4434,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
               {job.flexibleAdGroups.map((g, i) => (
                 <div key={i} className="draft-variation-card" style={{ borderLeftColor: 'var(--accent)' }}>
                   <p style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
-                    Anuncio Flexible {i + 1} — {g.mediaItems?.length || 0} medio(s)
+                    {tr('flexible_label', lang)} {i + 1} — {g.mediaItems?.length || 0} medio(s)
                   </p>
                   <p className="text-muted" style={{ fontSize: '12px' }}>
                     {g.headlines?.length || 0} títulos + {g.descriptions?.length || 0} textos + {[...new Set(g.ctas || [])].length} CTAs
@@ -4509,7 +4509,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
                 const descs = (g.descriptions || []).length;
                 return (
                   <p key={gi} style={{ margin: '3px 0' }}>
-                    Anuncio Flexible {gi + 1}: {(g.mediaItems || []).length} medio(s) ({imgs} img · {vids} vid) · {txts}T + {descs}D
+                    {tr('flexible_label', lang)} {gi + 1}: {(g.mediaItems || []).length} medio(s) ({imgs} img · {vids} vid) · {txts}T + {descs}D
                   </p>
                 );
               })}

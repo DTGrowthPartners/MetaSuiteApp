@@ -143,6 +143,60 @@ const strings = {
   link_descriptions: { es: 'Descripciones', en: 'Descriptions' },
   cta_label: { es: 'Llamada a la acción', en: 'Call to Action' },
 
+  // ==================== CONFIG PAGE ====================
+  config_title: { es: 'Configuración de Campaña', en: 'Campaign Configuration' },
+  config_subtitle: { es: 'Configura tu campaña siguiendo el flujo de Meta Ads Manager', en: 'Configure your campaign following the Meta Ads Manager flow' },
+  change_template: { es: '← Cambiar plantilla', en: '← Change template' },
+  view_content: { es: 'Ver contenido', en: 'View content' },
+  // Config tabs
+  tab_campaign: { es: 'Campaña', en: 'Campaign' },
+  tab_identity: { es: 'Identidad', en: 'Identity' },
+  tab_destination: { es: 'Destino', en: 'Destination' },
+  tab_budget: { es: 'Presupuesto', en: 'Budget' },
+  tab_audience: { es: 'Público', en: 'Audience' },
+  tab_ads: { es: 'Anuncios', en: 'Ads' },
+  // Campaign section
+  section_campaign: { es: 'Campaña', en: 'Campaign' },
+  campaign_name_label: { es: 'Nombre de la Campaña *', en: 'Campaign Name *' },
+  campaign_prefix_hint: { es: 'Se agregará', en: 'Will be added' },
+  campaign_prefix_hint2: { es: 'al inicio para identificar tus campañas', en: 'at the beginning to identify your campaigns' },
+  ad_account_label: { es: 'Cuenta Publicitaria *', en: 'Ad Account *' },
+  // Identity section
+  section_identity: { es: 'Identidad', en: 'Identity' },
+  page_hint: { es: 'La página desde la cual se publicará el anuncio', en: 'The page from which the ad will be published' },
+  ig_hint: { es: 'El anuncio aparecerá también en Instagram con esta cuenta', en: 'The ad will also appear on Instagram with this account' },
+  // Destination section
+  section_destination: { es: 'Destino', en: 'Destination' },
+  whatsapp_label: { es: 'Número de WhatsApp Business *', en: 'WhatsApp Business Number *' },
+  whatsapp_not_found: { es: 'No se encontraron números de WhatsApp Business para esta cuenta publicitaria.', en: 'No WhatsApp Business numbers found for this ad account.' },
+  whatsapp_hint: { es: 'Número con código de país sin espacios ni guiones ej: 573001234567', en: 'Number with country code, no spaces or dashes e.g.: 573001234567' },
+  url_label: { es: 'URL de destino *', en: 'Destination URL *' },
+  // Budget section
+  section_budget: { es: 'Presupuesto y Calendario', en: 'Budget and Schedule' },
+  budget_level_label: { es: 'Nivel de Presupuesto', en: 'Budget Level' },
+  budget_campaign_btn: { es: 'Por Campaña (CBO)', en: 'Campaign (CBO)' },
+  budget_adset_btn: { es: 'Por Conjunto de Anuncios', en: 'Per Ad Set' },
+  budget_cbo_hint: { es: 'Meta distribuye el presupuesto automáticamente entre los conjuntos de anuncios', en: 'Meta distributes the budget automatically across ad sets' },
+  budget_daily_label: { es: 'Presupuesto Diario (COP) *', en: 'Daily Budget (COP) *' },
+  // Audience section
+  section_audience: { es: 'Público por conjunto de anuncio', en: 'Audience per ad set' },
+  saved_audience: { es: 'Público guardado', en: 'Saved audience' },
+  custom_audience: { es: 'Personalizado', en: 'Custom' },
+  select_audience_placeholder: { es: 'Selecciona un público', en: 'Select an audience' },
+  set_label: { es: 'Conjunto', en: 'Ad Set' },
+  // Ad modes
+  dynamic_ad: { es: 'Anuncio Dinámico', en: 'Dynamic Ad' },
+  dynamic_desc: { es: '1 creativo x Ad · 5-5-5 Copys', en: '1 creative per Ad · 5-5-5 Copy' },
+  dynamic_hint: { es: 'Crea docenas de combinaciones automáticamente (5 títulos + 5 descripciones + 5 CTAs). Meta optimiza las mejores. Recomendado para la mayoría de campañas.', en: 'Creates dozens of combinations automatically (5 headlines + 5 descriptions + 5 CTAs). Meta optimizes the best ones. Recommended for most campaigns.' },
+  // Ad content
+  ad_name_placeholder: { es: 'Ad', en: 'Ad' },
+  ad_content_label: { es: 'Contenido (Imagen/video)', en: 'Content (Image/video)' },
+  media_empty: { es: 'Vacío', en: 'Empty' },
+  media_library: { es: 'Biblioteca', en: 'Library' },
+  media_upload: { es: 'Subir archivo', en: 'Upload file' },
+  media_no_image: { es: 'Sin imagen/video, usará la vista previa del link.', en: 'No image/video, will use the link preview.' },
+  titles_descriptions: { es: 'Títulos + Descripciones', en: 'Headlines + Descriptions' },
+
   // ==================== CREATE ====================
   continue_create: { es: 'Continuar a Crear Campaña', en: 'Continue to Create Campaign' },
   processing: { es: 'Procesando...', en: 'Processing...' },
