@@ -5,6 +5,7 @@ import CampaignReport from './components/CampaignReport';
 import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
 import { LogOut, Loader2 } from 'lucide-react';
+import tr from './translations';
 import './App.css';
 
 // ============================================
@@ -195,7 +196,7 @@ function LoginScreen({ onLogin }) {
           <h1 className="login-title">MetaSuite</h1>
           <span className="login-brand">by DT Growth Partners</span>
         </div>
-        <p className="login-subtitle">Inicia sesión para administrar tus campañas publicitarias</p>
+        <p className="login-subtitle">{tr('login_subtitle', lang)}</p>
 
         {/* Facebook Login Button */}
         <button
@@ -206,7 +207,12 @@ function LoginScreen({ onLogin }) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
-          {loading ? 'Conectando...' : 'Continuar con Facebook'}
+          {loading ? tr('login_connecting', lang) : tr('login_button', lang)}
+        </button>
+
+        {/* Language Switch */}
+        <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ marginTop: '16px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+          {lang === 'es' ? '🇺🇸 English' : '🇨🇴 Español'}
         </button>
 
         {/* Error */}
@@ -220,6 +226,7 @@ function LoginScreen({ onLogin }) {
 // MAIN APP
 // ============================================
 function App() {
+  const [lang, setLang] = useState('es');
   const [showSplash, setShowSplash] = useState(true);
 
   // Detectar si es una ruta de reporte (ej: /eq-cartagena)
@@ -354,23 +361,28 @@ function App() {
             className={`nav-link ${page === 'main' && !reportSlug ? 'active' : ''}`}
             onClick={() => { window.location.hash = ''; setPage('main'); }}
           >
-            Campañas
+            {tr('campaigns', lang)}
           </button>
           <button
             className={`nav-link ${page === 'audiences' ? 'active' : ''}`}
             onClick={() => { window.location.hash = '#audiences'; setPage('audiences'); }}
           >
-            Públicos
+            {tr('audiences', lang)}
           </button>
         </div>
         <div className="nav-info">
           {loadingAccounts ? (
-            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</span>
+            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {tr('loading', lang)}</span>
           ) : accountsError ? (
             <span className="account-count account-count--error">Error</span>
           ) : (
-            <span className="account-count">{adAccounts.length} cuentas</span>
+            <span className="account-count">{adAccounts.length} {tr('accounts_count', lang)}</span>
           )}
+
+          {/* Language Switch */}
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+            {lang === 'es' ? '🇺🇸 EN' : '🇨🇴 ES'}
+          </button>
 
           {/* User info + Logout */}
           <div className="nav-user">
@@ -411,7 +423,7 @@ function App() {
             onBack={() => { window.location.hash = ''; setPage('main'); }}
           />
         ) : (
-          <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} />
+          <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} lang={lang} />
         )}
       </main>
     </div>
