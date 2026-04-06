@@ -3,7 +3,6 @@ import axios from 'axios';
 import confetti from 'canvas-confetti';
 import MetaAdsService from '../services/metaAdsApi';
 import PropagateLoader from 'react-spinners/PropagateLoader';
-import { useI18n } from '../i18n';
 import {
   CAMPAIGN_TEMPLATES,
   CTA_OPTIONS,
@@ -67,7 +66,6 @@ function getObjectiveColor(objective) {
 // TEMPLATE SELECTOR COMPONENT - Selección de plantilla
 // ============================================
 function TemplateSelector({ onSelectTemplate }) {
-  const { t, lang } = useI18n();
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   const categories = getCategories();
@@ -91,8 +89,8 @@ function TemplateSelector({ onSelectTemplate }) {
 
   return (
     <div className="template-selector">
-      <h2>{t('select_template')}</h2>
-      <p className="subtitle">{t('select_template_desc')}</p>
+      <h2>Selecciona una Plantilla</h2>
+      <p className="subtitle">Eligue el tipo de campaña que quieres crear. Ya viene pre-configurada.</p>
 
       {/* Category Filter */}
       <div className="category-filter">
@@ -102,7 +100,7 @@ function TemplateSelector({ onSelectTemplate }) {
             className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
             onClick={() => setSelectedCategory(cat)}
           >
-            {cat === 'all' ? t('all_categories') : t(cat) || cat}
+            {cat === 'all' ? 'Todas' : cat}
           </button>
         ))}
       </div>
@@ -124,9 +122,9 @@ function TemplateSelector({ onSelectTemplate }) {
             >
               <div className="template-icon" style={{ background: `${objColor}20`, color: objColor }}>{(() => { const IC = ICON_MAP[template.icon]; return IC ? <IC size={24} /> : template.icon; })()}</div>
               <div className="template-content">
-                <h3>{t('tpl_' + template.id) || template.name}</h3>
-                <span className="template-category">{t(template.category) || template.category}</span>
-                <p className="template-description">{t('tpl_' + template.id + '_desc') || template.description}</p>
+                <h3>{template.name}</h3>
+                <span className="template-category">{template.category}</span>
+                <p className="template-description">{template.description}</p>
 
                 {/* Badges de requisitos */}
                 {requirements.length > 0 && (
@@ -141,10 +139,10 @@ function TemplateSelector({ onSelectTemplate }) {
 
                 <div className="template-meta">
                   <span className="meta-item">
-                    <strong>{t('tpl_budget')}:</strong> ${new Intl.NumberFormat('es-CO').format(suggestedBudget)} {t('tpl_per_day')}
+                    <strong>Presupuesto:</strong> ${new Intl.NumberFormat('es-CO').format(suggestedBudget)} COP/día
                   </span>
                   <span className="meta-item">
-                    <strong>{t('tpl_ctas')}:</strong> {[...new Set(ctaList)].slice(0, 3).map(c => t(getCTALabel(c)) || getCTALabel(c)).join(', ')}
+                    <strong>CTAs:</strong> {[...new Set(ctaList)].slice(0, 3).map(c => getCTALabel(c)).join(', ')}
                   </span>
                 </div>
               </div>
@@ -255,7 +253,6 @@ function TemplatePreview({ template, onClose }) {
 // UPLOAD STEP COMPONENT - Configuración rápida post-plantilla
 // ============================================
 function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTemplates, accessToken }) {
-  const { t, lang } = useI18n();
   // Obtener configuración de la plantilla (nueva estructura)
   const templateContent = selectedTemplate?.creativeContent || {};
   const templateAdSetConfig = selectedTemplate?.adSetConfig || {};
@@ -1842,7 +1839,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Facebook Page Selection */}
         <div className="form-group">
-          <label>{t('page')} *</label>
+          <label>Página de Facebook *</label>
           <CustomSelect
             value={selectedPage}
             onChange={(e) => setSelectedPage(e.target.value)}
@@ -1860,7 +1857,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* Instagram Account Selection - cargadas desde la cuenta publicitaria + página */}
         <div className="form-group">
-          <label>{t('ig_account')}</label>
+          <label>Cuenta de Instagram</label>
           <CustomSelect
             value={selectedIgAccount}
             onChange={(e) => setSelectedIgAccount(e.target.value)}
@@ -2090,7 +2087,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {/* Daily Budget in COP - solo visible en modo CBO */}
         {budgetLevel === 'campaign' && (
           <div className="form-group">
-            <label>{t('budget')} (COP) *</label>
+            <label>Presupuesto Diario (COP) *</label>
             <input
               type="number"
               placeholder="20000"
@@ -2132,7 +2129,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         <>
         {/* Audience Selection (Saved + Custom) */}
         <div className="form-group">
-          <label>{adSetMode === 'single' ? t('audience_shared') : t('audience_default')}</label>
+          <label>Público {adSetMode === 'single' ? '(compartido) *' : '(por defecto) *'}</label>
           {/* Cabecera de columnas */}
           {(budgetLevel === 'adset' || (whatsappMode === 'per-ad' && templateRequirements.whatsapp && whatsAppNumbers.length > 1)) && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', paddingRight: '28px' }}>
@@ -2211,10 +2208,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               </label>
               <div>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: advantageAudience ? '#a5b4fc' : '#94a3b8' }}>
-                  {t('advantage_audience')}
+                  Advantage+ Público
                 </span>
                 <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0' }}>
-                  {advantageAudience ? t('advantage_on_desc') : t('advantage_off_desc')}
+                  {advantageAudience
+                    ? 'La IA de Meta puede expandir la audiencia para encontrar mejores resultados fuera del público seleccionado.'
+                    : 'Solo se mostrará a las personas del público seleccionado, sin expansión.'}
                 </p>
               </div>
             </div>
@@ -2570,19 +2569,19 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: ANUNCIOS ===================== */}
         <div className="section-card" id="section-anuncios">
-          <h4><span className="section-icon"><Film size={18} /></span> {t('ads_title')} ({ads.length})</h4>
+          <h4><span className="section-icon"><Film size={18} /></span> Anuncios ({ads.length})</h4>
 
         {/* AdSet Mode Toggle */}
         <div className="form-group">
-          <label>{t('ad_structure')}</label>
+          <label>Estructura de Anuncios</label>
           <div className="toggle-group">
             <button
               type="button"
               className={`ad-mode-btn ${adSetMode === 'single' ? 'active' : ''}`}
               onClick={() => setAdSetMode('single')}
             >
-              <strong>{t('standard_ad')}</strong>
-              <small>{t('standard_desc')}</small>
+              <strong>Anuncio Estándar</strong>
+              <small>1-1-1 Copys x Ad</small>
             </button>
             {!isDCBlocked && (
               <button
@@ -2599,8 +2598,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               className={`ad-mode-btn ${adSetMode === 'per-ad' ? 'active' : ''}`}
               onClick={() => setAdSetMode('per-ad')}
             >
-              <strong>{t('per_ad')}</strong>
-              <small>{t('per_ad_desc')}</small>
+              <strong>1 Ad × 1 AdSet</strong>
+              <small>1 creativo x AdSet · público diferente</small>
             </button>
             {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
               <button
@@ -2608,8 +2607,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
                 onClick={() => setAdSetMode('flexible')}
               >
-                <strong>{t('flexible_ad')}</strong>
-                <small>{t('flexible_desc')}</small>
+                <strong>Anuncio Flexible</strong>
+                <small>1 Ad · 10 img/vid · 5-5-5 Copys</small>
               </button>
             )}
           </div>
@@ -2626,7 +2625,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* AI Text Generation Settings */}
         <div className="form-group">
-          <label>{t('ai_config')}</label>
+          <label>Configuración de textos IA</label>
           <div className="toggle-group mb-sm" style={{ alignItems: 'center' }}>
             <span className="text-muted" style={{ fontSize: '12px', marginRight: '4px' }}>Longitud:</span>
             {[
@@ -2680,7 +2679,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               className="toggle-btn active"
               style={{ padding: '14px 32px', fontSize: '15px', opacity: selectedAccount ? 1 : 0.5 }}
             >
-              {t('upload_files')}
+              Subir archivos
             </button>
             {multiUploadProgress && (
               <span
@@ -3472,7 +3471,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {error && <div className="error-message">{error}</div>}
 
         <button type="submit" className="submit-button" disabled={uploading || loadingAudiences || ads.some(ad => ad.analyzingMedia)}>
-          {uploading ? t('processing') : ads.some(ad => ad.analyzingMedia) ? `${t('analyzing_ai')} (${ads.filter(ad => ad.analyzingMedia).length} ${t('pending')})...` : t('continue_create')}
+          {uploading ? 'Procesando...' : ads.some(ad => ad.analyzingMedia) ? `Analizando con IA (${ads.filter(ad => ad.analyzingMedia).length} pendiente${ads.filter(ad => ad.analyzingMedia).length > 1 ? 's' : ''})...` : 'Continuar a Crear Campaña'}
         </button>
       </form>
     </div>
@@ -3483,7 +3482,6 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 // DRAFT STEP COMPONENT - CREA CAMPAIGN + ADSET + CREATIVE + AD
 // ============================================
 function DraftStep({ job, onComplete, onBack, accessToken }) {
-  const { t } = useI18n();
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
   const [draftData, setDraftData] = useState(null);
@@ -3540,22 +3538,25 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
       // Advantage+ Audience
       // Función para aplicar Advantage+ a cualquier targeting
-      const applyAdvantageAudience = (tgt, isAdvantage, label = '') => {
+      const applyAdvantageAudience = (t, isAdvantage, label = '') => {
         // age_range no es compatible con targeting_automation — siempre eliminarlo
-        delete tgt.age_range;
+        delete t.age_range;
         if (isAdvantage) {
-          const customAudiences = tgt.custom_audiences || [];
+          // Enviar custom_audiences en ambos campos para consistencia:
+          // - custom_audiences: para que aparezcan seleccionados en Ads Manager
+          // - audience_suggestions: para que Meta los trate como sugerencias Advantage+
+          const customAudiences = t.custom_audiences || [];
           if (customAudiences.length > 0) {
-            tgt.audience_suggestions = { custom_audiences: customAudiences };
+            t.audience_suggestions = { custom_audiences: customAudiences };
           }
-          tgt.targeting_automation = { advantage_audience: 1 };
+          t.targeting_automation = { advantage_audience: 1 };
           if (label) addLog(`${label}: Advantage+ ON`);
         } else {
-          tgt.targeting_automation = { advantage_audience: 0 };
-          tgt.targeting_relaxation_types = { custom_audience: 0 };
+          t.targeting_automation = { advantage_audience: 0 };
+          t.targeting_relaxation_types = { custom_audience: 0 };
           if (label) addLog(`${label}: Advantage+ OFF (estricto)`);
         }
-        return tgt;
+        return t;
       };
 
       applyAdvantageAudience(targeting, job.advantageAudience !== false, 'Conjunto 1');
@@ -4201,7 +4202,7 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               <Check size={32} strokeWidth={3} />
             </div>
             <h2 className="success-view-title">
-              {adWasCreated ? t('campaign_created') : t('campaign_adset_created')}
+              {adWasCreated ? 'Campaña Creada' : 'Campaña y Ad Set Creados'}
             </h2>
             <p className="success-view-subtitle">
               {adWasCreated
@@ -4264,10 +4265,10 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
               rel="noopener noreferrer"
               className="success-view-btn-secondary"
             >
-              <Globe size={16} /> {t('open_ads_manager')}
+              <Globe size={16} /> Abrir en Ads Manager
             </a>
             <button className="success-view-btn-primary" onClick={onComplete}>
-              <Plus size={16} /> {t('create_another')}
+              <Plus size={16} /> Crear Otra Campaña
             </button>
           </div>
         </div>
@@ -4279,9 +4280,9 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
     <div className="draft-step">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', padding: '24px 0 16px' }}>
         <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" style={{ height: '40px', objectFit: 'contain', opacity: 0.9 }} />
-        <h2 style={{ margin: 0, fontSize: '20px' }}>{t('creating_campaign')}</h2>
+        <h2 style={{ margin: 0, fontSize: '20px' }}>Creando Campaña</h2>
         <PropagateLoader color="#6366f1" size={12} speedMultiplier={0.8} />
-        <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>{t('sending_meta')}</p>
+        <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>Enviando a Meta Ads...</p>
       </div>
 
       <div className="campaign-type-badge">
@@ -4543,7 +4544,6 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 // MAIN CREATIVE BUILDER COMPONENT (Con sistema de plantillas)
 // ============================================
 export default function CreativeBuilder({ adAccounts, accessToken }) {
-  const { t } = useI18n();
   const [step, setStep] = useState('templates'); // templates, config, draft
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [currentJob, setCurrentJob] = useState(null);
@@ -4589,17 +4589,17 @@ export default function CreativeBuilder({ adAccounts, accessToken }) {
       <div className="progress-steps">
         <div className={`progress-step ${getStepStatus('templates')}`}>
           <span className="step-number">1</span>
-          <span className="step-label">{t('step_template')}</span>
+          <span className="step-label">Plantilla</span>
         </div>
         <div className="step-connector"></div>
         <div className={`progress-step ${getStepStatus('config')}`}>
           <span className="step-number">2</span>
-          <span className="step-label">{t('step_configure')}</span>
+          <span className="step-label">Configurar</span>
         </div>
         <div className="step-connector"></div>
         <div className={`progress-step ${getStepStatus('draft')}`}>
           <span className="step-number">3</span>
-          <span className="step-label">{t('step_create')}</span>
+          <span className="step-label">Crear</span>
         </div>
       </div>
 
