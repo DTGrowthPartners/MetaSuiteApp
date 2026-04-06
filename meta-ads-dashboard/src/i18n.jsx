@@ -263,16 +263,21 @@ const I18nContext = createContext();
 
 export function I18nProvider({ children }) {
   const [lang, setLang] = useState('es');
-  const t = (key) => translations[lang]?.[key] || translations['es']?.[key] || key;
+  const translate = (key) => translations[lang]?.[key] || translations['es']?.[key] || key;
   return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
+    <I18nContext.Provider value={{ lang, setLang, t: translate }}>
       {children}
     </I18nContext.Provider>
   );
 }
 
 export function useI18n() {
-  return useContext(I18nContext);
+  const ctx = useContext(I18nContext);
+  if (!ctx) {
+    // Fallback if used outside I18nProvider (shouldn't happen but prevents crash)
+    return { lang: 'es', setLang: () => {}, t: (key) => translations['es']?.[key] || key };
+  }
+  return ctx;
 }
 
 export function LanguageSwitch() {

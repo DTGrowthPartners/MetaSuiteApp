@@ -3540,25 +3540,22 @@ function DraftStep({ job, onComplete, onBack, accessToken }) {
 
       // Advantage+ Audience
       // Función para aplicar Advantage+ a cualquier targeting
-      const applyAdvantageAudience = (t, isAdvantage, label = '') => {
+      const applyAdvantageAudience = (tgt, isAdvantage, label = '') => {
         // age_range no es compatible con targeting_automation — siempre eliminarlo
-        delete t.age_range;
+        delete tgt.age_range;
         if (isAdvantage) {
-          // Enviar custom_audiences en ambos campos para consistencia:
-          // - custom_audiences: para que aparezcan seleccionados en Ads Manager
-          // - audience_suggestions: para que Meta los trate como sugerencias Advantage+
-          const customAudiences = t.custom_audiences || [];
+          const customAudiences = tgt.custom_audiences || [];
           if (customAudiences.length > 0) {
-            t.audience_suggestions = { custom_audiences: customAudiences };
+            tgt.audience_suggestions = { custom_audiences: customAudiences };
           }
-          t.targeting_automation = { advantage_audience: 1 };
+          tgt.targeting_automation = { advantage_audience: 1 };
           if (label) addLog(`${label}: Advantage+ ON`);
         } else {
-          t.targeting_automation = { advantage_audience: 0 };
-          t.targeting_relaxation_types = { custom_audience: 0 };
+          tgt.targeting_automation = { advantage_audience: 0 };
+          tgt.targeting_relaxation_types = { custom_audience: 0 };
           if (label) addLog(`${label}: Advantage+ OFF (estricto)`);
         }
-        return t;
+        return tgt;
       };
 
       applyAdvantageAudience(targeting, job.advantageAudience !== false, 'Conjunto 1');
