@@ -5,6 +5,7 @@ import CampaignReport from './components/CampaignReport';
 import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
 import { LogOut, Loader2 } from 'lucide-react';
+import { I18nProvider, LanguageSwitch, useI18n } from './i18n';
 import './App.css';
 
 // ============================================
@@ -195,7 +196,7 @@ function LoginScreen({ onLogin }) {
           <h1 className="login-title">MetaSuite</h1>
           <span className="login-brand">by DT Growth Partners</span>
         </div>
-        <p className="login-subtitle">Inicia sesión para administrar tus campañas publicitarias</p>
+        <p className="login-subtitle">{t('login_subtitle')}</p>
 
         {/* Facebook Login Button */}
         <button
@@ -206,8 +207,13 @@ function LoginScreen({ onLogin }) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
-          {loading ? 'Conectando...' : 'Continuar con Facebook'}
+          {t('login_button')}
         </button>
+
+        {/* Language Switch */}
+        <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+          <LanguageSwitch />
+        </div>
 
         {/* Error */}
         {error && <div className="login-error">{error}</div>}
@@ -220,6 +226,7 @@ function LoginScreen({ onLogin }) {
 // MAIN APP
 // ============================================
 function App() {
+  const { t } = useI18n();
   const [showSplash, setShowSplash] = useState(true);
 
   // Detectar si es una ruta de reporte (ej: /eq-cartagena)
@@ -354,22 +361,23 @@ function App() {
             className={`nav-link ${page === 'main' && !reportSlug ? 'active' : ''}`}
             onClick={() => { window.location.hash = ''; setPage('main'); }}
           >
-            Campañas
+            {t('campaigns')}
           </button>
           <button
             className={`nav-link ${page === 'audiences' ? 'active' : ''}`}
             onClick={() => { window.location.hash = '#audiences'; setPage('audiences'); }}
           >
-            Públicos
+            {t('audiences')}
           </button>
         </div>
         <div className="nav-info">
+          <LanguageSwitch />
           {loadingAccounts ? (
-            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</span>
+            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {t('loading')}</span>
           ) : accountsError ? (
             <span className="account-count account-count--error">Error</span>
           ) : (
-            <span className="account-count">{adAccounts.length} cuentas</span>
+            <span className="account-count">{adAccounts.length} {t('accounts_count')}</span>
           )}
 
           {/* User info + Logout */}
@@ -418,4 +426,12 @@ function App() {
   );
 }
 
-export default App;
+function AppWithI18n() {
+  return (
+    <I18nProvider>
+      <App />
+    </I18nProvider>
+  );
+}
+
+export default AppWithI18n;
