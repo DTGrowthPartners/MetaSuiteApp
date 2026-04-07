@@ -4290,6 +4290,15 @@ class MetaAdsService {
       : conversionLocation === 'LEAD_FROM_IG_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
+    // OUTCOME_LEADS no acepta INSTAGRAM_DIRECT (Meta solo permite UNDEFINED/WEBSITE/APP/MESSENGER).
+    // Para "leads a IG DM" hay que usar OUTCOME_ENGAGEMENT con destination_type=INSTAGRAM_DIRECT,
+    // que es como Meta UI implementa "Mensajes a Instagram" y cuenta cada conversación como lead.
+    if (conversionLocation === 'LEAD_FROM_IG_DIRECT' && objective === 'OUTCOME_LEADS') {
+      console.log('Overriding OUTCOME_LEADS → OUTCOME_ENGAGEMENT for IG DM (Meta API constraint)');
+      objective = 'OUTCOME_ENGAGEMENT';
+      optimizationGoal = 'CONVERSATIONS';
+    }
+
     // Para tráfico a perfil de IG: optimization_goal sigue siendo VISIT_INSTAGRAM_PROFILE (AdSet lo acepta)
     // NOTA: el CTA cambió a VIEW_INSTAGRAM_PROFILE pero el optimization_goal sigue con VISIT_
     if (conversionLocation === 'INSTAGRAM_PROFILE' && objective === 'OUTCOME_TRAFFIC') {
