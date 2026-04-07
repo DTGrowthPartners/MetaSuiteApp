@@ -4287,7 +4287,7 @@ class MetaAdsService {
       : conversionLocation === 'WHATSAPP' ? 'WHATSAPP'
       : conversionLocation === 'MESSENGER' ? 'MESSENGER'
       : conversionLocation === 'INSTAGRAM_DIRECT' ? 'INSTAGRAM_DIRECT'
-      : conversionLocation === 'LEAD_FROM_IG_DIRECT' ? 'ON_AD'
+      : conversionLocation === 'LEAD_FROM_IG_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
     // Para tráfico a perfil de IG: optimization_goal sigue siendo VISIT_INSTAGRAM_PROFILE (AdSet lo acepta)
