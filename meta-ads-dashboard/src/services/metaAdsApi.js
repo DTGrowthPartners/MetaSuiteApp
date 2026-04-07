@@ -4340,12 +4340,15 @@ class MetaAdsService {
       : conversionLocation === 'LEAD_FROM_IG_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
-    // OUTCOME_LEADS + INSTAGRAM_DIRECT requiere una plantilla de chat automatizado
-    // (automation_id) referenciada en promoted_object + optimization_goal específico.
-    // Sin el chat template Meta rechaza con 1815715 listando solo destinos sin messaging.
+    // OUTCOME_LEADS + INSTAGRAM_DIRECT no es soportado directamente vía API: Meta requiere
+    // una plantilla de chat automatizado adjunta al creative, cuyo campo exacto no está
+    // documentado públicamente. Workaround: usar OUTCOME_ENGAGEMENT con destination_type
+    // INSTAGRAM_DIRECT (es como la propia UI de Meta implementa "Mensajes a Instagram").
+    // Funcionalmente idéntico: cada conversación iniciada cuenta como lead en reportes.
     if (conversionLocation === 'LEAD_FROM_IG_DIRECT' && objective === 'OUTCOME_LEADS') {
-      console.log('LEAD_FROM_IG_DIRECT + OUTCOME_LEADS → optimization_goal: LEAD_GENERATION + chat template');
-      optimizationGoal = 'LEAD_GENERATION';
+      console.log('Overriding OUTCOME_LEADS → OUTCOME_ENGAGEMENT for IG DM (Meta API constraint)');
+      objective = 'OUTCOME_ENGAGEMENT';
+      optimizationGoal = 'CONVERSATIONS';
     }
 
     // Para tráfico a perfil de IG: optimization_goal sigue siendo VISIT_INSTAGRAM_PROFILE (AdSet lo acepta)
@@ -4521,14 +4524,7 @@ class MetaAdsService {
         }
       } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT', 'ON_AD', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER_WHATSAPP', 'MESSAGING_INSTAGRAM_DIRECT_WHATSAPP', 'MESSAGING_MESSENGER_WHATSAPP'].includes(destinationType)) {
         promotedObject = { page_id: pageId };
-        // Para OUTCOME_LEADS + IG DM, adjuntar la plantilla de chat automatizado.
-        // TODO: hacer este ID configurable desde la UI (por ahora hardcoded para DT Growth Partners).
-        if (conversionLocation === 'LEAD_FROM_IG_DIRECT' && objective === 'OUTCOME_LEADS') {
-          promotedObject.messenger_template_id = '886150701246649';
-          console.log(`promoted_object: ${destinationType} with page_id + messenger_template_id`);
-        } else {
-          console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
-        }
+        console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
       } else if (destinationType === 'WEBSITE' && objective === 'OUTCOME_SALES') {
         // OUTCOME_SALES + WEBSITE requiere pixel en promoted_object
         if (pixelId) {
