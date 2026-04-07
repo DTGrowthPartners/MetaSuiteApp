@@ -1673,6 +1673,15 @@ class MetaAdsService {
         errorMsg = `${errorData.error_user_title}: ${errorData.error_user_msg || errorMsg}`;
       }
 
+      // Lead Ads ToS no aceptadas en la Página (subcode 1815089)
+      if (errorData?.error_subcode === 1815089) {
+        const pageId = promotedObject?.page_id;
+        const tosUrl = pageId
+          ? `https://www.facebook.com/ads/leadgen/tos/?page_id=${pageId}`
+          : 'https://www.facebook.com/ads/leadgen/tos/';
+        errorMsg = `La Página de Facebook debe aceptar las Condiciones del Servicio de Lead Ads. Acéptalas aquí: ${tosUrl}`;
+      }
+
       return { success: false, error: errorMsg };
     }
   }

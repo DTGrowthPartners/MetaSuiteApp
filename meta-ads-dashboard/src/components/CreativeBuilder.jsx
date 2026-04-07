@@ -4302,9 +4302,22 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Loader2 size={14} className="creating-log-spinner" /> Progreso
           </h4>
-          {logs.map((log, i) => (
-            <p key={i} className="log-line">{log}</p>
-          ))}
+          {logs.map((log, i) => {
+            const urlMatch = log.match(/(https?:\/\/[^\s]+)/);
+            if (urlMatch) {
+              const [before, after] = log.split(urlMatch[1]);
+              return (
+                <p key={i} className="log-line">
+                  {before}
+                  <a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: '#4f8cff', textDecoration: 'underline', fontWeight: 600 }}>
+                    {urlMatch[1].includes('leadgen/tos') ? 'Aceptar Condiciones de Lead Ads →' : urlMatch[1]}
+                  </a>
+                  {after}
+                </p>
+              );
+            }
+            return <p key={i} className="log-line">{log}</p>;
+          })}
         </div>
       )}
 
