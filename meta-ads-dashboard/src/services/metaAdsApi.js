@@ -4340,10 +4340,11 @@ class MetaAdsService {
       : conversionLocation === 'LEAD_FROM_IG_DIRECT' ? 'INSTAGRAM_DIRECT'
       : null; // null = Meta decide automáticamente
 
-    // Para OUTCOME_LEADS + IG DM: usar optimization_goal=LEAD_GENERATION (igual que WhatsApp leads),
-    // no CONVERSATIONS. Esto es lo que hace que Meta acepte la combinación destino+objetivo.
+    // OUTCOME_LEADS + INSTAGRAM_DIRECT requiere una plantilla de chat automatizado
+    // (automation_id) referenciada en promoted_object + optimization_goal específico.
+    // Sin el chat template Meta rechaza con 1815715 listando solo destinos sin messaging.
     if (conversionLocation === 'LEAD_FROM_IG_DIRECT' && objective === 'OUTCOME_LEADS') {
-      console.log('LEAD_FROM_IG_DIRECT + OUTCOME_LEADS → optimization_goal: LEAD_GENERATION');
+      console.log('LEAD_FROM_IG_DIRECT + OUTCOME_LEADS → optimization_goal: LEAD_GENERATION + chat template');
       optimizationGoal = 'LEAD_GENERATION';
     }
 
@@ -4520,7 +4521,14 @@ class MetaAdsService {
         }
       } else if (['WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT', 'ON_AD', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER', 'MESSAGING_INSTAGRAM_DIRECT_MESSENGER_WHATSAPP', 'MESSAGING_INSTAGRAM_DIRECT_WHATSAPP', 'MESSAGING_MESSENGER_WHATSAPP'].includes(destinationType)) {
         promotedObject = { page_id: pageId };
-        console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
+        // Para OUTCOME_LEADS + IG DM, adjuntar la plantilla de chat automatizado.
+        // TODO: hacer este ID configurable desde la UI (por ahora hardcoded para DT Growth Partners).
+        if (conversionLocation === 'LEAD_FROM_IG_DIRECT' && objective === 'OUTCOME_LEADS') {
+          promotedObject.messenger_template_id = '886150701246649';
+          console.log(`promoted_object: ${destinationType} with page_id + messenger_template_id`);
+        } else {
+          console.log(`promoted_object: ${destinationType} with page_id: ${pageId}`);
+        }
       } else if (destinationType === 'WEBSITE' && objective === 'OUTCOME_SALES') {
         // OUTCOME_SALES + WEBSITE requiere pixel en promoted_object
         if (pixelId) {
