@@ -1653,9 +1653,13 @@ class MetaAdsService {
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
       // NO enviamos bid_strategy cuando usamos CBO - se hereda de la campaña
-      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      // Limpiar campos read-only que Meta devuelve en GET pero rechaza en POST.
+      // - targeting_optimization: eliminado por Meta Feb 2026
+      // - audience_suggestions: solo lectura (saved audiences lo incluyen y rompe el POST con
+      //   subcode 1487079 "is not a valid target spec field")
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
+      delete cleanTargeting.audience_suggestions;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
 
@@ -2935,9 +2939,13 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      // Limpiar campos read-only que Meta devuelve en GET pero rechaza en POST.
+      // - targeting_optimization: eliminado por Meta Feb 2026
+      // - audience_suggestions: solo lectura (saved audiences lo incluyen y rompe el POST con
+      //   subcode 1487079 "is not a valid target spec field")
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
+      delete cleanTargeting.audience_suggestions;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'WHATSAPP');
@@ -3061,9 +3069,13 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      // Limpiar campos read-only que Meta devuelve en GET pero rechaza en POST.
+      // - targeting_optimization: eliminado por Meta Feb 2026
+      // - audience_suggestions: solo lectura (saved audiences lo incluyen y rompe el POST con
+      //   subcode 1487079 "is not a valid target spec field")
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
+      delete cleanTargeting.audience_suggestions;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'MESSENGER');
@@ -3999,9 +4011,13 @@ class MetaAdsService {
       formData.append('campaign_id', campaignId);
       formData.append('billing_event', billingEvent);
       formData.append('optimization_goal', optimizationGoal);
-      // Limpiar targeting_optimization (eliminado por Meta Feb 2026)
+      // Limpiar campos read-only que Meta devuelve en GET pero rechaza en POST.
+      // - targeting_optimization: eliminado por Meta Feb 2026
+      // - audience_suggestions: solo lectura (saved audiences lo incluyen y rompe el POST con
+      //   subcode 1487079 "is not a valid target spec field")
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
+      delete cleanTargeting.audience_suggestions;
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       if (destinationType) formData.append('destination_type', destinationType);
