@@ -1660,6 +1660,19 @@ class MetaAdsService {
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
       delete cleanTargeting.audience_suggestions;
+
+      // Meta exige radio mínimo de 17 km (10 mi) para targeting por ciudad — radios menores
+      // disparan subcode 1487110 "El radio geográfico no se encuentra dentro de los límites".
+      if (cleanTargeting.geo_locations?.cities?.length) {
+        cleanTargeting.geo_locations = {
+          ...cleanTargeting.geo_locations,
+          cities: cleanTargeting.geo_locations.cities.map(c => {
+            const unit = c.distance_unit || 'kilometer';
+            const minRadius = unit === 'mile' ? 10 : 17;
+            return { ...c, radius: Math.max(c.radius || minRadius, minRadius), distance_unit: unit };
+          })
+        };
+      }
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
 
@@ -2946,6 +2959,19 @@ class MetaAdsService {
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
       delete cleanTargeting.audience_suggestions;
+
+      // Meta exige radio mínimo de 17 km (10 mi) para targeting por ciudad — radios menores
+      // disparan subcode 1487110 "El radio geográfico no se encuentra dentro de los límites".
+      if (cleanTargeting.geo_locations?.cities?.length) {
+        cleanTargeting.geo_locations = {
+          ...cleanTargeting.geo_locations,
+          cities: cleanTargeting.geo_locations.cities.map(c => {
+            const unit = c.distance_unit || 'kilometer';
+            const minRadius = unit === 'mile' ? 10 : 17;
+            return { ...c, radius: Math.max(c.radius || minRadius, minRadius), distance_unit: unit };
+          })
+        };
+      }
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'WHATSAPP');
@@ -3076,6 +3102,19 @@ class MetaAdsService {
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
       delete cleanTargeting.audience_suggestions;
+
+      // Meta exige radio mínimo de 17 km (10 mi) para targeting por ciudad — radios menores
+      // disparan subcode 1487110 "El radio geográfico no se encuentra dentro de los límites".
+      if (cleanTargeting.geo_locations?.cities?.length) {
+        cleanTargeting.geo_locations = {
+          ...cleanTargeting.geo_locations,
+          cities: cleanTargeting.geo_locations.cities.map(c => {
+            const unit = c.distance_unit || 'kilometer';
+            const minRadius = unit === 'mile' ? 10 : 17;
+            return { ...c, radius: Math.max(c.radius || minRadius, minRadius), distance_unit: unit };
+          })
+        };
+      }
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       formData.append('destination_type', 'MESSENGER');
@@ -4018,6 +4057,19 @@ class MetaAdsService {
       const cleanTargeting = { ...targeting };
       delete cleanTargeting.targeting_optimization;
       delete cleanTargeting.audience_suggestions;
+
+      // Meta exige radio mínimo de 17 km (10 mi) para targeting por ciudad — radios menores
+      // disparan subcode 1487110 "El radio geográfico no se encuentra dentro de los límites".
+      if (cleanTargeting.geo_locations?.cities?.length) {
+        cleanTargeting.geo_locations = {
+          ...cleanTargeting.geo_locations,
+          cities: cleanTargeting.geo_locations.cities.map(c => {
+            const unit = c.distance_unit || 'kilometer';
+            const minRadius = unit === 'mile' ? 10 : 17;
+            return { ...c, radius: Math.max(c.radius || minRadius, minRadius), distance_unit: unit };
+          })
+        };
+      }
       formData.append('targeting', JSON.stringify(cleanTargeting));
       formData.append('status', status);
       if (destinationType) formData.append('destination_type', destinationType);
