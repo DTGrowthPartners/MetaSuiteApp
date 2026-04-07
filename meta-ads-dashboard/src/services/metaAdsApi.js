@@ -1290,22 +1290,52 @@ class MetaAdsService {
   }
 
   // Obtener imágenes de la biblioteca de medios de la cuenta publicitaria
-  async getAdImages(adAccountId) {
+  // Pagina hasta `maxItems` y dedupea variantes auto-recortadas que Meta genera al subir.
+  async getAdImages(adAccountId, maxItems = 300) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
       console.log('Fetching ad images for:', normalizedId);
 
-      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/adimages`, {
-        params: {
-          access_token: this.accessToken,
-          fields: 'hash,url,name,width,height,created_time',
-          limit: 50
-        }
-      });
+      const all = [];
+      let url = `${META_API_BASE_URL}/${normalizedId}/adimages`;
+      let params = {
+        access_token: this.accessToken,
+        fields: 'hash,url,name,width,height,created_time',
+        limit: 100
+      };
 
-      const images = response.data.data || [];
-      console.log('Ad images found:', images.length);
-      return { success: true, data: images };
+      while (url && all.length < maxItems) {
+        const response = await axios.get(url, { params });
+        const batch = response.data?.data || [];
+        all.push(...batch);
+        const next = response.data?.paging?.next;
+        if (next && all.length < maxItems) {
+          url = next; // next ya trae todos los params + cursor
+          params = undefined;
+        } else {
+          url = null;
+        }
+      }
+
+      // Dedupe: Meta crea variantes recortadas al subir desde PC. Mismo `name` (a veces con
+      // sufijo tipo "_crop"), distinto hash. Agrupamos por nombre base y nos quedamos con la
+      // de mayor resolución (la original).
+      const baseNameOf = (name = '') => name
+        .replace(/\.(jpg|jpeg|png|gif|webp)$/i, '')
+        .replace(/[_-](crop|cropped|thumb|small|medium|large|\d+x\d+)$/i, '')
+        .toLowerCase();
+      const groups = new Map();
+      for (const img of all) {
+        const key = baseNameOf(img.name) || img.hash;
+        const prev = groups.get(key);
+        const area = (img.width || 0) * (img.height || 0);
+        const prevArea = prev ? (prev.width || 0) * (prev.height || 0) : -1;
+        if (!prev || area > prevArea) groups.set(key, img);
+      }
+      const deduped = Array.from(groups.values());
+
+      console.log(`Ad images found: ${all.length} (deduped to ${deduped.length})`);
+      return { success: true, data: deduped };
     } catch (error) {
       console.error('Error fetching ad images:', error.response?.data?.error || error.message);
       return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
@@ -1313,22 +1343,42 @@ class MetaAdsService {
   }
 
   // Obtener videos de la biblioteca de medios de la cuenta publicitaria
-  async getAdVideos(adAccountId) {
+  async getAdVideos(adAccountId, maxItems = 300) {
     try {
       const normalizedId = this.normalizeAccountId(adAccountId);
       console.log('Fetching ad videos for:', normalizedId);
 
-      const response = await axios.get(`${META_API_BASE_URL}/${normalizedId}/advideos`, {
-        params: {
-          access_token: this.accessToken,
-          fields: 'id,title,thumbnails,source,created_time,length',
-          limit: 50
-        }
-      });
+      const all = [];
+      let url = `${META_API_BASE_URL}/${normalizedId}/advideos`;
+      let params = {
+        access_token: this.accessToken,
+        fields: 'id,title,thumbnails,source,created_time,length',
+        limit: 100
+      };
 
-      const videos = response.data.data || [];
-      console.log('Ad videos found:', videos.length);
-      return { success: true, data: videos };
+      while (url && all.length < maxItems) {
+        const response = await axios.get(url, { params });
+        const batch = response.data?.data || [];
+        all.push(...batch);
+        const next = response.data?.paging?.next;
+        if (next && all.length < maxItems) {
+          url = next;
+          params = undefined;
+        } else {
+          url = null;
+        }
+      }
+
+      // Dedupe videos por título (Meta puede generar variantes de aspecto al subir)
+      const seen = new Map();
+      for (const v of all) {
+        const key = (v.title || v.id).toLowerCase();
+        if (!seen.has(key)) seen.set(key, v);
+      }
+      const deduped = Array.from(seen.values());
+
+      console.log(`Ad videos found: ${all.length} (deduped to ${deduped.length})`);
+      return { success: true, data: deduped };
     } catch (error) {
       console.error('Error fetching ad videos:', error.response?.data?.error || error.message);
       return { success: false, error: error.response?.data?.error?.message || error.message, data: [] };
