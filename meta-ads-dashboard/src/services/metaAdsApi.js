@@ -830,8 +830,8 @@ class MetaAdsService {
           access_token: this.accessToken,
           type: 'adgeolocation',
           q: query,
-          location_types: JSON.stringify(['city', 'region', 'country', 'subcity']),
-          limit: 15
+          location_types: JSON.stringify(['city', 'region', 'country', 'subcity', 'place', 'neighborhood']),
+          limit: 25
         }
       });
       const results = (resp.data.data || []).map(loc => ({
@@ -843,12 +843,17 @@ class MetaAdsService {
         region: loc.region,
         region_id: loc.region_id,
         primary_city: loc.primary_city,
+        primary_city_id: loc.primary_city_id,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
         supports_radius: loc.supports_radius || false,
         // Para display — lo más específico posible
         displayName: loc.type === 'country' ? loc.name
           : loc.type === 'region' ? `${loc.name}, ${loc.country_name}`
           : loc.type === 'city' ? `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
           : loc.type === 'subcity' ? `${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
+          : loc.type === 'place' ? `📍 ${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
+          : loc.type === 'neighborhood' ? `${loc.name}${loc.primary_city ? ', ' + loc.primary_city : ''}, ${loc.country_name}`
           : `${loc.name}${loc.region ? ', ' + loc.region : ''}, ${loc.country_name}`
       }));
       return { success: true, data: results };
@@ -867,8 +872,8 @@ class MetaAdsService {
           addressdetails: 1,
           limit: 8,
           'accept-language': 'es'
-        },
-        headers: { 'User-Agent': 'MetaSuiteApp/1.0' }
+        }
+        // No setear User-Agent: el browser lo bloquea ("Refused to set unsafe header")
       });
       const results = (resp.data || [])
         .filter(p => p.lat && p.lon)
