@@ -2579,6 +2579,81 @@ async function getReportData(accountId, token) {
 }
 
 // Endpoint: obtener datos de reporte para una cuenta
+// Endpoint: resumen rápido (ayer + hoy) de N cuentas en paralelo para el hub de reportes.
+// Hace 1 call por cuenta a /insights?time_increment=1 con rango yesterday..today, obteniendo
+// ambos días en una sola petición. Tolera fallos: una cuenta que falla no rompe el resto.
+app.get('/api/reports-summary', async (req, res) => {
+  try {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ success: false, error: 'Token requerido' });
+    const accountIds = (req.query.accountIds || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (accountIds.length === 0) return res.status(400).json({ success: false, error: 'accountIds requerido' });
+
+    const { yesterday, today } = getReportDates();
+
+    const extractResults = (dayData) => {
+      if (!dayData) return { spend: 0, results: 0, label: 'Resultados', impressions: 0, reach: 0 };
+      const spend = parseFloat(dayData.spend || 0);
+      const impressions = parseInt(dayData.impressions || 0);
+      const reach = parseInt(dayData.reach || 0);
+      const actions = dayData.actions || [];
+      let conv = 0, leads = 0, linkClicks = 0, lpv = 0, purchases = 0;
+      for (const a of actions) {
+        const t = a.action_type;
+        const v = parseInt(a.value || 0);
+        if (t === 'onsite_conversion.messaging_conversation_started_7d') conv = v;
+        else if (t === 'lead') leads = v;
+        else if (t === 'link_click') linkClicks = v;
+        else if (t === 'landing_page_view') lpv = v;
+        else if (t === 'purchase' || t === 'offsite_conversion.fb_pixel_purchase') purchases = v;
+      }
+      let results = 0, label = 'Clics';
+      if (purchases > 0) { results = purchases; label = 'Ventas'; }
+      else if (conv > 0) { results = conv; label = 'Mensajes'; }
+      else if (leads > 0) { results = leads; label = 'Leads'; }
+      else if (lpv > 0) { results = lpv; label = 'Visitas'; }
+      else if (linkClicks > 0) { results = linkClicks; label = 'Clics'; }
+      return { spend, results, label, impressions, reach };
+    };
+
+    const results = await Promise.all(accountIds.map(async (accountId) => {
+      const normalizedId = normalizeAccountId(accountId);
+      try {
+        const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/insights`, {
+          params: {
+            access_token: token,
+            fields: 'spend,impressions,reach,actions',
+            time_range: JSON.stringify({ since: yesterday, until: today }),
+            time_increment: 1
+          },
+          timeout: 20000
+        });
+        const data = resp.data.data || [];
+        const byDate = {};
+        for (const d of data) byDate[d.date_start] = d;
+        return {
+          accountId: normalizedId,
+          ok: true,
+          yesterday: extractResults(byDate[yesterday]),
+          today: extractResults(byDate[today])
+        };
+      } catch (e) {
+        return {
+          accountId: normalizedId,
+          ok: false,
+          error: e.response?.data?.error?.message || e.message,
+          yesterday: { spend: 0, results: 0, label: 'Resultados', impressions: 0, reach: 0 },
+          today: { spend: 0, results: 0, label: 'Resultados', impressions: 0, reach: 0 }
+        };
+      }
+    }));
+
+    res.json({ success: true, data: results, dateRange: { yesterday, today } });
+  } catch (error) {
+    if (!res.headersSent) res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Helper: resolver accountConfig desde slug preconfigurado o desde act_xxx dinámico
 function resolveAccountConfig(slug, query = {}) {
   if (REPORT_ACCOUNTS[slug]) return REPORT_ACCOUNTS[slug];

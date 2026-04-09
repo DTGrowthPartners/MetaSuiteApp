@@ -426,7 +426,7 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         {isReportsHub ? (
-          <ReportsHub adAccounts={adAccounts} loadingAccounts={loadingAccounts} />
+          <ReportsHub adAccounts={adAccounts} loadingAccounts={loadingAccounts} accessToken={accessToken} />
         ) : reportSlug ? (
           <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} lang={lang} />
         ) : page === 'dashboard' ? (
@@ -449,28 +449,100 @@ function App() {
 }
 
 // ============================================
-// REPORTS HUB — grid de tarjetas con todas las cuentas publicitarias
+// REPORTS HUB — tablero de decisión operativa
 // ============================================
-function ReportsHub({ adAccounts, loadingAccounts }) {
+function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
+  const [summary, setSummary] = useState({}); // { accountId: { yesterday, today, ok } }
+  const [loadingSummary, setLoadingSummary] = useState(true);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('urgent'); // urgent, review, healthy, inactive, all
+
+  // Cargar resumen de todas las cuentas al montar
+  useEffect(() => {
+    if (loadingAccounts || !adAccounts?.length || !accessToken) return;
+    setLoadingSummary(true);
+    const apiBase = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
+    const ids = adAccounts.map(a => (a.id.startsWith('act_') ? a.id : 'act_' + a.id)).join(',');
+    fetch(`${apiBase}/reports-summary?accountIds=${encodeURIComponent(ids)}&accessToken=${encodeURIComponent(accessToken)}`)
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) {
+          const map = {};
+          for (const item of json.data) map[item.accountId] = item;
+          setSummary(map);
+        }
+      })
+      .catch(err => console.error('reports-summary failed:', err))
+      .finally(() => setLoadingSummary(false));
+  }, [adAccounts, loadingAccounts, accessToken]);
 
   if (loadingAccounts) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+      <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Cargando cuentas...
       </div>
     );
   }
 
-  if (!adAccounts || adAccounts.length === 0) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-        No hay cuentas publicitarias disponibles.
-      </div>
-    );
+  if (!adAccounts?.length) {
+    return <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>No hay cuentas publicitarias disponibles.</div>;
   }
 
-  const filtered = adAccounts.filter(a => {
+  // Clasificar cada cuenta en urgent / review / healthy / inactive
+  const classify = (s) => {
+    if (!s || !s.ok) return 'inactive';
+    const tSpend = s.today?.spend || 0, tResults = s.today?.results || 0;
+    const ySpend = s.yesterday?.spend || 0, yResults = s.yesterday?.results || 0;
+    if (tSpend === 0 && ySpend === 0) return 'inactive';
+    // Urgente: gasto notable sin ningún resultado
+    if (tSpend >= 15000 && tResults === 0) return 'urgent';
+    if (ySpend >= 15000 && yResults === 0) return 'urgent';
+    // Revisar: frenó gasto hoy aunque ayer corría, o caída brusca de resultados
+    if (ySpend > 0 && tSpend === 0) return 'review';
+    if (yResults > 0 && tResults === 0 && tSpend > 0) return 'review';
+    // Revisar: CPA se disparó (>80% vs ayer)
+    if (yResults > 0 && tResults > 0) {
+      const yCPA = ySpend / yResults;
+      const tCPA = tSpend / tResults;
+      if (tCPA > yCPA * 1.8 && tSpend > 10000) return 'review';
+    }
+    return 'healthy';
+  };
+
+  const formatCOP = (v) => '$' + Math.round(v || 0).toLocaleString('es-CO');
+  const formatPct = (cur, prev) => {
+    if (!prev) return null;
+    const pct = ((cur - prev) / prev) * 100;
+    const sign = pct >= 0 ? '+' : '';
+    return `${sign}${pct.toFixed(0)}%`;
+  };
+
+  // Normalizar ID a act_
+  const normId = (id) => id?.startsWith('act_') ? id : 'act_' + id;
+
+  // Enriquecer cada cuenta con su status y summary
+  const enriched = adAccounts.map(a => {
+    const id = normId(a.id);
+    const s = summary[id];
+    return { ...a, normId: id, status: classify(s), summary: s };
+  });
+
+  // Totales globales
+  const statusCounts = { urgent: 0, review: 0, healthy: 0, inactive: 0 };
+  let totalSpendToday = 0, totalResultsToday = 0, totalSpendYesterday = 0, totalResultsYesterday = 0;
+  for (const a of enriched) {
+    statusCounts[a.status]++;
+    if (a.summary?.ok) {
+      totalSpendToday += a.summary.today?.spend || 0;
+      totalResultsToday += a.summary.today?.results || 0;
+      totalSpendYesterday += a.summary.yesterday?.spend || 0;
+      totalResultsYesterday += a.summary.yesterday?.results || 0;
+    }
+  }
+
+  // Filtrado por búsqueda + tab
+  const filtered = enriched.filter(a => {
+    if (filter !== 'all' && a.status !== filter) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (a.name || '').toLowerCase().includes(q)
@@ -478,103 +550,290 @@ function ReportsHub({ adAccounts, loadingAccounts }) {
       || (a.id || '').toLowerCase().includes(q);
   });
 
-  // Agrupar por business
-  const byBusiness = new Map();
-  for (const acc of filtered) {
-    const biz = acc.business?.name || 'Sin negocio';
-    if (!byBusiness.has(biz)) byBusiness.set(biz, []);
-    byBusiness.get(biz).push(acc);
-  }
-  const businessGroups = Array.from(byBusiness.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  // Orden: urgent primero, luego por gasto hoy desc
+  const ordered = [...filtered].sort((a, b) => {
+    const rank = { urgent: 0, review: 1, healthy: 2, inactive: 3 };
+    if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+    return (b.summary?.today?.spend || 0) - (a.summary?.today?.spend || 0);
+  });
+
+  const urgentAccounts = enriched.filter(a => a.status === 'urgent')
+    .sort((a, b) => (b.summary?.today?.spend || 0) - (a.summary?.today?.spend || 0));
 
   const openReport = (acc) => {
     const name = encodeURIComponent(acc.name || acc.id);
     const business = encodeURIComponent(acc.business?.name || '');
-    const id = acc.id.startsWith('act_') ? acc.id : 'act_' + acc.id;
-    window.location.href = `/${id}?name=${name}&business=${business}`;
+    window.location.href = `/${acc.normId}?name=${name}&business=${business}`;
+  };
+
+  // ========== Sub-componentes inline ==========
+  const STATUS_STYLES = {
+    urgent:   { color: '#f87171', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', label: 'URGENTE' },
+    review:   { color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', label: 'REVISAR' },
+    healthy:  { color: '#4ade80', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)', label: 'SALUDABLE' },
+    inactive: { color: '#94a3b8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)', label: 'INACTIVA' }
+  };
+
+  const KpiTile = ({ icon, label, value, sub, color, onClick, active }) => (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, minWidth: 180, textAlign: 'left', cursor: onClick ? 'pointer' : 'default',
+        background: active ? `${color}22` : 'rgba(15,23,42,0.6)',
+        border: `1px solid ${active ? color : 'rgba(99,102,241,0.2)'}`,
+        borderRadius: 14, padding: '16px 18px', color: '#e2e8f0',
+        transition: 'all 0.15s ease'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        {icon}
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{sub}</div>}
+    </button>
+  );
+
+  const UrgencyCard = ({ acc }) => {
+    const s = acc.summary;
+    const y = s?.yesterday || {}, t = s?.today || {};
+    const alerts = [];
+    if ((t.spend || 0) >= 15000 && (t.results || 0) === 0) alerts.push(`Sin resultados hoy con ${formatCOP(t.spend)} gastados`);
+    if ((y.spend || 0) >= 15000 && (y.results || 0) === 0) alerts.push(`Ayer: ${formatCOP(y.spend)} sin resultados`);
+    if ((y.spend || 0) > 0 && (t.spend || 0) === 0) alerts.push('Gasto detenido hoy');
+    if (y.results > 0 && t.results === 0 && t.spend > 0) alerts.push('Caída de resultados vs ayer');
+    const pctSpend = formatPct(t.spend || 0, y.spend || 0);
+
+    return (
+      <div
+        onClick={() => openReport(acc)}
+        style={{
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(15,23,42,0.9))',
+          border: '1px solid rgba(239,68,68,0.35)', borderRadius: 14, padding: 16,
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.7)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
+            <div style={{ fontSize: 10, color: '#64748b' }}>{acc.business?.name || '—'}</div>
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999, background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>URGENTE</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10, paddingTop: 10, borderTop: '1px solid rgba(99,102,241,0.15)' }}>
+          <div>
+            <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>Ayer</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{formatCOP(y.spend || 0)}</div>
+            <div style={{ fontSize: 10, color: '#94a3b8' }}>{y.results || 0} {y.label || 'resultados'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>Hoy {pctSpend && <span style={{ color: (t.spend || 0) < (y.spend || 0) ? '#f87171' : '#4ade80' }}>· {pctSpend}</span>}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{formatCOP(t.spend || 0)}</div>
+            <div style={{ fontSize: 10, color: '#94a3b8' }}>{t.results || 0} {t.label || 'resultados'}</div>
+          </div>
+        </div>
+        {alerts.slice(0, 2).map((a, i) => (
+          <div key={i} style={{ fontSize: 10, color: '#fca5a5', padding: '4px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: 6, marginTop: 4 }}>
+            ⚠ {a}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <div style={{ padding: '32px 24px', maxWidth: 1280, margin: '0 auto' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e8f0', margin: 0, marginBottom: 6 }}>
-          <BarChart3 size={26} style={{ verticalAlign: 'middle', marginRight: 10, color: '#a5b4fc' }} />
+    <div style={{ padding: '24px 20px', maxWidth: 1400, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#e2e8f0', margin: 0, marginBottom: 4 }}>
+          <BarChart3 size={24} style={{ verticalAlign: 'middle', marginRight: 10, color: '#a5b4fc' }} />
           Reportes
         </h1>
-        <p style={{ color: '#94a3b8', margin: 0, fontSize: 14 }}>
-          Selecciona una cuenta para ver su reporte de Ayer, Hoy y Último Mes.
+        <p style={{ color: '#94a3b8', margin: 0, fontSize: 13 }}>
+          Cuentas que necesitan atención hoy. Ordenadas por urgencia.
         </p>
       </div>
 
-      <input
-        type="text"
-        placeholder="Buscar cuenta o negocio..."
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        style={{
-          width: '100%', padding: '12px 16px', marginBottom: 24,
-          background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.25)',
-          borderRadius: 10, color: '#e2e8f0', fontSize: 14, outline: 'none'
-        }}
-      />
+      {/* KPI bar */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <KpiTile
+          icon={<span style={{ fontSize: 14 }}>🔴</span>}
+          label="Cuentas urgentes" value={statusCounts.urgent}
+          sub="Gasto sin resultados" color="#f87171"
+          active={filter === 'urgent'} onClick={() => setFilter('urgent')}
+        />
+        <KpiTile
+          icon={<span style={{ fontSize: 14 }}>🟡</span>}
+          label="En observación" value={statusCounts.review}
+          sub="Anomalías detectadas" color="#fbbf24"
+          active={filter === 'review'} onClick={() => setFilter('review')}
+        />
+        <KpiTile
+          icon={<span style={{ fontSize: 14 }}>🟢</span>}
+          label="Saludables" value={statusCounts.healthy}
+          sub="Dentro de parámetros" color="#4ade80"
+          active={filter === 'healthy'} onClick={() => setFilter('healthy')}
+        />
+        <KpiTile
+          icon={<span style={{ fontSize: 14 }}>⚫</span>}
+          label="Sin gasto" value={statusCounts.inactive}
+          sub="Sin operación" color="#94a3b8"
+          active={filter === 'inactive'} onClick={() => setFilter('inactive')}
+        />
+      </div>
 
-      {businessGroups.map(([biz, accounts]) => (
-        <div key={biz} style={{ marginBottom: 32 }}>
-          <h3 style={{ color: '#a5b4fc', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 12px' }}>
-            {biz} <span style={{ color: '#64748b', fontWeight: 400 }}>({accounts.length})</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-            {accounts.map(acc => {
-              const status = acc.account_status === 1 ? 'active' : 'inactive';
-              return (
-                <button
-                  key={acc.id}
-                  onClick={() => openReport(acc)}
-                  style={{
-                    textAlign: 'left', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.7))',
-                    border: '1px solid rgba(99,102,241,0.2)',
-                    borderRadius: 12, padding: '16px 18px',
-                    transition: 'all 0.15s ease',
-                    color: '#e2e8f0'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <BarChart3 size={18} style={{ color: '#a5b4fc' }} />
-                    <span style={{
-                      fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999,
-                      background: status === 'active' ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
-                      color: status === 'active' ? '#4ade80' : '#94a3b8'
-                    }}>
-                      {status === 'active' ? 'ACTIVA' : 'INACTIVA'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 }}>
-                    {acc.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>
-                    {acc.id} · {acc.currency || ''}
-                  </div>
-                </button>
-              );
-            })}
+      {/* Totales portafolio */}
+      <div style={{
+        display: 'flex', gap: 24, marginBottom: 20, padding: '12px 18px',
+        background: 'rgba(15,23,42,0.5)', borderRadius: 12, border: '1px solid rgba(99,102,241,0.15)',
+        flexWrap: 'wrap'
+      }}>
+        <div>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto hoy (portafolio)</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+            {formatCOP(totalSpendToday)} <span style={{ fontSize: 11, color: formatPct(totalSpendToday, totalSpendYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalSpendToday, totalSpendYesterday)}</span>
           </div>
         </div>
-      ))}
+        <div>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Resultados hoy</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+            {totalResultsToday} <span style={{ fontSize: 11, color: formatPct(totalResultsToday, totalResultsYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalResultsToday, totalResultsYesterday)}</span>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto ayer</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>{formatCOP(totalSpendYesterday)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cuentas con datos</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>{Object.values(summary).filter(s => s.ok).length} / {adAccounts.length}</div>
+        </div>
+        {loadingSummary && <div style={{ color: '#94a3b8', fontSize: 12, alignSelf: 'center' }}><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> Cargando métricas...</div>}
+      </div>
 
-      {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#94a3b8', padding: 40 }}>
-          No se encontraron cuentas que coincidan con "{query}".
+      {/* Urgencias Hoy — cards grandes */}
+      {urgentAccounts.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f87171', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            🔴 Urgencias Hoy <span style={{ color: '#64748b', fontSize: 12, fontWeight: 500 }}>· {urgentAccounts.length} cuentas requieren decisión</span>
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+            {urgentAccounts.slice(0, 9).map(acc => <UrgencyCard key={acc.normId} acc={acc} />)}
+          </div>
         </div>
       )}
+
+      {/* Buscador + tabs */}
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="🔍 Buscar cuenta o negocio..."
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{
+            width: '100%', padding: '10px 14px', marginBottom: 10,
+            background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.2)',
+            borderRadius: 10, color: '#e2e8f0', fontSize: 13, outline: 'none'
+          }}
+        />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[
+            { key: 'all', label: `Todas (${enriched.length})` },
+            { key: 'urgent', label: `🔴 Urgentes (${statusCounts.urgent})` },
+            { key: 'review', label: `🟡 Revisar (${statusCounts.review})` },
+            { key: 'healthy', label: `🟢 Saludables (${statusCounts.healthy})` },
+            { key: 'inactive', label: `⚫ Inactivas (${statusCounts.inactive})` }
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                background: filter === t.key ? 'rgba(99,102,241,0.25)' : 'rgba(15,23,42,0.6)',
+                border: `1px solid ${filter === t.key ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.15)'}`,
+                color: filter === t.key ? '#e2e8f0' : '#94a3b8'
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabla compacta de todas las cuentas */}
+      <div style={{
+        background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(99,102,241,0.15)',
+        borderRadius: 12, overflow: 'hidden'
+      }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
+          padding: '10px 14px', background: 'rgba(15,23,42,0.8)',
+          borderBottom: '1px solid rgba(99,102,241,0.15)',
+          fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5
+        }}>
+          <div>Cuenta</div>
+          <div>Estado</div>
+          <div>Gasto ayer</div>
+          <div>Gasto hoy</div>
+          <div>Resultados hoy</div>
+          <div style={{ textAlign: 'right' }}>Acción</div>
+        </div>
+        {ordered.length === 0 ? (
+          <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            {loadingSummary ? 'Cargando datos de las cuentas...' : 'No hay cuentas en esta categoría.'}
+          </div>
+        ) : ordered.map(acc => {
+          const s = acc.summary;
+          const stStyle = STATUS_STYLES[acc.status];
+          return (
+            <div
+              key={acc.normId}
+              onClick={() => openReport(acc)}
+              style={{
+                display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
+                padding: '12px 14px', cursor: 'pointer',
+                borderBottom: '1px solid rgba(99,102,241,0.08)',
+                fontSize: 12, color: '#e2e8f0', alignItems: 'center',
+                transition: 'background 0.1s ease'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.06)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>{acc.business?.name || '—'}</div>
+              </div>
+              <div>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999,
+                  background: stStyle.bg, color: stStyle.color, border: `1px solid ${stStyle.border}`
+                }}>{stStyle.label}</span>
+              </div>
+              <div style={{ color: '#cbd5e1' }}>{formatCOP(s?.yesterday?.spend || 0)}</div>
+              <div style={{ color: '#cbd5e1' }}>
+                {formatCOP(s?.today?.spend || 0)}
+                {s?.yesterday?.spend > 0 && (
+                  <span style={{ fontSize: 10, marginLeft: 6, color: (s.today?.spend || 0) < (s.yesterday?.spend || 0) ? '#f87171' : '#4ade80' }}>
+                    {formatPct(s.today?.spend || 0, s.yesterday?.spend || 0)}
+                  </span>
+                )}
+              </div>
+              <div>
+                <span style={{ fontWeight: 600, color: (s?.today?.results || 0) === 0 && (s?.today?.spend || 0) > 0 ? '#f87171' : '#e2e8f0' }}>
+                  {s?.today?.results || 0}
+                </span>
+                <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>{s?.today?.label || ''}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 600 }}>Ver →</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
