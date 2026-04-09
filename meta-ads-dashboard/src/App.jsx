@@ -362,14 +362,20 @@ function App() {
         </div>
         <div className="nav-links">
           <button
-            className={`nav-link ${page === 'main' && !reportSlug ? 'active' : ''}`}
-            onClick={() => { window.location.hash = ''; setPage('main'); }}
+            className={`nav-link ${page === 'main' && !reportSlug && !isReportsHub ? 'active' : ''}`}
+            onClick={() => {
+              if (window.location.pathname !== '/') { window.location.href = '/'; return; }
+              window.location.hash = ''; setPage('main');
+            }}
           >
             {tr('campaigns', lang)}
           </button>
           <button
-            className={`nav-link ${page === 'audiences' ? 'active' : ''}`}
-            onClick={() => { window.location.hash = '#audiences'; setPage('audiences'); }}
+            className={`nav-link ${page === 'audiences' && !reportSlug && !isReportsHub ? 'active' : ''}`}
+            onClick={() => {
+              if (window.location.pathname !== '/') { window.location.href = '/#audiences'; return; }
+              window.location.hash = '#audiences'; setPage('audiences');
+            }}
           >
             {tr('audiences', lang)}
           </button>
