@@ -608,7 +608,10 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     try {
       setLoading(true);
       setError(null);
-      const resp = await fetch(`${API_BASE}/report/${slug}?accessToken=${encodeURIComponent(accessToken)}`);
+      // Propagar query params (name/business) — necesarios para slugs dinámicos act_xxx
+      const search = window.location.search || '';
+      const sep = search ? '&' : '?';
+      const resp = await fetch(`${API_BASE}/report/${slug}${search}${sep}accessToken=${encodeURIComponent(accessToken)}`);
       const json = await resp.json();
       if (!json.success) throw new Error(json.error || 'Error cargando reporte');
 
@@ -659,6 +662,18 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     <div className="report-page">
       <header className="report-header">
         <div className="report-header-info">
+          {window.location.search && (
+            <button
+              onClick={() => { window.location.href = '/reportes'; }}
+              style={{
+                background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+                color: '#a5b4fc', borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, marginBottom: 8
+              }}
+            >
+              ← Reportes
+            </button>
+          )}
           <h1 className="report-title">{name}</h1>
           <span className="report-business">{businessName}</span>
         </div>
@@ -705,7 +720,9 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => {
-              window.open(`${API_BASE}/report/${slug}/pdf?accessToken=${encodeURIComponent(accessToken)}`, '_blank');
+              const s = window.location.search || '';
+              const sp = s ? '&' : '?';
+              window.open(`${API_BASE}/report/${slug}/pdf${s}${sp}accessToken=${encodeURIComponent(accessToken)}`, '_blank');
             }}
             className="report-refresh-btn"
             disabled={!data?.accountId}

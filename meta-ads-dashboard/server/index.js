@@ -2577,10 +2577,27 @@ async function getReportData(accountId, token) {
 }
 
 // Endpoint: obtener datos de reporte para una cuenta
+// Helper: resolver accountConfig desde slug preconfigurado o desde act_xxx dinámico
+function resolveAccountConfig(slug, query = {}) {
+  if (REPORT_ACCOUNTS[slug]) return REPORT_ACCOUNTS[slug];
+  // Slug dinámico: act_<id> usa info del query string para nombre/negocio
+  if (typeof slug === 'string' && slug.startsWith('act_')) {
+    return {
+      accountId: slug,
+      name: query.name || slug,
+      businessName: query.business || query.businessName || '',
+      locations: [],
+      resultMetric: 'conversations',
+      resultLabel: 'Mensajes'
+    };
+  }
+  return null;
+}
+
 app.get('/api/report/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
-    const accountConfig = REPORT_ACCOUNTS[slug];
+    const accountConfig = resolveAccountConfig(slug, req.query);
 
     if (!accountConfig) {
       return res.status(404).json({ success: false, error: 'Cuenta no encontrada' });
@@ -2735,7 +2752,7 @@ function generatePdfHtml(accountConfig, data) {
 app.get('/api/report/:slug/pdf', async (req, res) => {
   try {
     const { slug } = req.params;
-    const accountConfig = REPORT_ACCOUNTS[slug];
+    const accountConfig = resolveAccountConfig(slug, req.query);
     if (!accountConfig) return res.status(404).json({ success: false, error: 'Cuenta no encontrada' });
 
     const token = getToken(req);

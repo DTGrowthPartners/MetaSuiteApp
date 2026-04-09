@@ -4,7 +4,7 @@ import AccountDashboard from './components/AccountDashboard';
 import CampaignReport from './components/CampaignReport';
 import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, BarChart3 } from 'lucide-react';
 import tr from './translations';
 import './App.css';
 
@@ -251,7 +251,9 @@ function App() {
     return <div dangerouslySetInnerHTML={{ __html: legalHtml }} />;
   }
 
-  const reportSlug = pathname !== '/' && !pathname.startsWith('/assets') && !pathname.startsWith('/api')
+  // /reportes = hub que lista todas las cuentas. /reportes/act_xxx también acepta.
+  const isReportsHub = pathname === '/reportes' || pathname === '/reportes/';
+  const reportSlug = !isReportsHub && pathname !== '/' && !pathname.startsWith('/assets') && !pathname.startsWith('/api')
     ? pathname.replace(/^\//, '').replace(/\/$/, '')
     : null;
 
@@ -371,6 +373,12 @@ function App() {
           >
             {tr('audiences', lang)}
           </button>
+          <button
+            className={`nav-link ${isReportsHub || reportSlug ? 'active' : ''}`}
+            onClick={() => { window.location.href = '/reportes'; }}
+          >
+            <BarChart3 size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />Reportes
+          </button>
         </div>
         <div className="nav-info">
           {loadingAccounts ? (
@@ -411,7 +419,9 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        {reportSlug ? (
+        {isReportsHub ? (
+          <ReportsHub adAccounts={adAccounts} loadingAccounts={loadingAccounts} />
+        ) : reportSlug ? (
           <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} lang={lang} />
         ) : page === 'dashboard' ? (
           <AccountDashboard
@@ -428,6 +438,137 @@ function App() {
           <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} lang={lang} />
         )}
       </main>
+    </div>
+  );
+}
+
+// ============================================
+// REPORTS HUB — grid de tarjetas con todas las cuentas publicitarias
+// ============================================
+function ReportsHub({ adAccounts, loadingAccounts }) {
+  const [query, setQuery] = useState('');
+
+  if (loadingAccounts) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Cargando cuentas...
+      </div>
+    );
+  }
+
+  if (!adAccounts || adAccounts.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+        No hay cuentas publicitarias disponibles.
+      </div>
+    );
+  }
+
+  const filtered = adAccounts.filter(a => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (a.name || '').toLowerCase().includes(q)
+      || (a.business?.name || '').toLowerCase().includes(q)
+      || (a.id || '').toLowerCase().includes(q);
+  });
+
+  // Agrupar por business
+  const byBusiness = new Map();
+  for (const acc of filtered) {
+    const biz = acc.business?.name || 'Sin negocio';
+    if (!byBusiness.has(biz)) byBusiness.set(biz, []);
+    byBusiness.get(biz).push(acc);
+  }
+  const businessGroups = Array.from(byBusiness.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+  const openReport = (acc) => {
+    const name = encodeURIComponent(acc.name || acc.id);
+    const business = encodeURIComponent(acc.business?.name || '');
+    const id = acc.id.startsWith('act_') ? acc.id : 'act_' + acc.id;
+    window.location.href = `/${id}?name=${name}&business=${business}`;
+  };
+
+  return (
+    <div style={{ padding: '32px 24px', maxWidth: 1280, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e2e8f0', margin: 0, marginBottom: 6 }}>
+          <BarChart3 size={26} style={{ verticalAlign: 'middle', marginRight: 10, color: '#a5b4fc' }} />
+          Reportes
+        </h1>
+        <p style={{ color: '#94a3b8', margin: 0, fontSize: 14 }}>
+          Selecciona una cuenta para ver su reporte de Ayer, Hoy y Último Mes.
+        </p>
+      </div>
+
+      <input
+        type="text"
+        placeholder="Buscar cuenta o negocio..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        style={{
+          width: '100%', padding: '12px 16px', marginBottom: 24,
+          background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.25)',
+          borderRadius: 10, color: '#e2e8f0', fontSize: 14, outline: 'none'
+        }}
+      />
+
+      {businessGroups.map(([biz, accounts]) => (
+        <div key={biz} style={{ marginBottom: 32 }}>
+          <h3 style={{ color: '#a5b4fc', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 12px' }}>
+            {biz} <span style={{ color: '#64748b', fontWeight: 400 }}>({accounts.length})</span>
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+            {accounts.map(acc => {
+              const status = acc.account_status === 1 ? 'active' : 'inactive';
+              return (
+                <button
+                  key={acc.id}
+                  onClick={() => openReport(acc)}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer',
+                    background: 'linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.7))',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    borderRadius: 12, padding: '16px 18px',
+                    transition: 'all 0.15s ease',
+                    color: '#e2e8f0'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <BarChart3 size={18} style={{ color: '#a5b4fc' }} />
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999,
+                      background: status === 'active' ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
+                      color: status === 'active' ? '#4ade80' : '#94a3b8'
+                    }}>
+                      {status === 'active' ? 'ACTIVA' : 'INACTIVA'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 }}>
+                    {acc.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>
+                    {acc.id} · {acc.currency || ''}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#94a3b8', padding: 40 }}>
+          No se encontraron cuentas que coincidan con "{query}".
+        </div>
+      )}
     </div>
   );
 }
