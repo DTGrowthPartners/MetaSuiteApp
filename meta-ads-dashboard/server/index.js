@@ -2480,27 +2480,13 @@ async function getReportData(accountId, token) {
 
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
 
-  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo).
-  // Cada sub-fetch tiene su propio fallback para que una falla parcial no rompa el reporte.
-  const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights] = await Promise.all([
-    // Ayer/hoy por campaña
-    Promise.all(campaigns.map(async (campaign) => {
-      let insightsYesterday = {};
-      let insightsToday = {};
-      try {
-        const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
-          params: { access_token: token, fields: insightsFields, time_range: JSON.stringify({ since: yesterday, until: yesterday }) }
-        });
-        insightsYesterday = resp.data.data?.[0] || {};
-      } catch (e) {}
-      try {
-        const resp = await axios.get(`${META_API_BASE_URL}/${campaign.id}/insights`, {
-          params: { access_token: token, fields: insightsFields, time_range: JSON.stringify({ since: today, until: today }) }
-        });
-        insightsToday = resp.data.data?.[0] || {};
-      } catch (e) {}
-      return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth: {}, insightsMonthBeforeLast: {} };
-    })),
+  // Fetch ayer/hoy/meses a nivel de cuenta (insights agregados por campaña) — 6 calls totales
+  // independientemente del número de campañas. Antes hacía 2N calls (una por campaña por día),
+  // que en cuentas con muchas campañas saturaba el rate limit y disparaba timeouts del proxy
+  // (nginx devolvía HTML 504, lo que rompía el frontend con "Unexpected token '<'").
+  const [yesterdayInsightsByCampaign, todayInsightsByCampaign, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights] = await Promise.all([
+    safe(() => getAccountInsightsByCampaign(normalizedId, token, { since: yesterday, until: yesterday }), [], 'yesterdayByCampaign'),
+    safe(() => getAccountInsightsByCampaign(normalizedId, token, { since: today, until: today }), [], 'todayByCampaign'),
     safe(() => getAccountInsightsByCampaign(normalizedId, token, lastMonth), [], 'lastMonthInsights'),
     safe(() => getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast), [], 'prevMonthInsights'),
     safe(() => getAdsetReachSum(normalizedId, token, lastMonth), 0, 'adsetReachLastMonth'),
@@ -2520,7 +2506,18 @@ async function getReportData(accountId, token) {
     }, { reach: 0, impressions: 0 }, 'accountYesterdayInsights')
   ]);
 
-  const withInsights = dailyInsights;
+  // Indexar insights de ayer/hoy por campaign_id (vienen agregados a nivel cuenta)
+  const yesterdayMap = buildInsightsMap(yesterdayInsightsByCampaign);
+  const todayMap = buildInsightsMap(todayInsightsByCampaign);
+
+  // Mezclar insights con la lista de campañas conocidas
+  const withInsights = campaigns.map(c => ({
+    ...c,
+    insightsYesterday: yesterdayMap[c.id] || {},
+    insightsToday: todayMap[c.id] || {},
+    insightsLastMonth: {},
+    insightsMonthBeforeLast: {}
+  }));
 
   // Asignar insightsLastMonth
   const lastMonthMap = buildInsightsMap(lastMonthInsights);
@@ -2530,14 +2527,15 @@ async function getReportData(accountId, token) {
       delete lastMonthMap[c.id];
     }
   }
-  // Campañas que solo existieron el mes pasado
+  // Campañas que solo existieron el mes pasado (eliminadas pero con gasto)
   for (const [campaignId, ins] of Object.entries(lastMonthMap)) {
     if (parseFloat(ins.spend || 0) > 0) {
       withInsights.push({
         id: campaignId,
         name: ins.campaign_name || `Campaña ${campaignId}`,
         status: 'DELETED', objective: '', configured_status: 'DELETED',
-        insightsYesterday: {}, insightsToday: {},
+        insightsYesterday: yesterdayMap[campaignId] || {},
+        insightsToday: todayMap[campaignId] || {},
         insightsLastMonth: ins, insightsMonthBeforeLast: {}
       });
     }
@@ -2636,9 +2634,11 @@ app.get('/api/report/:slug', async (req, res) => {
       cached: false
     });
   } catch (error) {
-    const errMsg = error.response?.data?.error?.message || error.message;
+    const errMsg = error.response?.data?.error?.message || error.message || 'Error interno';
     console.error(`Report error [${req.params.slug}]:`, errMsg);
-    res.status(500).json({ success: false, error: errMsg });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: errMsg });
+    }
   }
 });
 
