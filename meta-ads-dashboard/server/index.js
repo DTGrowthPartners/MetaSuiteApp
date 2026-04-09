@@ -2455,20 +2455,33 @@ async function getReportData(accountId, token) {
   const monthBeforeLast = getMonthBeforeLastRange();
   const normalizedId = normalizeAccountId(accountId);
 
-  // Obtener campañas activas y pausadas (para hoy/ayer)
-  const campaignsResp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
-    params: {
-      access_token: token,
-      fields: 'id,name,status,objective,configured_status',
-      filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE', 'PAUSED'] }]),
-      limit: 100
+  // Helper: ejecuta una promesa devolviendo `fallback` si lanza, para que un sub-fetch
+  // fallido (cuenta sin permisos, sin campañas, deshabilitada) no rompa todo el reporte.
+  const safe = async (fn, fallback, label) => {
+    try { return await fn(); }
+    catch (e) {
+      console.warn(`getReportData[${normalizedId}] ${label} failed:`, e.response?.data?.error?.message || e.message);
+      return fallback;
     }
-  });
-  const campaigns = campaignsResp.data.data || [];
+  };
+
+  // Obtener campañas activas y pausadas (para hoy/ayer)
+  const campaigns = await safe(async () => {
+    const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/campaigns`, {
+      params: {
+        access_token: token,
+        fields: 'id,name,status,objective,configured_status',
+        filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE', 'PAUSED'] }]),
+        limit: 100
+      }
+    });
+    return resp.data.data || [];
+  }, [], 'campaigns');
 
   const insightsFields = 'spend,impressions,reach,actions,cost_per_action_type,inline_link_clicks,video_thruplay_watched_actions';
 
-  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo)
+  // Fetch ayer/hoy por campaña + ambos meses a nivel de cuenta + adset reach (en paralelo).
+  // Cada sub-fetch tiene su propio fallback para que una falla parcial no rompa el reporte.
   const [dailyInsights, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights] = await Promise.all([
     // Ayer/hoy por campaña
     Promise.all(campaigns.map(async (campaign) => {
@@ -2488,32 +2501,23 @@ async function getReportData(accountId, token) {
       } catch (e) {}
       return { ...campaign, insightsYesterday, insightsToday, insightsLastMonth: {}, insightsMonthBeforeLast: {} };
     })),
-    // Mes pasado a nivel de cuenta
-    getAccountInsightsByCampaign(normalizedId, token, lastMonth),
-    // Mes anterior al pasado (para comparativa)
-    getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast),
-    // Reach a nivel de adset (para compatibilidad)
-    getAdsetReachSum(normalizedId, token, lastMonth),
-    getAdsetReachSum(normalizedId, token, monthBeforeLast),
-    // Reach REAL a nivel de cuenta (deduplicado)
-    (async () => {
-      try {
-        const resp = await axios.get(META_API_BASE_URL + '/' + normalizedId + '/insights', {
-          params: { access_token: token, fields: 'reach', time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until }) }
-        });
-        return parseInt(resp.data.data?.[0]?.reach || 0);
-      } catch (e) { return 0; }
-    })(),
-    // Reach + impresiones de AYER a nivel de CUENTA (deduplicado, cuentas únicas reales)
-    (async () => {
-      try {
-        const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/insights`, {
-          params: { access_token: token, fields: 'reach,impressions', time_range: JSON.stringify({ since: yesterday, until: yesterday }) }
-        });
-        const d = resp.data.data?.[0] || {};
-        return { reach: parseInt(d.reach || 0), impressions: parseInt(d.impressions || 0) };
-      } catch (e) { return { reach: 0, impressions: 0 }; }
-    })()
+    safe(() => getAccountInsightsByCampaign(normalizedId, token, lastMonth), [], 'lastMonthInsights'),
+    safe(() => getAccountInsightsByCampaign(normalizedId, token, monthBeforeLast), [], 'prevMonthInsights'),
+    safe(() => getAdsetReachSum(normalizedId, token, lastMonth), 0, 'adsetReachLastMonth'),
+    safe(() => getAdsetReachSum(normalizedId, token, monthBeforeLast), 0, 'adsetReachPrevMonth'),
+    safe(async () => {
+      const resp = await axios.get(META_API_BASE_URL + '/' + normalizedId + '/insights', {
+        params: { access_token: token, fields: 'reach', time_range: JSON.stringify({ since: lastMonth.since, until: lastMonth.until }) }
+      });
+      return parseInt(resp.data.data?.[0]?.reach || 0);
+    }, 0, 'accountReachLastMonth'),
+    safe(async () => {
+      const resp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/insights`, {
+        params: { access_token: token, fields: 'reach,impressions', time_range: JSON.stringify({ since: yesterday, until: yesterday }) }
+      });
+      const d = resp.data.data?.[0] || {};
+      return { reach: parseInt(d.reach || 0), impressions: parseInt(d.impressions || 0) };
+    }, { reach: 0, impressions: 0 }, 'accountYesterdayInsights')
   ]);
 
   const withInsights = dailyInsights;
@@ -2632,8 +2636,9 @@ app.get('/api/report/:slug', async (req, res) => {
       cached: false
     });
   } catch (error) {
-    console.error('Report error:', error.response?.data || error.message);
-    res.status(500).json({ success: false, error: error.message });
+    const errMsg = error.response?.data?.error?.message || error.message;
+    console.error(`Report error [${req.params.slug}]:`, errMsg);
+    res.status(500).json({ success: false, error: errMsg });
   }
 });
 
