@@ -1,0 +1,246 @@
+MetaSuite by DT Growth Partners — App Review Documentation (v2, 2026-04-17)
+============================================================================
+
+App URL:   https://metasuite.dtgrowthpartners.com
+App ID:    779707284522963
+Developer: Edgardo Meza — DT Growth Partners
+Location:  Cartagena, Colombia
+Contact:   contacto@dtgrowthpartners.com
+
+This submission includes ONE master screen recording that demonstrates
+every requested permission end-to-end. Jump to the timestamp for the
+permission you're reviewing:
+
+    00:00 - 00:20   Pre-login screen (app URL + language toggle)
+    00:20 - 00:55   Facebook Login + OAuth consent dialog
+    00:55 - 01:25   business_management (ad accounts list across BMs)
+    01:25 - 01:55   pages_show_list (Facebook Page dropdown)
+    01:55 - 02:20   instagram_basic (Instagram Account dropdown)
+    02:20 - 03:15   ads_management (full campaign creation in PAUSED)
+    03:15 - 03:50   ads_read (reports hub + per-account dashboard)
+    03:50 - 04:10   pages_read_engagement (page-level reach/results)
+
+OVERVIEW
+--------
+MetaSuite is a web-based Meta Ads campaign management dashboard for
+advertisers who operate multiple ad accounts across several Business
+Managers. It streamlines three workflows:
+
+  1. Campaign creation — pick a pre-configured template (Traffic,
+     WhatsApp messages, Instagram messages, Website conversions, etc.),
+     select the Facebook Page + Instagram account, upload media, let
+     the AI generate copy, configure audience + budget, and create
+     the campaign. Every campaign is created in PAUSED status.
+
+  2. Cross-account reporting — a single dashboard at /reportes that
+     aggregates spend, reach, impressions, and conversions for all the
+     ad accounts the user can access, grouped by Business Manager and
+     ranked by an urgency score so the operator sees which accounts
+     need attention first.
+
+  3. Audience management — creating and reusing custom audiences
+     from engagement, customer lists, and website pixel events.
+
+HOW TO ACCESS AND TEST
+----------------------
+  1. Open https://metasuite.dtgrowthpartners.com in a desktop browser.
+  2. On the login screen, click the flag button in the top-right to
+     switch the UI to English (this matches the recording).
+  3. Click "Continue with Facebook". The standard Meta OAuth dialog
+     opens. Every requested permission is listed. Click "Continue as
+     <your name>".
+  4. The header will show "X accounts · Y Business Managers" once
+     loading completes.
+  5. All campaign creation is safe: every campaign created through
+     the app is placed in PAUSED status and generates zero ad spend.
+     The reviewer can delete test campaigns afterwards.
+
+PERMISSION-BY-PERMISSION WALKTHROUGH
+------------------------------------
+
+[business_management]  —  00:55 to 01:25 in the video
+  Why we need it
+    The app is built for agencies and in-house teams that manage many
+    ad accounts living in different Business Managers. We call
+    /me/businesses to enumerate the user's Business Managers, then
+    /{business_id}/owned_ad_accounts and /client_ad_accounts for each
+    one, so the app can present a unified list.
+  What the reviewer will see
+    - The nav header shows a clickable badge: "N accounts · M Business
+      Managers" (e.g. "30 accounts · 12 Business Managers"). The
+      tooltip on that badge reads: "Ad accounts loaded via
+      business_management permission from all your Business Managers".
+    - The ad-account dropdown on the campaign builder groups accounts
+      by Business Manager so the source is obvious.
+    - On /reportes, accounts are grouped and sortable by Business
+      Manager.
+  Code reference
+    meta-ads-dashboard/src/services/metaAdsApi.js  (getBusinesses,
+    getAdAccounts, fetchAccountsForBusinesses).
+
+[pages_show_list]  —  01:25 to 01:55 in the video
+  Why we need it
+    Every ad must be published from a Facebook Page. We call
+    /{ad_account_id}/promote_pages (and /me/accounts as a fallback)
+    to list the Pages the user is authorized to publish from inside
+    the selected ad account, so the user can pick one at creation time.
+  What the reviewer will see
+    - In the campaign builder, after selecting an ad account, the
+      "Facebook Page *" dropdown under the Identity section shows the
+      list of Pages. The hint underneath reads: "Select the Facebook
+      Page from your connected Business Managers that will publish
+      this ad."
+    - The reviewer selects a Page. The Page selection is then used as
+      promoted_object.page_id when the campaign is created (see
+      ads_management below).
+  Code reference
+    getPromotePages / getUserPages in services/metaAdsApi.js.
+
+[instagram_basic]  —  01:55 to 02:20 in the video
+  Why we need it
+    Meta Ads that run on Instagram need an Instagram Business profile
+    to act as the ad's "voice". We call
+    /{ad_account_id}/instagram_accounts and fall back to
+    /{page_id}/instagram_accounts to find the Instagram profile linked
+    to the selected Page. Without this the ad cannot appear on
+    Instagram surfaces.
+  What the reviewer will see
+    - The "Instagram Account" dropdown appears right below the Page
+      dropdown in the Identity section.
+    - When an IG Business account is linked, it shows as "@username".
+      When nothing is linked, a hint explains that the user must link
+      their IG Business account to the Facebook Page first.
+    - The selected IG id is used as object_story_spec.instagram_user_id
+      on the creative (see ads_management).
+  Code reference
+    getInstagramAccountsForAdAccount in services/metaAdsApi.js.
+
+[ads_management]  —  02:20 to 03:15 in the video
+  Why we need it
+    Core functionality of the app. We use ads_management to create
+    campaigns, ad sets, creatives, and ads on behalf of the user via
+    POST /act_{account_id}/campaigns, /adsets, /adcreatives, /ads.
+    Everything is created in PAUSED status so the reviewer can inspect
+    the result in Ads Manager without incurring any spend.
+  What the reviewer will see
+    - Template picker with nine pre-configured objective templates
+      (Traffic, WhatsApp Sales, Instagram Messages, Web Conversions,
+      etc.). Each template pre-fills objective, optimization goal,
+      billing event, CTA, suggested budget, etc.
+    - Media upload: the reviewer either uploads an image or picks one
+      from the Media Library (ad images loaded via /adimages).
+    - AI text generation: the app uses Anthropic Claude (NOT Meta
+      data) to generate 5 headlines + 5 descriptions + 5 CTAs.
+    - Audience + budget configuration.
+    - Single click on "Create Campaign" triggers the full sequence:
+      Campaign (PAUSED) → AdSet → Creative → Ad. A success banner
+      shows the Meta IDs of the created objects.
+    - The reviewer can open Ads Manager and confirm the campaign
+      exists with status = PAUSED.
+  Safety guarantees
+    - Every create call sets status:"PAUSED" at all three levels
+      (Campaign, AdSet, Ad).
+    - There is no "enable" / "activate" action in the app's UI. The
+      reviewer cannot accidentally start spend from inside the app.
+  Code reference
+    createCampaign, createAdSet, createAdCreative*, createAd and the
+    orchestrator createCampaignWithMultipleAds in
+    services/metaAdsApi.js.
+
+[ads_read]  —  03:15 to 03:50 in the video
+  Why we need it
+    The dashboards at /reportes and /{account_id} pull campaign
+    performance from the Insights API
+    (/act_{id}/insights?level=campaign) to show spend, impressions,
+    reach, actions (conversations, link clicks, leads, purchases,
+    landing page views), CPR and deltas for Yesterday, Today, and
+    Last Month.
+  What the reviewer will see
+    - /reportes shows a KPI bar (urgent / review / healthy / inactive
+      account counts), a portfolio totals row (today vs yesterday
+      deltas), an "Urgencias Hoy" section with cards for accounts that
+      spent money without producing results, and a sortable table of
+      every account.
+    - Clicking any card or row opens the detailed report for that
+      account at /act_xxxx, with Yesterday / Today / Last Month tabs.
+    - A CSV export button and a PDF report button in the footer use
+      the same data.
+  Code reference
+    /api/reports-summary and /api/report/:slug in server/index.js;
+    CampaignReport.jsx on the frontend.
+
+[pages_read_engagement]  —  03:50 to 04:10 in the video
+  Why we need it
+    The report page mixes account-level insights with page-level
+    context: account reach (deduplicated, account-level only Meta
+    returns accurately for Pages), impressions, and results driven by
+    the Page as the publisher. This is how the operator sees the
+    connection between organic Page activity and paid performance for
+    the same Page.
+  What the reviewer will see
+    - Inside any account report, the "Last Month" tab renders
+      page-level aggregate metrics: accountReachLastMonth,
+      accountReachYesterday, accountImpressionsYesterday. These values
+      come from Meta's Insights API scoped to the ad account that
+      owns the Facebook Page.
+    - The PDF report generated via "Download PDF" includes the same
+      page-level summary.
+  Code reference
+    getReportData in server/index.js, fetching
+    /{account_id}/insights?fields=reach,impressions.
+
+DATA HANDLING
+-------------
+- Access tokens are stored ONLY in the user's browser localStorage
+  under the key "meta_access_token". Nothing is synced to our server.
+- The backend never persists the user's access token. Every API call
+  takes the token from the request query/header and forwards it to
+  Meta's Graph API.
+- Report data is cached in-memory on the backend for 15 minutes per
+  account to avoid rate-limit issues on the public-review account.
+- AI-generated ad copy is produced by Anthropic's Claude API. The
+  app does not send Meta user data to Anthropic. Only the reviewer's
+  template choice and (optionally) the uploaded image/video is used
+  to generate copy.
+- Privacy Policy: https://metasuite.dtgrowthpartners.com/privacy
+- Terms of Service: https://metasuite.dtgrowthpartners.com/terms
+- Data Deletion:   https://metasuite.dtgrowthpartners.com/data-deletion
+
+TECHNICAL NOTES
+---------------
+- React SPA (Vite) + Node.js/Express backend, both served from
+  https://metasuite.dtgrowthpartners.com.
+- All Meta API calls go through the user's access token obtained via
+  Facebook Login (OAuth 2.0). No system user tokens are used.
+- UI supports Spanish and English via a flag toggle in the nav and
+  the login screen. The recording uses English throughout.
+- All campaigns are created in PAUSED status with no exception.
+- No payment, subscription, or test credentials are required. The
+  reviewer logs in with their own Facebook account.
+
+SECURITY
+--------
+- All communication over HTTPS.
+- OAuth 2.0 standard Facebook Login flow.
+- Tokens are never transmitted to third parties.
+- No server-side persistence of access tokens.
+
+SCOPE OF RE-SUBMISSION
+----------------------
+This re-submission is aimed at addressing the prior rejection, which
+noted that the previous screen recording did not fully demonstrate
+the use case for each permission. The app's functionality has not
+changed materially; the deliverables are:
+
+  - An improved single screen recording (4 minutes) that walks
+    through every permission in context, with English UI, on-screen
+    labels that explicitly name the permission driving each section,
+    and narrated subtitles.
+  - This instructions document with precise timestamps so the
+    reviewer can jump to any permission in the video.
+  - Minor UI label improvements (hints under each dropdown, the
+    "X Business Managers" counter in the header, and a descriptive
+    subtitle on /reportes) to make the source of each data point
+    obvious during review.
+
+Thank you for reviewing MetaSuite.

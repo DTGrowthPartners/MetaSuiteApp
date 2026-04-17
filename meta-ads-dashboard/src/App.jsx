@@ -392,7 +392,13 @@ function App() {
           ) : accountsError ? (
             <span className="account-count account-count--error">Error</span>
           ) : (
-            <span className="account-count">{adAccounts.length} {tr('accounts_count', lang)}</span>
+            <span className="account-count" title="Ad accounts loaded via business_management permission from all your Business Managers">
+              {adAccounts.length} {tr('accounts_count', lang)}
+              {(() => {
+                const bmSet = new Set(adAccounts.map(a => a.business?.id).filter(Boolean));
+                return bmSet.size > 0 ? ` · ${bmSet.size} ${tr('business_managers_count', lang)}` : '';
+              })()}
+            </span>
           )}
 
           {/* Language Switch */}
@@ -653,7 +659,7 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
           Reportes
         </h1>
         <p style={{ color: '#94a3b8', margin: 0, fontSize: 13 }}>
-          Cuentas que necesitan atención hoy. Ordenadas por urgencia.
+          Campaign performance data from all your Meta ad accounts (loaded via business_management and ads_read). Accounts that need attention today, sorted by urgency.
         </p>
       </div>
 

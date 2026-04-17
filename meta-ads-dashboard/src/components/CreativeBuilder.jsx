@@ -1836,7 +1836,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
         {/* ===================== SECCIÓN: IDENTIDAD ===================== */}
         <div className="section-card" id="section-identidad">
-          <h4><span className="section-icon"><UserCircle size={18} /></span> Identidad</h4>
+          <h4><span className="section-icon"><UserCircle size={18} /></span> {lang === 'en' ? 'Identity' : 'Identidad'}</h4>
+          <p className="hint" style={{ marginTop: -6, marginBottom: 12 }}>
+            {lang === 'en'
+              ? 'Pick the Facebook Page and Instagram account to publish from. The lists come from your Business Managers (pages_show_list + instagram_basic).'
+              : 'Elige la Página de Facebook y la cuenta de Instagram desde las que publicar. Las listas vienen de tus Business Managers.'}
+          </p>
 
         {/* Facebook Page Selection */}
         <div className="form-group">
@@ -1844,7 +1849,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <CustomSelect
             value={selectedPage}
             onChange={(e) => setSelectedPage(e.target.value)}
-            placeholder={!selectedAccount ? 'Selecciona una cuenta publicitaria primero' : 'Selecciona una página'}
+            placeholder={!selectedAccount ? tr('select_account_first', lang) : tr('select_page', lang)}
             loading={loadingPages || loadingBusinessPages}
             disabled={loadingPages || loadingBusinessPages || !selectedAccount}
             options={displayPages.map(page => ({
@@ -1862,7 +1867,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <CustomSelect
             value={selectedIgAccount}
             onChange={(e) => setSelectedIgAccount(e.target.value)}
-            placeholder={igAccounts.length === 0 ? 'No se encontraron cuentas de Instagram' : 'Sin Instagram'}
+            placeholder={igAccounts.length === 0 ? tr('ig_no_accounts', lang) : tr('ig_none', lang)}
             icon={Instagram}
             options={igAccounts.map(ig => ({
               value: ig.id,
@@ -1872,8 +1877,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
           <p className="hint">
             {igAccounts.length === 0
               ? (templateAdSetConfig?.conversionLocation === 'INSTAGRAM_PROFILE'
-                ? 'Se usará la cuenta de Instagram vinculada a tu página para dirigir tráfico al perfil'
-                : 'Vincula una cuenta de Instagram a tu página de Facebook para publicar en Instagram')
+                ? tr('ig_hint_no_accounts_profile', lang)
+                : tr('ig_hint_no_accounts', lang))
               : tr('ig_hint', lang)}
           </p>
         </div>
