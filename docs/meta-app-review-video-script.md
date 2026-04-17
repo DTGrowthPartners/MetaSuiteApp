@@ -1,230 +1,236 @@
-# MetaSuite App Review — Video Script (word-for-word)
+# MetaSuite App Review — Guion del video (palabra por palabra)
 
-**Target length:** ~4 minutes
-**Resolution:** 1080p (1920×1080), 60fps if possible
-**Language:** English (UI + narration). Spanish subtitles optional, English subtitles recommended.
-**Narration:** Calm, slow pace. Leave 1 second of silence before and after each section so the reviewer can jump by timestamp.
+**Duración objetivo:** ~4 minutos
+**Resolución:** 1080p (1920×1080), 60fps si es posible
+**Idioma de la UI:** Inglés (obligatorio según la guía de Meta)
+**Narración:** Español (natural para ti)
+**Subtítulos:** Inglés quemados en el video (obligatorio — YouTube auto-caption → exportar .srt → quemar con cualquier editor)
+**Ritmo:** Pausado. Deja 1 segundo de silencio antes y después de cada sección para que el revisor pueda saltar por timestamp.
 
-Before you start recording:
-- Log out of MetaSuite (localStorage.clear() on the app origin).
-- Clear browser cache.
-- Close all tabs except MetaSuite.
-- Hide bookmarks toolbar.
-- Set browser zoom to 100%.
-- Enable a visible mouse cursor / click highlighter (e.g. OBS "Mouse click highlight").
-- Have the Meta OAuth account ready in another tab but logged in — so that Facebook Login does not ask for a password in the recording. (If it asks, that's fine too; just type slowly.)
-
----
-
-## 00:00 – 00:20 · Intro + pre-login
-
-**[Screen]** Start recording. Open a new tab. Type: `https://metasuite.dtgrowthpartners.com`. Press Enter. The login screen appears.
-
-**[What to SAY on screen / narration]**:
-
-> "Hi. This is MetaSuite, a Meta Ads campaign management dashboard by DT Growth Partners. This video walks through every permission our app requests. I will show the Meta login flow first, and then demonstrate each permission in context. The user interface is set to English."
-
-**[Mouse action]** Move cursor to the flag button in the top-right of the login screen. Click to switch the UI to English if it is not already.
-
-> "MetaSuite supports both Spanish and English. For this review I've switched the interface to English."
+### Preparación antes de grabar (hazlo en este orden)
+- [ ] Cierra sesión en MetaSuite (`localStorage.clear()` en la consola del origen).
+- [ ] Limpia la caché del navegador.
+- [ ] Cierra todas las pestañas excepto MetaSuite.
+- [ ] Oculta la barra de marcadores del navegador.
+- [ ] Zoom del navegador al 100%.
+- [ ] Activa un resaltador de mouse / clicks visible (OBS tiene "Mouse click highlight").
+- [ ] Deja la cuenta de Facebook ya logueada en OTRA pestaña, para que el login no te pida contraseña dentro de la grabación. Si te la pide igual, no pasa nada, escríbela lento.
+- [ ] Practica el guion una vez en voz alta antes de grabar.
 
 ---
 
-## 00:20 – 00:55 · Facebook Login + OAuth consent
+## 00:00 – 00:20 · Intro + pantalla pre-login
 
-**[Screen]** The login screen shows a big "Continue with Facebook" button.
+**[Pantalla]** Inicia la grabación. Abre una pestaña nueva. Escribe: `https://metasuite.dtgrowthpartners.com`. Dale Enter. Aparece la pantalla de login.
 
-**[Narration]**
+**[Narración — di esto en voz alta]**:
 
-> "Authentication uses Meta's standard OAuth 2.0 flow. I'll click 'Continue with Facebook'."
+> "Hola. Esta es MetaSuite, un dashboard para administrar campañas de Meta Ads de DT Growth Partners. En este video voy a mostrar cada uno de los permisos que la app solicita. Primero paso por el login de Meta y después demuestro cada permiso en contexto. La interfaz de la app está en inglés."
 
-**[Mouse action]** Click the "Continue with Facebook" button. The Meta OAuth popup opens.
+**[Mouse]** Mueve el cursor al botón de la bandera arriba a la derecha de la pantalla de login. Haz click para cambiar la UI a inglés si no está ya.
 
-**[Narration while the popup loads]**
-
-> "Meta's consent dialog now lists every permission our app requests. Please note: ads_management, ads_read, pages_show_list, business_management, pages_read_engagement, instagram_basic and whatsapp_business_management."
-
-**[Mouse action]** Slowly scroll through the permissions list in the OAuth dialog so each line is visible for about a second.
-
-**[Narration]**
-
-> "I'll continue as the logged-in user."
-
-**[Mouse action]** Click "Continue as …". Popup closes. The app redirects back to MetaSuite. The header shows the loading spinner and then the counts.
+> "MetaSuite soporta español e inglés. Para esta revisión dejé la interfaz en inglés."
 
 ---
 
-## 00:55 – 01:25 · business_management — ad accounts across Business Managers
+## 00:20 – 00:55 · Facebook Login + diálogo OAuth de consentimiento
 
-**[Screen]** Focus on the top nav. There is a badge that reads, for example, "**30 accounts · 12 Business Managers**".
+**[Pantalla]** La pantalla de login muestra un botón grande "Continue with Facebook".
 
-**[Narration]**
+**[Narración]**
 
-> "MetaSuite uses the business_management permission to enumerate every Business Manager the user belongs to and list every ad account in each one. Here you can see: thirty accounts across twelve Business Managers. Without business_management, the user would have to configure each Business Manager manually."
+> "La autenticación usa el flujo estándar de OAuth 2.0 de Meta. Voy a hacer click en 'Continue with Facebook'."
 
-**[Mouse action]** Hover the "30 accounts · 12 Business Managers" badge — the tooltip explains it is loaded via business_management.
+**[Mouse]** Click en el botón "Continue with Facebook". Se abre el popup de OAuth de Meta.
 
-**[Mouse action]** Click on the ad account dropdown in the campaign builder (or open the Campaigns view if not already). The dropdown lists accounts grouped by Business Manager.
+**[Narración mientras carga el popup]**
 
-**[Narration]**
+> "Este es el diálogo de consentimiento de Meta. Aquí aparecen todos los permisos que la app solicita: ads_management, ads_read, pages_show_list, business_management, pages_read_engagement, instagram_basic y whatsapp_business_management."
 
-> "Accounts are grouped by Business Manager so the operator knows exactly where each one lives. I'll select one account."
+**[Mouse]** Desplázate lentamente por la lista de permisos en el diálogo OAuth para que cada línea sea visible como un segundo.
 
-**[Mouse action]** Select an ad account (e.g. "DTGP-CTG" from "DT Growth Partners"). The dropdown closes. Related fields (Page list, Instagram list) start loading.
+**[Narración]**
 
----
+> "Voy a continuar como el usuario logueado."
 
-## 01:25 – 01:55 · pages_show_list — Facebook Page dropdown
-
-**[Screen]** Scroll to the "Identity" section of the campaign builder.
-
-**[Narration]**
-
-> "Because every ad needs to be published from a Facebook Page, MetaSuite uses the pages_show_list permission to fetch the list of Pages the user can publish from inside the selected ad account. You can see the explanatory hint under the dropdown."
-
-**[Mouse action]** Click the "Facebook Page" dropdown. The list of Pages appears.
-
-**[Narration while the list is visible]**
-
-> "These are the Pages loaded via pages_show_list. I'll pick one."
-
-**[Mouse action]** Select a Page (e.g. "DT Growth Partners"). The dropdown closes. The hint underneath now says: "Select the Facebook Page from your connected Business Managers that will publish this ad."
+**[Mouse]** Click en "Continue as …". El popup se cierra. La app redirige de vuelta a MetaSuite. El header muestra el spinner de carga y luego los contadores.
 
 ---
 
-## 01:55 – 02:20 · instagram_basic — Instagram Account dropdown
+## 00:55 – 01:25 · business_management — cuentas publicitarias de varios Business Managers
 
-**[Screen]** Stay in the "Identity" section. Move focus to the "Instagram Account" dropdown just below the Page dropdown.
+**[Pantalla]** Enfoca el nav superior. Hay un badge que dice, por ejemplo, "**30 accounts · 12 Business Managers**".
 
-**[Narration]**
+**[Narración]**
 
-> "For ads that run on Instagram, MetaSuite uses the instagram_basic permission to identify which Instagram Business account is linked to the selected Facebook Page. The dropdown below shows the linked Instagram profile."
+> "MetaSuite usa el permiso business_management para enumerar todos los Business Managers a los que pertenece el usuario y listar cada cuenta publicitaria dentro de ellos. Aquí pueden ver: treinta cuentas distribuidas en doce Business Managers. Sin business_management, el usuario tendría que configurar cada Business Manager manualmente."
 
-**[Mouse action]** Click the "Instagram Account" dropdown. The linked Instagram professional account is listed as "@dtgrowthpartners" (or equivalent).
+**[Mouse]** Pasa el cursor sobre el badge "30 accounts · 12 Business Managers" — el tooltip explica que se carga mediante business_management.
 
-**[Narration]**
+**[Mouse]** Click en el dropdown de cuenta publicitaria en el creative builder (o abre la vista de Campañas si no está ya abierta). El dropdown lista las cuentas agrupadas por Business Manager.
 
-> "This is the Instagram account that will be attached to the ad creative. Without instagram_basic, the ad cannot appear on Instagram surfaces."
+**[Narración]**
 
-**[Mouse action]** Select the Instagram account. Dropdown closes.
+> "Las cuentas están agrupadas por Business Manager para que el operador sepa exactamente dónde vive cada una. Voy a seleccionar una cuenta."
+
+**[Mouse]** Selecciona una cuenta (por ejemplo "DTGP-CTG" de "DT Growth Partners"). El dropdown se cierra. Los campos relacionados (Pages, Instagram) empiezan a cargar.
 
 ---
 
-## 02:20 – 03:15 · ads_management — full campaign creation (PAUSED)
+## 01:25 – 01:55 · pages_show_list — dropdown de Facebook Pages
 
-**[Narration]**
+**[Pantalla]** Desplázate a la sección "Identity" del creative builder.
 
-> "Now the core of the app: ads_management. I'll create a complete campaign end-to-end. Every campaign created through MetaSuite is set to PAUSED, so no ad spend is generated."
+**[Narración]**
 
-**[Mouse action]** Scroll up to the template picker or click "New Campaign". Select a template, e.g. "Website Traffic".
+> "Como todo anuncio debe publicarse desde una página de Facebook, MetaSuite usa el permiso pages_show_list para obtener la lista de páginas desde las que el usuario puede publicar dentro de la cuenta publicitaria seleccionada. Pueden ver el hint explicativo debajo del dropdown."
 
-**[Narration]**
+**[Mouse]** Click en el dropdown "Facebook Page". Aparece la lista de páginas.
 
-> "I'm picking the Website Traffic template. Each template comes with objective, optimization goal, billing event and budget pre-configured."
+**[Narración mientras la lista está visible]**
 
-**[Mouse action]** Scroll down to the media upload area. Upload an image from the computer or pick one from the Media Library.
+> "Estas son las páginas cargadas mediante pages_show_list. Voy a elegir una."
 
-**[Narration]**
+**[Mouse]** Selecciona una página (por ejemplo "DT Growth Partners"). El dropdown se cierra. El hint debajo dice: "Select the Facebook Page from your connected Business Managers that will publish this ad."
 
-> "I upload a single image for this ad. The app also integrates with the ad account's media library via the /adimages endpoint."
+---
 
-**[Mouse action]** Wait for AI generation to complete. The app fills 5 headlines, 5 descriptions, and 5 CTAs.
+## 01:55 – 02:20 · instagram_basic — dropdown de Instagram Account
 
-**[Narration]**
+**[Pantalla]** Mantente en la sección "Identity". Mueve el foco al dropdown "Instagram Account" justo debajo del dropdown de Page.
 
-> "MetaSuite uses Anthropic's Claude AI to generate five headlines, five descriptions, and five calls to action. No Meta user data is sent to Claude — only the creative brief."
+**[Narración]**
 
-**[Mouse action]** Scroll down to the audience / budget section. Pick a default saved audience (or leave defaults). Budget is pre-filled.
+> "Para los anuncios que corren en Instagram, MetaSuite usa el permiso instagram_basic para identificar qué cuenta profesional de Instagram está vinculada a la página de Facebook seleccionada. El dropdown de abajo muestra el perfil de Instagram vinculado."
 
-**[Narration]**
+**[Mouse]** Click en el dropdown "Instagram Account". La cuenta profesional de Instagram vinculada aparece como "@dtgrowthpartners" (o equivalente).
 
-> "I'll keep the default audience and daily budget of twenty thousand pesos, but remember — since the campaign is PAUSED, nothing will actually spend."
+**[Narración]**
 
-**[Mouse action]** Click the big "Create Campaign" button. The progress log starts appearing:
+> "Esta es la cuenta de Instagram que se va a adjuntar al creativo del anuncio. Sin instagram_basic, el anuncio no puede aparecer en Instagram."
+
+**[Mouse]** Selecciona la cuenta de Instagram. El dropdown se cierra.
+
+---
+
+## 02:20 – 03:15 · ads_management — creación completa de campaña (en PAUSED)
+
+**[Narración]**
+
+> "Ahora el núcleo de la app: ads_management. Voy a crear una campaña completa de punta a punta. Toda campaña creada desde MetaSuite queda en estado PAUSED, por lo que no se genera gasto publicitario."
+
+**[Mouse]** Desplázate hacia arriba al selector de plantilla o click en "New Campaign". Selecciona una plantilla, por ejemplo "Website Traffic".
+
+**[Narración]**
+
+> "Elijo la plantilla de Tráfico a Sitio Web. Cada plantilla ya viene con objetivo, meta de optimización, evento de facturación y presupuesto pre-configurados."
+
+**[Mouse]** Desplázate al área de subida de media. Sube una imagen desde el computador o elige una de la Media Library.
+
+**[Narración]**
+
+> "Subo una imagen para este anuncio. La app también se integra con la biblioteca de medios de la cuenta publicitaria mediante el endpoint /adimages."
+
+**[Mouse]** Espera a que termine la generación con IA. La app rellena 5 titulares, 5 descripciones y 5 CTAs.
+
+**[Narración]**
+
+> "MetaSuite usa la IA de Anthropic Claude para generar cinco titulares, cinco descripciones y cinco llamados a la acción. No se envía ningún dato de Meta a Claude, solo el brief del creativo."
+
+**[Mouse]** Desplázate a la sección de público / presupuesto. Elige un público guardado por defecto (o deja los defaults). El presupuesto ya está pre-llenado.
+
+**[Narración]**
+
+> "Dejo el público y el presupuesto diario por defecto de veinte mil pesos. Pero recuerden: como la campaña queda en PAUSED, no se va a gastar nada realmente."
+
+**[Mouse]** Click en el botón grande "Create Campaign". Empiezan a aparecer los logs de progreso:
 - Campaign creation SUCCESS: …
 - AdSet creation SUCCESS: …
 - Creative SUCCESS: …
 - Ad creation SUCCESS: …
 
-**[Narration]**
+**[Narración]**
 
-> "The app is now calling the Marketing API in sequence — Campaign, AdSet, Creative, Ad. All four objects are created with status PAUSED. Here is the success confirmation."
+> "La app ahora está llamando a la Marketing API en secuencia: Campaign, AdSet, Creative, Ad. Los cuatro objetos se crean con status PAUSED. Aquí está la confirmación de éxito."
 
-**[Mouse action]** OPTIONAL: Open a new tab with Meta Ads Manager, navigate to the ad account, and show the new campaign in PAUSED status. Take 5 seconds and close.
+**[Mouse]** OPCIONAL: abre una pestaña nueva con Meta Ads Manager, navega a la cuenta publicitaria y muestra la nueva campaña en estado PAUSED. Tarda 5 segundos y cierra.
 
-> "Here is the newly created campaign in Meta Ads Manager, confirmed as PAUSED. No ad spend has been incurred."
-
----
-
-## 03:15 – 03:50 · ads_read — reports hub and per-account dashboard
-
-**[Mouse action]** Close the Ads Manager tab. Back in MetaSuite, click the "Reportes" link in the nav.
-
-**[Narration]**
-
-> "MetaSuite uses the ads_read permission to build cross-account dashboards. The reports hub you see now aggregates spend, results, reach, and impressions across every ad account the user can access."
-
-**[Mouse action]** Point out the KPI tiles at the top: "urgent accounts", "in review", "healthy", "inactive". Point out the portfolio totals row: "total spend today", "results today".
-
-**[Narration]**
-
-> "At the top we surface a health classification: urgent accounts are the ones that spent money today without producing any results. Below you can see portfolio totals with day-over-day deltas."
-
-**[Mouse action]** Click on any account card or row (for example "DTGP-CTG"). The per-account report opens at /act_781485172384812.
-
-**[Narration]**
-
-> "Clicking an account opens its detailed report. We have three tabs: Yesterday, Today, and Last Month. Each tab shows spend, impressions, reach, and per-campaign breakdown with the main result type for each campaign — messages, leads, purchases, visits, or clicks."
-
-**[Mouse action]** Click the Yesterday tab, then the Today tab, then the Last Month tab. Let each tab render for ~3 seconds.
+> "Aquí está la campaña recién creada en Meta Ads Manager, confirmada como PAUSED. No se ha generado ningún gasto publicitario."
 
 ---
 
-## 03:50 – 04:10 · pages_read_engagement — page-level metrics
+## 03:15 – 03:50 · ads_read — hub de reportes y dashboard por cuenta
 
-**[Screen]** Stay on the Last Month tab of the per-account report.
+**[Mouse]** Cierra la pestaña de Ads Manager. De vuelta en MetaSuite, click en el link "Reportes" en el nav.
 
-**[Narration]**
+**[Narración]**
 
-> "Finally, pages_read_engagement gives us access to Page-level engagement metrics — reach, impressions, and page-driven results — which we display alongside the ad insights so the operator can tie paid performance back to the Page that published the ad."
+> "MetaSuite usa el permiso ads_read para construir dashboards cruzados entre cuentas. El hub de reportes que ven ahora agrega gasto, resultados, alcance e impresiones de todas las cuentas publicitarias a las que el usuario tiene acceso."
 
-**[Mouse action]** Point out the "Reach", "Impressions" fields and any "conversations / results" counters at the top of the report. Hover each for ~1 second.
+**[Mouse]** Señala las tarjetas de KPI arriba: "urgent accounts", "in review", "healthy", "inactive". Señala la fila de totales del portafolio: "total spend today", "results today".
 
-**[Mouse action]** OPTIONAL: Click "Download PDF" in the footer to show the full monthly PDF export opening in a new tab. Let it load, then close.
+**[Narración]**
 
-**[Narration]**
+> "Arriba mostramos una clasificación de salud. Las cuentas urgentes son las que gastaron dinero hoy sin producir resultados. Abajo se ven los totales del portafolio con los deltas día contra día."
 
-> "The same data is included in the downloadable PDF report. That completes the walkthrough."
+**[Mouse]** Click en cualquier tarjeta o fila de cuenta (por ejemplo "DTGP-CTG"). Se abre el reporte por cuenta en /act_781485172384812.
 
----
+**[Narración]**
 
-## 04:10 – 04:20 · Closing
+> "Al hacer click en una cuenta se abre su reporte detallado. Tenemos tres tabs: Yesterday, Today y Last Month. Cada tab muestra gasto, impresiones, alcance y el desglose por campaña con el tipo de resultado principal de cada una: mensajes, leads, compras, visitas o clicks."
 
-**[Screen]** Return to the /reportes hub or the home view.
-
-**[Narration]**
-
-> "Thank you for reviewing MetaSuite. The video covered every requested permission: business_management for multi-account access, pages_show_list for the Facebook Page dropdown, instagram_basic for Instagram account selection, ads_management for paused campaign creation, ads_read for the reports dashboard, and pages_read_engagement for page-level metrics. The full use case is described in the attached instructions document."
-
-**[Screen]** Stop recording.
+**[Mouse]** Click en el tab Yesterday, después Today, después Last Month. Deja cada tab renderizar unos 3 segundos.
 
 ---
 
-## Post-recording checklist before uploading
+## 03:50 – 04:10 · pages_read_engagement — métricas a nivel de página
 
-- [ ] Open the recording in a player and confirm resolution is 1080p or higher.
-- [ ] Confirm the entire OAuth consent dialog is visible and readable.
-- [ ] Confirm every section lasts at least 15 seconds so the reviewer can follow.
-- [ ] Generate English subtitles (YouTube auto-captions work, then export .srt and burn-in, or use any other tool).
-- [ ] Export as .mp4, H.264, below 2 GB (Meta's cap).
-- [ ] Upload as a single file attached to each permission's video field in the App Review form. (You can upload the same file for every permission — Meta explicitly allows this.)
-- [ ] In each permission's text area, paste "See master video. Relevant segment: 00:55-01:25 (business_management)" etc., replacing timestamps per permission.
-- [ ] Attach the updated `meta-app-review-instructions.txt` under "Supporting documentation".
+**[Pantalla]** Mantente en el tab Last Month del reporte por cuenta.
 
-## If something in the demo fails
-If the OAuth flow, an API call, or campaign creation errors out during the recording, STOP, fix it, and re-record from the top. Do not upload a video that shows errors — Meta will reject it.
+**[Narración]**
 
-## Per-permission timestamp cheat sheet (copy into each field)
+> "Por último, pages_read_engagement nos da acceso a las métricas de engagement a nivel de página: alcance, impresiones y resultados generados por la página, que mostramos junto a las métricas de anuncios para que el operador pueda conectar el rendimiento pagado con la página que publicó el anuncio."
+
+**[Mouse]** Señala los campos "Reach", "Impressions" y los contadores de "conversations / results" en la parte de arriba del reporte. Pasa el mouse por cada uno como 1 segundo.
+
+**[Mouse]** OPCIONAL: click en "Download PDF" en el footer para mostrar que el reporte mensual se abre en una pestaña nueva. Déjalo cargar y ciérralo.
+
+**[Narración]**
+
+> "Los mismos datos se incluyen en el PDF descargable. Con eso termina el recorrido."
+
+---
+
+## 04:10 – 04:20 · Cierre
+
+**[Pantalla]** Vuelve al hub /reportes o a la vista home.
+
+**[Narración]**
+
+> "Gracias por revisar MetaSuite. El video cubre cada uno de los permisos solicitados: business_management para el acceso multi-cuenta, pages_show_list para el dropdown de páginas de Facebook, instagram_basic para la selección de cuenta de Instagram, ads_management para la creación de campañas en PAUSED, ads_read para el dashboard de reportes, y pages_read_engagement para las métricas a nivel de página. El caso de uso completo está descrito en el documento de instrucciones adjunto."
+
+**[Pantalla]** Detén la grabación.
+
+---
+
+## Checklist después de grabar, antes de subir
+
+- [ ] Abre la grabación y confirma que la resolución es 1080p o más.
+- [ ] Confirma que todo el diálogo de consentimiento de OAuth se ve legible.
+- [ ] Confirma que cada sección dura al menos 15 segundos para que el revisor pueda seguir.
+- [ ] Genera los subtítulos en **inglés**. Opciones:
+  - YouTube: sube el video privado → YouTube transcribe → traduce al inglés → exporta .srt → quema en el video con un editor.
+  - Whisper local: `whisper video.mp4 --language Spanish --task translate --model medium` produce subtítulos en inglés.
+  - Alternativamente DaVinci Resolve tiene transcripción y traducción incorporadas.
+- [ ] Exporta como .mp4, H.264, menos de 2 GB (tope de Meta).
+- [ ] Sube el mismo MP4 a los 6 permisos. Meta permite explícitamente subir el mismo video a cada permiso.
+- [ ] En el campo de texto de cada permiso pega el bloque de cheat sheet de timestamps que está abajo.
+- [ ] Adjunta el `meta-app-review-instructions.txt` actualizado en "Supporting documentation".
+
+## Si algo falla durante la grabación
+Si el flujo de OAuth, una llamada a la API o la creación de la campaña tira un error, **PARA, soluciónalo y regraba desde cero**. Meta rechaza videos con errores visibles.
+
+## Bloque para pegar en cada permiso del formulario
 
 ```
 Master video walkthrough. Relevant segment for this permission:
