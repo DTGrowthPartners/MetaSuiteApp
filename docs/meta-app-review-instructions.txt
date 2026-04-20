@@ -1,4 +1,4 @@
-MetaSuite by DT Growth Partners — App Review Documentation (v2, 2026-04-17)
+MetaSuite by DT Growth Partners — App Review Documentation (v3, 2026-04-20)
 ============================================================================
 
 App URL:   https://metasuite.dtgrowthpartners.com
@@ -7,18 +7,21 @@ Developer: Edgardo Meza — DT Growth Partners
 Location:  Cartagena, Colombia
 Contact:   contacto@dtgrowthpartners.com
 
-This submission includes ONE master screen recording that demonstrates
-every requested permission end-to-end. Jump to the timestamp for the
-permission you're reviewing:
+This submission includes SIX dedicated screen recordings, one per
+permission. Each video starts with the complete Meta Login / OAuth
+consent flow (~30 seconds) and then demonstrates the specific
+permission end-to-end. Videos are attached to their corresponding
+permission in the App Review form:
 
-    00:00 - 00:20   Pre-login screen (app URL + language toggle)
-    00:20 - 00:55   Facebook Login + OAuth consent dialog
-    00:55 - 01:25   business_management (ad accounts list across BMs)
-    01:25 - 01:55   pages_show_list (Facebook Page dropdown)
-    01:55 - 02:20   instagram_basic (Instagram Account dropdown)
-    02:20 - 03:15   ads_management (full campaign creation in PAUSED)
-    03:15 - 03:50   ads_read (reports hub + per-account dashboard)
-    03:50 - 04:10   pages_read_engagement (page-level reach/results)
+    01-business_management.mp4      →  business_management
+    02-pages_show_list.mp4          →  pages_show_list
+    03-instagram_basic.mp4          →  instagram_basic
+    04-ads_management.mp4           →  ads_management
+    05-ads_read.mp4                 →  ads_read
+    06-pages_read_engagement.mp4    →  pages_read_engagement
+
+Every video uses English UI throughout (toggle via the flag button on
+the login screen) and includes English subtitles burned in.
 
 OVERVIEW
 --------
@@ -45,7 +48,7 @@ HOW TO ACCESS AND TEST
 ----------------------
   1. Open https://metasuite.dtgrowthpartners.com in a desktop browser.
   2. On the login screen, click the flag button in the top-right to
-     switch the UI to English (this matches the recording).
+     switch the UI to English (this matches the recordings).
   3. Click "Continue with Facebook". The standard Meta OAuth dialog
      opens. Every requested permission is listed. Click "Continue as
      <your name>".
@@ -58,7 +61,7 @@ HOW TO ACCESS AND TEST
 PERMISSION-BY-PERMISSION WALKTHROUGH
 ------------------------------------
 
-[business_management]  —  00:55 to 01:25 in the video
+[business_management]  —  see video 01-business_management.mp4
   Why we need it
     The app is built for agencies and in-house teams that manage many
     ad accounts living in different Business Managers. We call
@@ -78,7 +81,7 @@ PERMISSION-BY-PERMISSION WALKTHROUGH
     meta-ads-dashboard/src/services/metaAdsApi.js  (getBusinesses,
     getAdAccounts, fetchAccountsForBusinesses).
 
-[pages_show_list]  —  01:25 to 01:55 in the video
+[pages_show_list]  —  see video 02-pages_show_list.mp4
   Why we need it
     Every ad must be published from a Facebook Page. We call
     /{ad_account_id}/promote_pages (and /me/accounts as a fallback)
@@ -96,7 +99,7 @@ PERMISSION-BY-PERMISSION WALKTHROUGH
   Code reference
     getPromotePages / getUserPages in services/metaAdsApi.js.
 
-[instagram_basic]  —  01:55 to 02:20 in the video
+[instagram_basic]  —  see video 03-instagram_basic.mp4
   Why we need it
     Meta Ads that run on Instagram need an Instagram Business profile
     to act as the ad's "voice". We call
@@ -115,7 +118,7 @@ PERMISSION-BY-PERMISSION WALKTHROUGH
   Code reference
     getInstagramAccountsForAdAccount in services/metaAdsApi.js.
 
-[ads_management]  —  02:20 to 03:15 in the video
+[ads_management]  —  see video 04-ads_management.mp4
   Why we need it
     Core functionality of the app. We use ads_management to create
     campaigns, ad sets, creatives, and ads on behalf of the user via
@@ -147,7 +150,7 @@ PERMISSION-BY-PERMISSION WALKTHROUGH
     orchestrator createCampaignWithMultipleAds in
     services/metaAdsApi.js.
 
-[ads_read]  —  03:15 to 03:50 in the video
+[ads_read]  —  see video 05-ads_read.mp4
   Why we need it
     The dashboards at /reportes and /{account_id} pull campaign
     performance from the Insights API
@@ -169,7 +172,7 @@ PERMISSION-BY-PERMISSION WALKTHROUGH
     /api/reports-summary and /api/report/:slug in server/index.js;
     CampaignReport.jsx on the frontend.
 
-[pages_read_engagement]  —  03:50 to 04:10 in the video
+[pages_read_engagement]  —  see video 06-pages_read_engagement.mp4
   Why we need it
     The report page mixes account-level insights with page-level
     context: account reach (deduplicated, account-level only Meta
@@ -213,7 +216,7 @@ TECHNICAL NOTES
 - All Meta API calls go through the user's access token obtained via
   Facebook Login (OAuth 2.0). No system user tokens are used.
 - UI supports Spanish and English via a flag toggle in the nav and
-  the login screen. The recording uses English throughout.
+  the login screen. All six recordings use English throughout.
 - All campaigns are created in PAUSED status with no exception.
 - No payment, subscription, or test credentials are required. The
   reviewer logs in with their own Facebook account.
@@ -232,15 +235,20 @@ noted that the previous screen recording did not fully demonstrate
 the use case for each permission. The app's functionality has not
 changed materially; the deliverables are:
 
-  - An improved single screen recording (4 minutes) that walks
-    through every permission in context, with English UI, on-screen
-    labels that explicitly name the permission driving each section,
-    and narrated subtitles.
-  - This instructions document with precise timestamps so the
-    reviewer can jump to any permission in the video.
+  - SIX dedicated screen recordings (one per permission), each
+    beginning with the full Meta Login / OAuth consent flow and then
+    demonstrating the complete use case of a single permission. This
+    replaces the previous single-video approach so that each reviewer
+    receives a focused recording directly matching the permission
+    under review.
+  - English UI throughout every video, with English subtitles burned
+    in.
   - Minor UI label improvements (hints under each dropdown, the
     "X Business Managers" counter in the header, and a descriptive
     subtitle on /reportes) to make the source of each data point
     obvious during review.
+  - This instructions document mapping each permission to its
+    corresponding video file, along with code references for reviewer
+    spot-checks.
 
 Thank you for reviewing MetaSuite.
