@@ -5063,7 +5063,10 @@ class MetaAdsService {
             if (texts.filter(t => t.text_type === 'headline').length === 0) texts.push({ text: 'Descubre más', text_type: 'headline' });
             if (texts.filter(t => t.text_type === 'primary_text').length === 0) texts.push({ text: 'Conoce nuestros productos', text_type: 'primary_text' });
 
-            const groupCTAType = (flexGroup.ctas?.[0]) || defaultCTAForStandard || 'LEARN_MORE';
+            // VIEW_INSTAGRAM_PROFILE tampoco es válido en creative_asset_groups_spec (igual que
+            // en asset_feed_spec/DC clásico) — reusamos el mismo reemplazo.
+            const rawGroupCTAType = (flexGroup.ctas?.[0]) || defaultCTAForStandard || 'LEARN_MORE';
+            const groupCTAType = DC_CTA_REPLACEMENTS[rawGroupCTAType] || rawGroupCTAType;
             let groupFlexLinkUrl = linkUrl;
             if (groupCTAType === 'WHATSAPP_MESSAGE' && whatsappNumber) {
               groupFlexLinkUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber.replace(/\D/g, '')}`;
