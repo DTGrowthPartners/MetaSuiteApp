@@ -741,6 +741,20 @@ class MetaAdsService {
     }
   }
 
+  // Borra un AdSet (usado para limpiar conjuntos que quedaron sin ningún anuncio dentro,
+  // por ejemplo cuando falla la creación de todos los anuncios de ese conjunto)
+  async deleteAdSet(adSetId) {
+    try {
+      await axios.post(`${META_API_BASE_URL}/${adSetId}`, null, {
+        params: { access_token: this.accessToken, status: 'DELETED' }
+      });
+      return { success: true };
+    } catch (error) {
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      return { success: false, error: errorMsg };
+    }
+  }
+
   // =============================================
   // CREATIVE BUILDER - Campaign Creation Methods
   // =============================================
@@ -2094,6 +2108,35 @@ class MetaAdsService {
       // Obtener primera descripción si existe
       const firstDescription = texts.find(t => t.text_type === 'description')?.text || '';
 
+      // Resuelve la miniatura de UN video: usa la que ya viene, si no, la pide al servidor.
+      // Se aplica a TODOS los videos del grupo (antes solo se aplicaba a videos[0]), porque
+      // Meta rechaza cualquier video de creative_asset_groups_spec que llegue sin miniatura —
+      // con >1 video por grupo eso dejaba el Ad Set creado pero sin ningún anuncio dentro.
+      const resolveVideoThumb = async (videoId, providedHash, providedUrl) => {
+        if (providedHash) return { hash: providedHash, url: null };
+        if (providedUrl) return { hash: null, url: providedUrl };
+        try {
+          const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videoId}`, {
+            params: { adAccountId: normalizedId }
+          });
+          const autoThumbHash = thumbResponse.data?.data?.thumbnailHash || '';
+          const autoThumbUrl = thumbResponse.data?.data?.thumbnailUrl || '';
+          if (autoThumbHash) return { hash: autoThumbHash, url: null };
+          if (autoThumbUrl) return { hash: null, url: autoThumbUrl };
+          console.warn('Flexible Ad: server could not obtain thumbnail for video:', videoId);
+        } catch (thumbErr) {
+          console.warn('Flexible Ad: failed to fetch video thumbnail:', videoId, thumbErr.message);
+        }
+        return { hash: null, url: null };
+      };
+
+      // Resolvemos la miniatura de cada video del grupo una sola vez, para reusarla tanto en
+      // object_story_spec.video_data (solo necesita la del primer video) como en
+      // creative_asset_groups_spec (necesita la de todos).
+      const resolvedVideoThumbs = videos.length > 0
+        ? await Promise.all(videos.map(vid => resolveVideoThumb(vid.video_id, vid.image_hash, vid.image_url)))
+        : [];
+
       if (videos.length > 0 && images.length === 0) {
         // SOLO videos (sin imágenes): usar video_data
         objectStorySpec.video_data = {
@@ -2105,30 +2148,11 @@ class MetaAdsService {
             value: { link: resolvedLink }
           }
         };
-        // Thumbnail: image_hash tiene prioridad, luego image_url, luego auto-fetch
-        if (videos[0].image_hash) {
-          objectStorySpec.video_data.image_hash = videos[0].image_hash;
-        } else if (videos[0].image_url) {
-          objectStorySpec.video_data.image_url = videos[0].image_url;
-        } else {
-          // Fallback: obtener thumbnail automáticamente del video via servidor proxy
-          console.log('Flexible Ad: no thumbnail, fetching from server for video:', videos[0].video_id);
-          try {
-            const thumbResponse = await axios.get(`${BACKEND_API_URL}/video-thumbnail/${videos[0].video_id}`, {
-              params: { adAccountId: normalizedId }
-            });
-            const autoThumbUrl = thumbResponse.data?.data?.thumbnailUrl || '';
-            const autoThumbHash = thumbResponse.data?.data?.thumbnailHash || '';
-            if (autoThumbHash) {
-              objectStorySpec.video_data.image_hash = autoThumbHash;
-            } else if (autoThumbUrl) {
-              objectStorySpec.video_data.image_url = autoThumbUrl;
-            } else {
-              console.warn('Flexible Ad: server could not obtain thumbnail for video:', videos[0].video_id);
-            }
-          } catch (thumbErr) {
-            console.warn('Flexible Ad: failed to fetch video thumbnail:', thumbErr.message);
-          }
+        const firstThumb = resolvedVideoThumbs[0];
+        if (firstThumb.hash) {
+          objectStorySpec.video_data.image_hash = firstThumb.hash;
+        } else if (firstThumb.url) {
+          objectStorySpec.video_data.image_url = firstThumb.url;
         }
         if (firstDescription) {
           objectStorySpec.video_data.link_description = firstDescription;
@@ -2167,12 +2191,13 @@ class MetaAdsService {
         group.images = images.map(img => ({ hash: img.hash }));
       }
       if (videos.length > 0) {
-        group.videos = videos.map(vid => {
+        group.videos = videos.map((vid, i) => {
           const v = { video_id: vid.video_id };
-          if (vid.image_hash) {
-            v.image_hash = vid.image_hash;
-          } else if (vid.image_url) {
-            v.image_url = vid.image_url;
+          const thumb = resolvedVideoThumbs[i];
+          if (thumb?.hash) {
+            v.image_hash = thumb.hash;
+          } else if (thumb?.url) {
+            v.image_url = thumb.url;
           }
           return v;
         });
@@ -4659,7 +4684,16 @@ class MetaAdsService {
 
       // Helper: crear Dynamic Creative (asset_feed_spec 5+5+5) + ad
       // fallbackContext: { targeting, campaignId } — datos para crear AdSet sin DC si falla con 1885392
-      const createDynamicCreativeAndAd = async (ad, adIndex, adSetId, fallbackContext = null) => {
+      const createDynamicCreativeAndAd = async (ad, adIndex, adSetData, fallbackContext = null) => {
+        const adSetId = adSetData.id;
+        // Si el AdSet original termina sin ningún anuncio dentro, bórralo en vez de dejarlo
+        // huérfano y vacío en la cuenta.
+        const deleteEmptyOriginalAdSet = async () => {
+          const delResult = await this.deleteAdSet(adSetId);
+          if (!delResult.success) {
+            console.warn(`No se pudo eliminar el AdSet vacío ${adSetId}: ${delResult.error}`);
+          }
+        };
         const validTitles = ad.headlines?.filter(t => t?.trim()) || ['Conoce más'];
         const validBodies = ad.descriptions?.filter(b => b?.trim()) || ['Descubre más'];
         const validLinkDescs = ad.linkDescriptions?.filter(d => d?.trim()) || [];
@@ -4697,6 +4731,7 @@ class MetaAdsService {
 
         if (!creativeResult.success) {
           results.errors.push(`Creative ${adIndex + 1}: ${creativeResult.error}`);
+          await deleteEmptyOriginalAdSet();
           return false;
         }
         results.creatives.push(creativeResult.data);
@@ -4732,14 +4767,25 @@ class MetaAdsService {
             // Remove the stale DC error and add fallback error
             results.errors.pop(); // remove the pending error we haven't pushed yet
             results.errors.push(`Ad ${adIndex + 1}: DC no soportado y fallback AdSet falló: ${fallbackAdSetResult.error}`);
+            await deleteEmptyOriginalAdSet();
             return false;
           }
-          results.adSets.push(fallbackAdSetResult.data);
+
+          // El AdSet original (con Dynamic Creative) se queda sin anuncios porque el fallback
+          // usa uno nuevo — bórralo para no dejar un conjunto vacío en la cuenta.
+          await deleteEmptyOriginalAdSet();
 
           // Usar el helper de Standard Creative
           const stdSuccess = await createStandardCreativeAndAd(ad, adIndex, fallbackAdSetResult.data.id);
           if (stdSuccess) {
             console.log(`  Fallback successful! Ad ${adIndex + 1} created with standard creative.`);
+            results.adSets.push(fallbackAdSetResult.data);
+          } else {
+            // El fallback AdSet tampoco recibió un anuncio: bórralo también.
+            const delResult = await this.deleteAdSet(fallbackAdSetResult.data.id);
+            if (!delResult.success) {
+              console.warn(`No se pudo eliminar el fallback AdSet vacío ${fallbackAdSetResult.data.id}: ${delResult.error}`);
+            }
           }
           return stdSuccess;
         }
@@ -4759,6 +4805,7 @@ class MetaAdsService {
             });
             if (adResult.success) {
               results.ads.push(adResult.data);
+              results.adSets.push(adSetData);
               return true;
             }
           }
@@ -4766,9 +4813,11 @@ class MetaAdsService {
 
         if (!adResult.success) {
           results.errors.push(`Ad ${adIndex + 1}: ${adResult.error}`);
+          await deleteEmptyOriginalAdSet();
           return false;
         }
         results.ads.push(adResult.data);
+        results.adSets.push(adSetData);
         return true;
       };
 
@@ -4888,11 +4937,23 @@ class MetaAdsService {
             results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
             continue;
           }
-          results.adSets.push(adSetResult.data);
 
+          let adsCreatedInAdSet = 0;
           for (let i = 0; i < ads.length; i++) {
             console.log(`Creating standard creative + ad ${i + 1}/${ads.length}${audPrefix} in shared AdSet...`);
-            await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
+            const adCreated = await createStandardCreativeAndAd(ads[i], i, adSetResult.data.id);
+            if (adCreated) adsCreatedInAdSet++;
+          }
+
+          if (adsCreatedInAdSet > 0) {
+            results.adSets.push(adSetResult.data);
+          } else {
+            console.warn(`AdSet${audPrefix} quedó sin anuncios, eliminando...`);
+            const delResult = await this.deleteAdSet(adSetResult.data.id);
+            if (!delResult.success) {
+              console.warn(`No se pudo eliminar el AdSet vacío ${adSetResult.data.id}: ${delResult.error}`);
+            }
+            results.errors.push(`AdSet${audPrefix}: ningún anuncio se pudo crear, el conjunto vacío fue eliminado`);
           }
         }
 
@@ -4927,9 +4988,10 @@ class MetaAdsService {
               results.errors.push(`AdSet ${i + 1}${audPrefix}: ${adSetResult.error}`);
               continue;
             }
-            results.adSets.push(adSetResult.data);
 
-            await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id, {
+            // No se agrega a results.adSets aquí: createDynamicCreativeAndAd lo agrega solo si
+            // termina con al menos un anuncio dentro (si no, lo elimina en vez de dejarlo vacío).
+            await createDynamicCreativeAndAd(ads[i], i, adSetResult.data, {
               targeting: currentAudience.targeting,
               campaignId: results.campaign.id
             });
@@ -4965,8 +5027,8 @@ class MetaAdsService {
             results.errors.push(`AdSet${audPrefix}: ${adSetResult.error}`);
             continue;
           }
-          results.adSets.push(adSetResult.data);
           const flexAdSetId = adSetResult.data.id;
+          let adsCreatedInFlexAdSet = 0;
 
           // FLEXIBLE MODE: 1 AdSet per audience → N Flexible Ads (1 per flexibleAdGroups entry)
           const groupsToCreate = flexibleAdGroups.length > 0 ? flexibleAdGroups : [{
@@ -5025,7 +5087,21 @@ class MetaAdsService {
               results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error}`);
             } else {
               results.ads.push(flexResult.data);
+              adsCreatedInFlexAdSet++;
             }
+          }
+
+          if (adsCreatedInFlexAdSet > 0) {
+            results.adSets.push(adSetResult.data);
+          } else {
+            // Ningún anuncio se creó en este AdSet (p. ej. video sin miniatura válida) —
+            // bórralo en vez de dejarlo huérfano y vacío en la cuenta.
+            console.warn(`AdSet${audPrefix} quedó sin anuncios, eliminando...`);
+            const delResult = await this.deleteAdSet(flexAdSetId);
+            if (!delResult.success) {
+              console.warn(`No se pudo eliminar el AdSet vacío ${flexAdSetId}: ${delResult.error}`);
+            }
+            results.errors.push(`AdSet${audPrefix}: ningún anuncio se pudo crear, el conjunto vacío fue eliminado`);
           }
         }
 
@@ -5060,9 +5136,10 @@ class MetaAdsService {
             results.errors.push(`AdSet ${i + 1}: ${adSetResult.error}`);
             continue;
           }
-          results.adSets.push(adSetResult.data);
 
-          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data.id, {
+          // No se agrega a results.adSets aquí: createDynamicCreativeAndAd lo agrega solo si
+          // termina con al menos un anuncio dentro (si no, lo elimina en vez de dejarlo vacío).
+          await createDynamicCreativeAndAd(ads[i], i, adSetResult.data, {
             targeting: adTargeting,
             campaignId: results.campaign.id
           });
