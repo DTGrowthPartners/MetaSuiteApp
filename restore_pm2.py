@@ -1,10 +1,11 @@
 import sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-import paramiko
+import paramiko, os
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('149.56.133.201', username='ubuntu', password='zohzer-sebky3-pypNaw')
+# Contraseña por variable de entorno — exporta VPS_SSH_PASSWORD antes de correr esto.
+ssh.connect('149.56.133.201', username='ubuntu', password=os.environ['VPS_SSH_PASSWORD'])
 sftp = ssh.open_sftp()
 sftp.put(r'c:\Users\Edgar\OneDrive\Documentos\MetaSuiteApp\meta-ads-dashboard\server\generate_eq_report.py',
     '/home/ubuntu/MetaSuiteApp/meta-ads-dashboard/server/generate_eq_report.py')

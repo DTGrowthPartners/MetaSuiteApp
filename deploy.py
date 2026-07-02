@@ -4,7 +4,11 @@ import paramiko, os
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('149.56.133.201', username='ubuntu', password='zohzer-sebky3-pypNaw')
+# Antes tenía la contraseña del VPS en texto plano aquí (filtrada en git). Ahora se lee
+# de una variable de entorno — exporta VPS_SSH_PASSWORD antes de correr este script,
+# o mejor, migra a autenticación por llave SSH.
+vps_password = os.environ['VPS_SSH_PASSWORD']
+ssh.connect('149.56.133.201', username='ubuntu', password=vps_password)
 
 sftp = ssh.open_sftp()
 
