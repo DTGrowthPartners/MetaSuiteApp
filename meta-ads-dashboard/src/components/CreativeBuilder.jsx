@@ -2605,7 +2605,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               <strong>{tr('per_ad', lang)}</strong>
               <small>{tr('per_ad_desc', lang)}</small>
             </button>
-            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].includes(selectedTemplate?.objective) && (
+            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].includes(selectedTemplate?.objective) &&
+              // Meta rechaza Flexible Ads para el optimization_goal VISIT_INSTAGRAM_PROFILE
+              // (error_subcode 3858343: "el objetivo no admite el formato flexible"), confirmado
+              // en producción — el fallback a DC clásico funciona bien, pero mejor no ofrecer un
+              // botón que siempre va a fallar y generar ruido.
+              templateAdSetConfig?.conversionLocation !== 'INSTAGRAM_PROFILE' && (
               <button
                 type="button"
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
