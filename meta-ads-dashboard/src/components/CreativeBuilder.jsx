@@ -2605,7 +2605,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               <strong>{tr('per_ad', lang)}</strong>
               <small>{tr('per_ad_desc', lang)}</small>
             </button>
-            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
+            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].includes(selectedTemplate?.objective) && (
               <button
                 type="button"
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
@@ -2623,7 +2623,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               ? 'Crea docenas de combinaciones automáticamente (5 títulos + 5 descripciones + 5 CTAs). Meta optimiza las mejores. Recomendado para la mayoría de campañas.'
               : adSetMode === 'per-ad'
               ? 'Cada anuncio tiene su propio Ad Set con público diferente. Ideal para testear audiencias distintas con el mismo creativo.'
-              : 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio. Meta optimiza automáticamente. Solo para campañas de Ventas o Apps.'}
+              : 'Usa el formato nativo de Meta que combina imágenes, videos y textos en un solo anuncio, todo dentro de 1 Ad Set (sin separar por conjuntos). Meta optimiza automáticamente. Disponible para Ventas, Apps, Tráfico e Interacción.'}
           </p>
         </div>
 

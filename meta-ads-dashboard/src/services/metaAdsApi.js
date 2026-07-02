@@ -2071,13 +2071,14 @@ class MetaAdsService {
     }
   }
 
-  // NOTA (actualizado Mar 2026): creative_asset_groups_spec (Flexible Ads) SÍ funciona via API
-  // pero SOLO para OUTCOME_SALES y OUTCOME_APP_PROMOTION.
-  // Se envía como parámetro separado en /ads (no dentro del creative).
-  // El creative lleva un object_story_spec básico (page_id) y el contenido va en creative_asset_groups_spec.
+  // NOTA (actualizado Jul 2026): creative_asset_groups_spec (Flexible Ads) SÍ funciona via API.
+  // Meta amplió los objetivos soportados a OUTCOME_SALES, OUTCOME_APP_PROMOTION, OUTCOME_TRAFFIC
+  // y OUTCOME_ENGAGEMENT (antes solo Sales/Apps). Se envía como parámetro separado en /ads (no
+  // dentro del creative). El creative lleva un object_story_spec básico (page_id) y el contenido
+  // va en creative_asset_groups_spec.
 
   // Crear Ad con Formato Flexible (creative_asset_groups_spec)
-  // Solo soportado para OUTCOME_SALES y OUTCOME_APP_PROMOTION
+  // Soportado para OUTCOME_SALES, OUTCOME_APP_PROMOTION, OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT
   async createFlexibleAd(adAccountId, {
     name,
     adsetId,
@@ -5001,7 +5002,9 @@ class MetaAdsService {
       } else if (adSetMode === 'flexible') {
         // ========================================================
         // MODO FLEXIBLE: M AdSets (1 por público) → N Ads con creative_asset_groups_spec
-        // Solo soportado para OUTCOME_SALES y OUTCOME_APP_PROMOTION
+        // Soportado para OUTCOME_SALES, OUTCOME_APP_PROMOTION, OUTCOME_TRAFFIC, OUTCOME_ENGAGEMENT
+        // Si Meta rechaza el Flexible Ad para una cuenta/objetivo puntual, cae a Dynamic
+        // Creative clásico (AdSet dedicado, 1 solo medio del grupo) en vez de fallar sin más.
         // ========================================================
         for (let audIdx = 0; audIdx < audiencesToProcess.length; audIdx++) {
           const currentAudience = audiencesToProcess[audIdx];
@@ -5083,11 +5086,64 @@ class MetaAdsService {
               status: 'ACTIVE'
             });
 
-            if (!flexResult.success) {
-              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error}`);
-            } else {
+            if (flexResult.success) {
               results.ads.push(flexResult.data);
               adsCreatedInFlexAdSet++;
+              continue;
+            }
+
+            console.warn(`Flexible Ad${audPrefix}${groupLabel} falló, probando Dynamic Creative clásico:`, flexResult.error);
+
+            // Fallback: AdSet dedicado con Dynamic Creative clásico (solo admite 1 medio por
+            // AdSet), usando el primer medio del grupo — mejor un anuncio con 1 video/imagen
+            // que ningún anuncio.
+            const firstMedia = flexGroup.mediaItems[0];
+            if (!firstMedia) {
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (sin medios para fallback a DC)`);
+              continue;
+            }
+
+            const dcFallbackAdSetResult = await this.createAdSet(adAccountId, {
+              name: `${currentAudience?.name || 'Principal'} · ${campaignName} (DC)`,
+              campaignId: results.campaign.id,
+              dailyBudget: !isCBO ? audDailyBudget : null,
+              billingEvent,
+              optimizationGoal,
+              targeting: currentAudience.targeting,
+              status: 'ACTIVE',
+              endTime: endDate,
+              isDynamicCreative: true,
+              destinationType,
+              promotedObject
+            });
+
+            if (!dcFallbackAdSetResult.success) {
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (fallback AdSet DC también falló: ${dcFallbackAdSetResult.error})`);
+              continue;
+            }
+
+            const dcFallbackAd = {
+              videoId: firstMedia.type === 'video' ? firstMedia.videoId : null,
+              imageHash: firstMedia.hash || null,
+              imageUrl: firstMedia.type === 'image' ? (firstMedia.url || null) : null,
+              videoThumbnailUrl: firstMedia.type === 'video' ? (firstMedia.thumbnailUrl || firstMedia.url || null) : null,
+              headlines: flexGroup.headlines,
+              descriptions: flexGroup.descriptions,
+              linkDescriptions: flexGroup.linkDescriptions,
+              ctas: flexGroup.ctas
+            };
+            const dcFallbackSuccess = await createDynamicCreativeAndAd(dcFallbackAd, gi, dcFallbackAdSetResult.data, {
+              targeting: currentAudience.targeting,
+              campaignId: results.campaign.id
+            });
+            if (dcFallbackSuccess) {
+              // OJO: esto NO cuenta para adsCreatedInFlexAdSet — el anuncio quedó en el AdSet
+              // de fallback (que createDynamicCreativeAndAd ya agregó a results.adSets), no en
+              // flexAdSetId. El AdSet flexible original sigue vacío y se elimina más abajo si
+              // ningún otro grupo sí logró crear su Flexible Ad ahí.
+              console.log(`  Fallback a Dynamic Creative clásico exitoso${audPrefix}${groupLabel}`);
+            } else {
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (fallback a DC clásico también falló)`);
             }
           }
 
