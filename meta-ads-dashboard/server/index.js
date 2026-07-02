@@ -313,30 +313,118 @@ const LEGAL_STYLE = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
     .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+    .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     h1 { color: #a5b4fc; font-size: 2rem; margin-bottom: 8px; }
     h2 { color: #818cf8; font-size: 1.3rem; margin: 32px 0 12px; }
     .subtitle { color: #94a3b8; margin-bottom: 32px; }
     p, li { color: #cbd5e1; margin-bottom: 12px; }
-    ul { padding-left: 24px; }
+    ul, ol { padding-left: 24px; }
     a { color: #6366f1; }
-    .logo { font-size: 1.5rem; font-weight: 700; color: #6366f1; margin-bottom: 24px; display: block; }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #6366f1; display: block; }
     .card { background: #1e293b; border-radius: 12px; padding: 32px; margin: 24px 0; border: 1px solid #334155; }
     .updated { color: #64748b; font-size: 0.85rem; }
+    .lang-toggle a { color: #94a3b8; text-decoration: none; font-size: 0.85rem; margin-left: 14px; }
+    .lang-toggle a.active { color: #e2e8f0; font-weight: 600; }
   </style>
 `;
 
+// Toggle ES/EN para las páginas legales — recarga la misma página con ?lang=
+const legalLangToggle = (path, lang) => `
+    <div class="lang-toggle">
+      <a href="${path}?lang=es" class="${lang === 'es' ? 'active' : ''}">🇨🇴 Español</a>
+      <a href="${path}?lang=en" class="${lang === 'en' ? 'active' : ''}">🇺🇸 English</a>
+    </div>`;
+
 // Privacy Policy
 app.get('/api/legal/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Política de Privacidad - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
-  <div class="container">
-    <span class="logo">MetaSuite</span>
+  const lang = req.query.lang === 'en' ? 'en' : 'es';
+  const title = lang === 'en' ? 'Privacy Policy' : 'Política de Privacidad';
+  const body = lang === 'en' ? `
+    <h1>Privacy Policy</h1>
+    <p class="subtitle">Last updated: March 30, 2026</p>
+
+    <div class="card">
+      <h2>1. Information we collect</h2>
+      <p>Faro DT ("the App"), developed by DT Growth Partners, accesses the following data through the Meta (Facebook) API:</p>
+      <ul>
+        <li><strong>Public profile information:</strong> Facebook name and profile picture to identify the user within the App.</li>
+        <li><strong>Facebook Pages:</strong> List of pages you manage, to link ad campaigns.</li>
+        <li><strong>Ad accounts:</strong> Information about your ad accounts (name, ID, performance metrics) to manage campaigns.</li>
+        <li><strong>Ad data:</strong> Campaign metrics (impressions, clicks, conversions, costs) to display performance reports.</li>
+        <li><strong>Business assets:</strong> Access to linked Business Managers to manage advertising resources.</li>
+        <li><strong>Instagram accounts:</strong> Instagram accounts linked to your Pages, to create ads on Instagram.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>2. How we use the information</h2>
+      <p>We use this data exclusively to:</p>
+      <ul>
+        <li>Let you create, edit, and manage advertising campaigns on Meta.</li>
+        <li>Show performance reports and metrics for your ads.</li>
+        <li>Generate ad copy (text and images) using artificial intelligence.</li>
+        <li>Manage your advertising assets (Pages, accounts, audiences).</li>
+      </ul>
+      <p><strong>We do not sell, share, or transfer your data to third parties.</strong></p>
+    </div>
+
+    <div class="card">
+      <h2>3. Data storage</h2>
+      <ul>
+        <li>Access tokens are stored <strong>only in the user's browser</strong> (localStorage) and never on our servers.</li>
+        <li>We do not maintain databases with users' personal information.</li>
+        <li>Campaign and metrics data is fetched in real time from the Meta API and is not stored permanently.</li>
+        <li>Generated reports are cached temporarily (up to 24 hours) to improve load times.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. Data sharing</h2>
+      <p>We do not share personal data with third parties. The only external services that process information are:</p>
+      <ul>
+        <li><strong>Meta (Facebook) API:</strong> To carry out the advertising operations requested by the user.</li>
+        <li><strong>Anthropic API (Claude AI):</strong> To generate ad copy. Only the ad's image/video and the business context provided by the user are sent. No personal data is sent.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. Data deletion</h2>
+      <p>You can request deletion of your data at any time:</p>
+      <ul>
+        <li>By logging out of the App (this removes all tokens stored in your browser).</li>
+        <li>By revoking the App's access from your <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank">Facebook Settings → Apps and Websites</a>.</li>
+        <li>By emailing: <strong>contacto@dtgrowthpartners.com</strong></li>
+      </ul>
+      <p>For more details, visit our <a href="/data-deletion">data deletion page</a>.</p>
+    </div>
+
+    <div class="card">
+      <h2>6. Security</h2>
+      <ul>
+        <li>All communication takes place over HTTPS.</li>
+        <li>Access tokens are never transmitted to or stored on our own servers.</li>
+        <li>Access to the Meta API uses standard OAuth 2.0 protocols.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>7. Contact</h2>
+      <p>If you have questions about this privacy policy, contact us:</p>
+      <ul>
+        <li><strong>Company:</strong> DT Growth Partners</li>
+        <li><strong>Responsible party:</strong> Edgardo Meza</li>
+        <li><strong>Email:</strong> contacto@dtgrowthpartners.com</li>
+        <li><strong>Location:</strong> Cartagena, Colombia</li>
+      </ul>
+    </div>
+
+    <p class="updated">This policy may be updated periodically. The last-updated date is shown at the top of this document.</p>` : `
     <h1>Política de Privacidad</h1>
     <p class="subtitle">Última actualización: 30 de marzo de 2026</p>
 
     <div class="card">
       <h2>1. Información que recopilamos</h2>
-      <p>MetaSuite ("la App"), desarrollada por DT Growth Partners, accede a los siguientes datos a través de la API de Meta (Facebook):</p>
+      <p>Faro DT ("la App"), desarrollada por DT Growth Partners, accede a los siguientes datos a través de la API de Meta (Facebook):</p>
       <ul>
         <li><strong>Información de perfil público:</strong> Nombre y foto de perfil de Facebook para identificar al usuario dentro de la App.</li>
         <li><strong>Páginas de Facebook:</strong> Lista de páginas que administras para vincular campañas publicitarias.</li>
@@ -409,27 +497,95 @@ app.get('/api/legal/privacy', (req, res) => {
       </ul>
     </div>
 
-    <p class="updated">Esta política puede actualizarse periódicamente. La fecha de última actualización se indica al inicio del documento.</p>
+    <p class="updated">Esta política puede actualizarse periódicamente. La fecha de última actualización se indica al inicio del documento.</p>`;
+  res.send(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - Faro DT by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <div class="top-row"><span class="logo">Faro DT</span>${legalLangToggle('/privacy', lang)}</div>
+    ${body}
   </div></body></html>`);
 });
 
 // Terms of Service
 app.get('/api/legal/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Términos de Servicio - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
-  <div class="container">
-    <span class="logo">MetaSuite</span>
+  const lang = req.query.lang === 'en' ? 'en' : 'es';
+  const title = lang === 'en' ? 'Terms of Service' : 'Términos de Servicio';
+  const body = lang === 'en' ? `
+    <h1>Terms of Service</h1>
+    <p class="subtitle">Last updated: March 30, 2026</p>
+
+    <div class="card">
+      <h2>1. Acceptance of terms</h2>
+      <p>By using Faro DT ("the App"), you agree to these terms of service. If you do not agree, do not use the App.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Service description</h2>
+      <p>Faro DT is an advertising campaign management dashboard developed by DT Growth Partners that lets you:</p>
+      <ul>
+        <li>Create, edit, and manage advertising campaigns on Meta (Facebook and Instagram).</li>
+        <li>View ad performance metrics and reports.</li>
+        <li>Generate ad copy using artificial intelligence.</li>
+        <li>Manage business assets (Pages, ad accounts, audiences).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>3. Usage requirements</h2>
+      <ul>
+        <li>You must have an active Facebook account with access to ad accounts.</li>
+        <li>You must authorize the App to access your advertising data via Facebook Login.</li>
+        <li>You are responsible for all campaigns and ads created through the App.</li>
+        <li>You must comply with <a href="https://www.facebook.com/policies/ads/" target="_blank">Meta's Advertising Policies</a>.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. User responsibilities</h2>
+      <ul>
+        <li>You are solely responsible for the content of your ads and campaigns.</li>
+        <li>You must not use the App to create ads that violate Meta's policies or applicable laws.</li>
+        <li>You are responsible for keeping your Facebook account and access token secure.</li>
+        <li>Advertising budgets and spend are your direct responsibility with Meta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. AI-generated content</h2>
+      <p>The App uses artificial intelligence to generate suggested ad copy. This content:</p>
+      <ul>
+        <li>Is a suggestion the user must review and approve before publishing.</li>
+        <li>DT Growth Partners is not responsible for AI-generated content.</li>
+        <li>The user is responsible for verifying the content complies with Meta's policies.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>6. Limitation of liability</h2>
+      <p>DT Growth Partners is not responsible for:</p>
+      <ul>
+        <li>Interruptions to the Meta service or changes to its API.</li>
+        <li>Results of advertising campaigns.</li>
+        <li>Data loss due to changes in Meta's policies.</li>
+        <li>Suspension or restriction of ad accounts by Meta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>7. Contact</h2>
+      <p><strong>DT Growth Partners</strong><br>Edgardo Meza<br>contacto@dtgrowthpartners.com<br>Cartagena, Colombia</p>
+    </div>` : `
     <h1>Términos de Servicio</h1>
     <p class="subtitle">Última actualización: 30 de marzo de 2026</p>
 
     <div class="card">
       <h2>1. Aceptación de los términos</h2>
-      <p>Al usar MetaSuite ("la App"), aceptas estos términos de servicio. Si no estás de acuerdo, no uses la App.</p>
+      <p>Al usar Faro DT ("la App"), aceptas estos términos de servicio. Si no estás de acuerdo, no uses la App.</p>
     </div>
 
     <div class="card">
       <h2>2. Descripción del servicio</h2>
-      <p>MetaSuite es un dashboard de gestión de campañas publicitarias desarrollado por DT Growth Partners que permite:</p>
+      <p>Faro DT es un dashboard de gestión de campañas publicitarias desarrollado por DT Growth Partners que permite:</p>
       <ul>
         <li>Crear, editar y gestionar campañas publicitarias en Meta (Facebook e Instagram).</li>
         <li>Visualizar métricas y reportes de rendimiento de anuncios.</li>
@@ -482,22 +638,55 @@ app.get('/api/legal/terms', (req, res) => {
     <div class="card">
       <h2>7. Contacto</h2>
       <p><strong>DT Growth Partners</strong><br>Edgardo Meza<br>contacto@dtgrowthpartners.com<br>Cartagena, Colombia</p>
-    </div>
+    </div>`;
+  res.send(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - Faro DT by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <div class="top-row"><span class="logo">Faro DT</span>${legalLangToggle('/terms', lang)}</div>
+    ${body}
   </div></body></html>`);
 });
 
 // Data Deletion Callback & Instructions Page
 app.get('/api/legal/data-deletion', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eliminación de Datos - MetaSuite by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
-  <div class="container">
-    <span class="logo">MetaSuite</span>
-    <h1>Eliminación de Datos de Usuario</h1>
-    <p class="subtitle">Cómo eliminar tus datos de MetaSuite</p>
+  const lang = req.query.lang === 'en' ? 'en' : 'es';
+  const title = lang === 'en' ? 'User Data Deletion' : 'Eliminación de Datos de Usuario';
+  const body = lang === 'en' ? `
+    <h1>User Data Deletion</h1>
+    <p class="subtitle">How to delete your Faro DT data</p>
 
     <div class="card">
-      <h2>¿Qué datos almacena MetaSuite?</h2>
-      <p>MetaSuite almacena datos mínimos, exclusivamente en tu navegador:</p>
+      <h2>What data does Faro DT store?</h2>
+      <p>Faro DT stores minimal data, exclusively in your browser:</p>
+      <ul>
+        <li>Facebook access token (in your browser's localStorage).</li>
+        <li>Name and profile picture (to display in the interface).</li>
+      </ul>
+      <p><strong>We do not store personal data on our servers.</strong> All campaign and metrics data is fetched in real time from Meta.</p>
+    </div>
+
+    <div class="card">
+      <h2>How to delete your data</h2>
+      <p><strong>Option 1:</strong> Log out of Faro DT. This immediately removes all data stored in your browser.</p>
+      <p><strong>Option 2:</strong> Revoke access from Facebook:</p>
+      <ol>
+        <li>Go to <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank">Facebook Settings → Apps and Websites</a>.</li>
+        <li>Look for "Faro DT".</li>
+        <li>Click "Remove" to revoke all permissions.</li>
+      </ol>
+      <p><strong>Option 3:</strong> Email <strong>contacto@dtgrowthpartners.com</strong> requesting deletion of your data.</p>
+    </div>
+
+    <div class="card">
+      <h2>Confirmation</h2>
+      <p>Since we do not store personal data on our servers, deletion is immediate upon logging out or revoking permissions. There is no pending data to delete on our side.</p>
+    </div>` : `
+    <h1>Eliminación de Datos de Usuario</h1>
+    <p class="subtitle">Cómo eliminar tus datos de Faro DT</p>
+
+    <div class="card">
+      <h2>¿Qué datos almacena Faro DT?</h2>
+      <p>Faro DT almacena datos mínimos, exclusivamente en tu navegador:</p>
       <ul>
         <li>Token de acceso de Facebook (en localStorage de tu navegador).</li>
         <li>Nombre y foto de perfil (para mostrar en la interfaz).</li>
@@ -507,11 +696,11 @@ app.get('/api/legal/data-deletion', (req, res) => {
 
     <div class="card">
       <h2>Cómo eliminar tus datos</h2>
-      <p><strong>Opción 1:</strong> Cierra sesión en MetaSuite. Esto elimina inmediatamente todos los datos almacenados en tu navegador.</p>
+      <p><strong>Opción 1:</strong> Cierra sesión en Faro DT. Esto elimina inmediatamente todos los datos almacenados en tu navegador.</p>
       <p><strong>Opción 2:</strong> Revoca el acceso desde Facebook:</p>
       <ol>
         <li>Ve a <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank">Configuración de Facebook → Aplicaciones y sitios web</a>.</li>
-        <li>Busca "ApiAppSuite" o "MetaSuite".</li>
+        <li>Busca "Faro DT".</li>
         <li>Haz clic en "Eliminar" para revocar todos los permisos.</li>
       </ol>
       <p><strong>Opción 3:</strong> Envía un email a <strong>contacto@dtgrowthpartners.com</strong> solicitando la eliminación de tus datos.</p>
@@ -520,7 +709,12 @@ app.get('/api/legal/data-deletion', (req, res) => {
     <div class="card">
       <h2>Confirmación</h2>
       <p>Dado que no almacenamos datos personales en nuestros servidores, la eliminación es inmediata al cerrar sesión o revocar permisos. No hay datos pendientes de borrar en nuestro lado.</p>
-    </div>
+    </div>`;
+  res.send(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - Faro DT by DT Growth Partners</title>${LEGAL_STYLE}</head><body>
+  <div class="container">
+    <div class="top-row"><span class="logo">Faro DT</span>${legalLangToggle('/data-deletion', lang)}</div>
+    ${body}
   </div></body></html>`);
 });
 

@@ -113,7 +113,7 @@ function SplashScreen({ onFinish }) {
         <div className="splash-bar-track">
           <div className="splash-bar-fill" />
         </div>
-        <p className="splash-tagline">MetaSuite</p>
+        <p className="splash-tagline">Faro DT</p>
       </div>
     </div>
   );
@@ -193,7 +193,7 @@ function LoginScreen({ onLogin, lang, setLang }) {
               <defs><linearGradient id="g1" x1="3" y1="3" x2="21" y2="21"><stop stopColor="#4A9FFF"/><stop offset="1" stopColor="#7C5CFC"/></linearGradient></defs>
             </svg>
           </div>
-          <h1 className="login-title">MetaSuite</h1>
+          <h1 className="login-title">Faro DT</h1>
           <span className="login-brand">by DT Growth Partners</span>
         </div>
         <p className="login-subtitle">{tr('login_subtitle', lang)}</p>
@@ -241,7 +241,7 @@ function App() {
   useEffect(() => {
     if (!isLegalPage) return;
     const apiBase = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
-    fetch(`${apiBase}${pathname.replace('/', '/legal/')}`)
+    fetch(`${apiBase}${pathname.replace('/', '/legal/')}${window.location.search}`)
       .then(r => r.text())
       .then(html => setLegalHtml(html))
       .catch(() => setLegalHtml('<p>Error cargando la página</p>'));
@@ -357,7 +357,7 @@ function App() {
         <div className="nav-brand">
           <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" className="nav-logo-img" />
           <div className="nav-brand-text">
-            <span className="nav-title">MetaSuite</span>
+            <span className="nav-title">Faro DT</span>
           </div>
         </div>
         <div className="nav-links">
