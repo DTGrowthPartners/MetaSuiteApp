@@ -112,7 +112,8 @@ function detectCampaignType(campaignName, patterns = []) {
 
 // ===================== VISTA MENSUAL (estilo PDF) =====================
 function MonthlyReportView({ data, locations, lang }) {
-  const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [], adsetReachLastMonth = 0 } = data;
+  const { campaigns = [], dateRange, prevMonthTotals, campaignTypePatterns = [], adsetReachLastMonth = 0, pageEngagement = null } = data;
+  const pageFollowers = pageEngagement?.followersCount ?? pageEngagement?.fanCount ?? null;
   const active = campaigns.filter(c => parseFloat(c.insightsLastMonth?.spend || 0) > 0);
 
   // Totales del mes actual (TODAS las campañas)
@@ -241,6 +242,12 @@ function MonthlyReportView({ data, locations, lang }) {
             <span className="monthly-metric-label">Nuevos Contactos</span>
             <ChangeBadge current={convTotals.firstReplies} previous={prevConvTotals.firstReplies} />
           </div>
+          {pageFollowers !== null && (
+            <div className="monthly-metric-card">
+              <span className="monthly-metric-value">{formatCompact(pageFollowers)}</span>
+              <span className="monthly-metric-label">Seguidores de la Página{pageEngagement.pageName ? ` (${pageEngagement.pageName})` : ''}</span>
+            </div>
+          )}
         </div>
       </section>
 

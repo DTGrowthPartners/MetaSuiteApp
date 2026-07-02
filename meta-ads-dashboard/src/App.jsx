@@ -189,7 +189,11 @@ function LoginScreen({ onLogin, lang, setLang }) {
         <div className="login-logo">
           <div className="login-logo-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm13 0l4 8-4-1-4 1 4-8z" fill="url(#g1)" />
+              <path d="M6.75 7.5 L2.25 4.5" stroke="url(#g1)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M17.25 7.5 L21.75 4.5" stroke="url(#g1)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M9 6.75 L15 6.75 L12 3 Z" fill="url(#g1)" />
+              <rect x="9.75" y="6.75" width="4.5" height="2.6" fill="url(#g1)" />
+              <path d="M10.1 9.4 L13.9 9.4 L15.75 20.25 L8.25 20.25 Z" fill="url(#g1)" />
               <defs><linearGradient id="g1" x1="3" y1="3" x2="21" y2="21"><stop stopColor="#4A9FFF"/><stop offset="1" stopColor="#7C5CFC"/></linearGradient></defs>
             </svg>
           </div>

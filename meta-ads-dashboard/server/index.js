@@ -2678,7 +2678,7 @@ async function getReportData(accountId, token) {
   // independientemente del número de campañas. Antes hacía 2N calls (una por campaña por día),
   // que en cuentas con muchas campañas saturaba el rate limit y disparaba timeouts del proxy
   // (nginx devolvía HTML 504, lo que rompía el frontend con "Unexpected token '<'").
-  const [yesterdayInsightsByCampaign, todayInsightsByCampaign, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights] = await Promise.all([
+  const [yesterdayInsightsByCampaign, todayInsightsByCampaign, lastMonthInsights, prevMonthInsights, adsetReachLastMonth, adsetReachPrevMonth, accountReachLastMonth, accountYesterdayInsights, pageEngagement] = await Promise.all([
     safe(() => getAccountInsightsByCampaign(normalizedId, token, { since: yesterday, until: yesterday }), [], 'yesterdayByCampaign'),
     safe(() => getAccountInsightsByCampaign(normalizedId, token, { since: today, until: today }), [], 'todayByCampaign'),
     safe(() => getAccountInsightsByCampaign(normalizedId, token, lastMonth), [], 'lastMonthInsights'),
@@ -2697,7 +2697,27 @@ async function getReportData(accountId, token) {
       });
       const d = resp.data.data?.[0] || {};
       return { reach: parseInt(d.reach || 0), impressions: parseInt(d.impressions || 0) };
-    }, { reach: 0, impressions: 0 }, 'accountYesterdayInsights')
+    }, { reach: 0, impressions: 0 }, 'accountYesterdayInsights'),
+    // Página vinculada a esta cuenta publicitaria — usa pages_read_engagement para leer
+    // fan_count/followers_count/engagement del nodo de la Página (no del ad account).
+    // Esto es lo único en todo el backend que ejerce ese permiso de forma inequívoca.
+    safe(async () => {
+      const pagesResp = await axios.get(`${META_API_BASE_URL}/${normalizedId}/promote_pages`, {
+        params: { access_token: token, fields: 'id,name', limit: 1 }
+      });
+      const page = pagesResp.data?.data?.[0];
+      if (!page) return null;
+      const pageResp = await axios.get(`${META_API_BASE_URL}/${page.id}`, {
+        params: { access_token: token, fields: 'engagement,fan_count,followers_count' }
+      });
+      return {
+        pageId: page.id,
+        pageName: page.name,
+        fanCount: pageResp.data?.fan_count ?? null,
+        followersCount: pageResp.data?.followers_count ?? null,
+        engagementCount: pageResp.data?.engagement?.count ?? null
+      };
+    }, null, 'pageEngagement')
   ]);
 
   // Indexar insights de ayer/hoy por campaign_id (vienen agregados a nivel cuenta)
@@ -2766,6 +2786,7 @@ async function getReportData(accountId, token) {
     accountImpressionsYesterday: accountYesterdayInsights.impressions,
     adsetReachLastMonth: adsetReachLastMonth,
     accountReachLastMonth: accountReachLastMonth,
+    pageEngagement: pageEngagement,
     prevMonthTotals,
     fetchedAt: new Date().toISOString(),
     totalCampaigns: activeCampaigns.length

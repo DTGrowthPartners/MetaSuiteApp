@@ -1031,7 +1031,7 @@ class MetaAdsService {
       if (description) params.append('description', description);
 
       const resp = await axios.post(
-        `https://graph.facebook.com/v22.0/${normalizedId}/customaudiences`,
+        `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
         params.toString(),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
@@ -1086,7 +1086,7 @@ class MetaAdsService {
       if (description) params.append('description', description);
 
       const resp = await axios.post(
-        `https://graph.facebook.com/v21.0/${normalizedId}/customaudiences`,
+        `${META_API_BASE_URL}/${normalizedId}/customaudiences`,
         params.toString(),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
