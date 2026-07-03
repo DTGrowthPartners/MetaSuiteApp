@@ -128,13 +128,16 @@ class MetaAdsService {
   async analyzeMediaUrlBatch(mediaItems, adIndex = 0, category = '', objective = '', templateName = '', destType = '', textLength = 'medium', campaignContext = '') {
     try {
       if (!mediaItems || mediaItems.length === 0) return { success: false, error: 'No hay medios' };
-      const hasVideoWithSource = mediaItems.some(i => i.type === 'video' && i.sourceUrl);
+      // Treat both sourceUrl and videoId as "transcribable video" because the backend can resolve sourceUrl from videoId
+      const hasVideoTranscribable = mediaItems.some(i => i.type === 'video' && (i.sourceUrl || i.videoId));
       // Videos need more time (download + Whisper transcription + frame extraction): 150s per video, 15s per image
       const timeout = Math.max(120000, mediaItems.reduce((t, i) =>
-        t + (i.type === 'video' && i.sourceUrl ? 150000 : 15000), 0));
-      console.log(`Batch analyzing ${mediaItems.length} items (timeout ${timeout/1000}s, hasVideo: ${hasVideoWithSource})...`);
+        t + (i.type === 'video' && (i.sourceUrl || i.videoId) ? 150000 : 15000), 0));
+      console.log(`Batch analyzing ${mediaItems.length} items (timeout ${timeout/1000}s, hasVideo: ${hasVideoTranscribable})...`);
       const response = await axios.post(`${BACKEND_API_URL}/analyze-media-url-batch`, {
-        mediaItems, adIndex, category, objective, templateName, destType, textLength, campaignContext
+        mediaItems, adIndex, category, objective, templateName, destType, textLength, campaignContext,
+        // Backend uses this to resolve sourceUrl for videos when Meta's bulk listing returned it empty
+        accessToken: this.accessToken
       }, { timeout });
       if (response.data.success) {
         return { success: true, data: response.data.data };
@@ -1315,26 +1318,15 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
       console.log('Fetching ad images for:', normalizedId);
 
-      const all = [];
-      let url = `${META_API_BASE_URL}/${normalizedId}/adimages`;
-      let params = {
-        access_token: this.accessToken,
-        fields: 'hash,url,name,width,height,created_time',
-        limit: 100
-      };
-
-      while (url && all.length < maxItems) {
-        const response = await axios.get(url, { params });
-        const batch = response.data?.data || [];
-        all.push(...batch);
-        const next = response.data?.paging?.next;
-        if (next && all.length < maxItems) {
-          url = next; // next ya trae todos los params + cursor
-          params = undefined;
-        } else {
-          url = null;
-        }
+      // Listar vía backend con el token del servidor (larga duración). Antes se pegaba
+      // directo a Meta con el token del navegador, que al expirar dejaba la lista vacía.
+      const response = await axios.get(`${BACKEND_API_URL}/ad-images`, {
+        params: { adAccountId: normalizedId, maxItems }
+      });
+      if (!response.data?.success) {
+        return { success: false, error: response.data?.error || 'Error listando imágenes', data: [] };
       }
+      const all = response.data.data || [];
 
       // Dedupe: Meta crea variantes recortadas al subir desde PC. Mismo `name` (a veces con
       // sufijo tipo "_crop"), distinto hash. Agrupamos por nombre base y nos quedamos con la
@@ -1367,26 +1359,15 @@ class MetaAdsService {
       const normalizedId = this.normalizeAccountId(adAccountId);
       console.log('Fetching ad videos for:', normalizedId);
 
-      const all = [];
-      let url = `${META_API_BASE_URL}/${normalizedId}/advideos`;
-      let params = {
-        access_token: this.accessToken,
-        fields: 'id,title,thumbnails,source,created_time,length',
-        limit: 100
-      };
-
-      while (url && all.length < maxItems) {
-        const response = await axios.get(url, { params });
-        const batch = response.data?.data || [];
-        all.push(...batch);
-        const next = response.data?.paging?.next;
-        if (next && all.length < maxItems) {
-          url = next;
-          params = undefined;
-        } else {
-          url = null;
-        }
+      // Listar vía backend con el token del servidor (larga duración). Antes se pegaba
+      // directo a Meta con el token del navegador, que al expirar dejaba la lista vacía.
+      const response = await axios.get(`${BACKEND_API_URL}/ad-videos`, {
+        params: { adAccountId: normalizedId, maxItems }
+      });
+      if (!response.data?.success) {
+        return { success: false, error: response.data?.error || 'Error listando videos', data: [] };
       }
+      const all = response.data.data || [];
 
       // Dedupe videos por título (Meta puede generar variantes de aspecto al subir)
       const seen = new Map();

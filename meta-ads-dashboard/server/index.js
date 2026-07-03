@@ -78,17 +78,34 @@ const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'TU_META_ACCESS_TOKEN_AQUI
 
 // Anthropic (Claude) Configuration
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || null;
+const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL || null;
+const CLAUDE_MODEL_PRINCIPAL = process.env.CLAUDE_MODEL_PRINCIPAL || 'claude-haiku-4-5-20251001';
 let anthropic = null;
 
 if (ANTHROPIC_API_KEY) {
   try {
-    anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    console.log('Anthropic (Claude) API configurada correctamente');
+    anthropic = new Anthropic({
+      apiKey: ANTHROPIC_API_KEY,
+      ...(ANTHROPIC_BASE_URL ? { baseURL: ANTHROPIC_BASE_URL } : {})
+    });
+    console.log(`Anthropic (Claude) API configurada correctamente${ANTHROPIC_BASE_URL ? ` (baseURL: ${ANTHROPIC_BASE_URL})` : ''}`);
   } catch (err) {
     console.error('ERROR al inicializar Anthropic:', err.message);
   }
 } else {
   console.warn('ADVERTENCIA: ANTHROPIC_API_KEY no está configurada. Las funciones de IA (5+5+5 automático) no funcionarán.');
+}
+
+// Extrae el primer bloque de texto de una respuesta de Claude.
+// Robusto frente a respuestas vía proxy (Dario) que pueden anteponer bloques
+// no-texto (p.ej. thinking) — content[0] no siempre es el texto.
+function extractClaudeText(completion) {
+  const block = completion?.content?.find(b => b && b.type === 'text');
+  if (!block || typeof block.text !== 'string') {
+    const types = (completion?.content || []).map(b => b && b.type).join(', ') || 'vacío';
+    throw new Error(`Respuesta de Claude sin bloque de texto (bloques: ${types})`);
+  }
+  return block.text;
 }
 
 const META_API_VERSION = 'v24.0';
@@ -1435,6 +1452,52 @@ app.get('/api/pages', async (req, res) => {
   }
 });
 
+// Listar imágenes de la biblioteca de una cuenta publicitaria.
+// Usa SIEMPRE el token del servidor (larga duración): así la biblioteca no depende
+// del token de sesión de Facebook del navegador, que expira y dejaba la lista vacía.
+app.get('/api/ad-images', async (req, res) => {
+  try {
+    const normalizedId = normalizeAccountId(req.query.adAccountId);
+    if (!normalizedId) return res.status(400).json({ success: false, error: 'adAccountId requerido', data: [] });
+    const maxItems = Math.min(parseInt(req.query.maxItems, 10) || 300, 1000);
+    const all = [];
+    let url = `${META_API_BASE_URL}/${normalizedId}/adimages`;
+    let params = { access_token: ACCESS_TOKEN, fields: 'hash,url,name,width,height,created_time', limit: 100 };
+    while (url && all.length < maxItems) {
+      const r = await axios.get(url, { params });
+      all.push(...(r.data?.data || []));
+      const next = r.data?.paging?.next;
+      if (next && all.length < maxItems) { url = next; params = undefined; } else { url = null; }
+    }
+    res.json({ success: true, data: all });
+  } catch (error) {
+    console.error('Error listing ad images:', error.response?.data?.error || error.message);
+    res.status(500).json({ success: false, error: error.response?.data?.error?.message || error.message, data: [] });
+  }
+});
+
+// Listar videos de la biblioteca de una cuenta publicitaria (token del servidor, ver nota arriba).
+app.get('/api/ad-videos', async (req, res) => {
+  try {
+    const normalizedId = normalizeAccountId(req.query.adAccountId);
+    if (!normalizedId) return res.status(400).json({ success: false, error: 'adAccountId requerido', data: [] });
+    const maxItems = Math.min(parseInt(req.query.maxItems, 10) || 300, 1000);
+    const all = [];
+    let url = `${META_API_BASE_URL}/${normalizedId}/advideos`;
+    let params = { access_token: ACCESS_TOKEN, fields: 'id,title,thumbnails,source,created_time,length', limit: 100 };
+    while (url && all.length < maxItems) {
+      const r = await axios.get(url, { params });
+      all.push(...(r.data?.data || []));
+      const next = r.data?.paging?.next;
+      if (next && all.length < maxItems) { url = next; params = undefined; } else { url = null; }
+    }
+    res.json({ success: true, data: all });
+  } catch (error) {
+    console.error('Error listing ad videos:', error.response?.data?.error || error.message);
+    res.status(500).json({ success: false, error: error.response?.data?.error?.message || error.message, data: [] });
+  }
+});
+
 // Obtener públicos guardados de una cuenta
 app.get('/api/audiences/:accountId', async (req, res) => {
   try {
@@ -1566,14 +1629,14 @@ Responde en este formato JSON exacto:
 }`;
 
     const completion = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: CLAUDE_MODEL_PRINCIPAL,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       temperature: 0.7,
       max_tokens: 2000
     });
 
-    const responseText = completion.content[0].text;
+    const responseText = extractClaudeText(completion);
     console.log('Claude response:', responseText);
 
     // Parsear el JSON de la respuesta
@@ -1917,14 +1980,14 @@ JSON exacto:
 }`;
 
   const completion = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: CLAUDE_MODEL_PRINCIPAL,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
     temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
     max_tokens: 2000
   });
 
-  const responseText = completion.content[0].text;
+  const responseText = extractClaudeText(completion);
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
   // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
@@ -1967,7 +2030,7 @@ async function generateContentFromImage(base64Image, adIndex, category, objectiv
   const len = getTextLengthRules(textLength);
 
   const completion = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: CLAUDE_MODEL_PRINCIPAL,
     system: `Eres un experto copywriter de Facebook/Instagram Ads con años de experiencia creando campañas virales y de alto rendimiento.
 
 ${ctx.focus}
@@ -2020,7 +2083,7 @@ Máximo 1 emoji por título y 1 emoji por oración en descripciones. No abuses d
     max_tokens: 2000
   });
 
-  const responseText = completion.content[0].text;
+  const responseText = extractClaudeText(completion);
   const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleanJson);
   // Ensure exactly 5 CTAs using campaign-specific preferred CTAs
@@ -2256,7 +2319,7 @@ app.post('/api/analyze-media-url-batch', async (req, res) => {
     if (!anthropic) {
       return res.status(503).json({ success: false, error: 'Anthropic no está configurado.' });
     }
-    const { mediaItems, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc } = req.body;
+    const { mediaItems, adIndex: adIndexStr, category, objective, templateName, destType, textLength: tl, campaignContext: cc, accessToken: metaAccessToken } = req.body;
     if (!mediaItems || !Array.isArray(mediaItems) || mediaItems.length === 0) {
       return res.status(400).json({ success: false, error: 'Se requiere array de mediaItems' });
     }
@@ -2266,6 +2329,29 @@ app.post('/api/analyze-media-url-batch', async (req, res) => {
 
     const itemsToProcess = mediaItems.slice(0, 6);
     console.log(`Batch analyzing ${itemsToProcess.length} media items (group ${adIndex})...`);
+
+    // Resolve sourceUrl for videos that have videoId but no sourceUrl
+    // (Meta's /advideos bulk listing often returns source empty; /{video_id}?fields=source returns it)
+    if (metaAccessToken) {
+      for (const item of itemsToProcess) {
+        if (item.type === 'video' && !item.sourceUrl && item.videoId) {
+          try {
+            const r = await axios.get(`${META_API_BASE_URL}/${item.videoId}`, {
+              params: { access_token: metaAccessToken, fields: 'source' },
+              timeout: 10000
+            });
+            if (r.data?.source) {
+              item.sourceUrl = r.data.source;
+              console.log(`Resolved sourceUrl for video ${item.videoId} (${item.name || ''})`);
+            } else {
+              console.warn(`Video ${item.videoId} has no source field (Meta returned empty)`);
+            }
+          } catch (e) {
+            console.warn(`Could not resolve sourceUrl for video ${item.videoId}: ${e.response?.data?.error?.message || e.message}`);
+          }
+        }
+      }
+    }
 
     const base64Frames = [];
     const videoTitles = [];
@@ -2346,14 +2432,16 @@ app.post('/api/analyze-media-url-batch', async (req, res) => {
     const ctx = getCampaignContext(objective, destType);
     const len = getTextLengthRules(textLength);
 
-    const businessContext = campaignContext
-      ? `⚠️ CONTEXTO DEL NEGOCIO (OBLIGATORIO — basa el copy en esto, no en lo que parezcan las imágenes):\n"${campaignContext}"\n\n`
+    // Detectar si el contexto fue dado manualmente por el anunciante (no vacío y con sustancia)
+    const hasManualContext = !!(campaignContext && campaignContext.trim().length > 0);
+    const businessContext = hasManualContext
+      ? `📝 CONTEXTO ADICIONAL DEL ANUNCIANTE (úsalo para enriquecer el copy, pero NO ignores la transcripción/imágenes del video):\n"${campaignContext}"\n\n`
       : '';
     const videoCtx = videoTitles.length > 0 ? `Videos analizados: ${videoTitles.join(', ')}\n` : '';
 
     // Build transcript context if any
     const transcriptCtx = transcripts.length > 0
-      ? `\n🎙️ TRANSCRIPCIÓN DE AUDIO (lo que se dice en el/los videos):\n${transcripts.map(t => `"${t.text}"`).join('\n')}\n`
+      ? `\n🎙️ TRANSCRIPCIÓN DE AUDIO DEL VIDEO (FUENTE PRINCIPAL — esto es exactamente lo que se dice en el anuncio):\n${transcripts.map(t => `"${t.text}"`).join('\n')}\n`
       : '';
 
     const hasVisual = base64Frames.length > 0;
@@ -2381,9 +2469,11 @@ app.post('/api/analyze-media-url-batch', async (req, res) => {
 ${templateName ? `Tipo de campaña: ${templateName}` : ''}
 Instrucción de ángulo: ${angle}
 
-IMPORTANTE:${transcripts.length > 0 ? '\n- La transcripción de audio muestra EXACTAMENTE lo que se comunica en el video — úsala como fuente principal del mensaje del anuncio.' : ''}
-- Si hay contexto del negocio, el copy DEBE ser 100% sobre ese negocio.${hasVisual ? '\n- Las imágenes muestran el contenido visual del anuncio — úsalas para entender el estilo.' : ''}
-- El tipo de negocio lo define el contexto textual, no las imágenes.
+IMPORTANTE — JERARQUÍA DE FUENTES:
+${transcripts.length > 0
+  ? '1. La TRANSCRIPCIÓN DEL AUDIO es la fuente principal: refleja qué producto/servicio se promociona, qué oferta, qué tono y qué call-to-action usa el video. El copy DEBE estar basado en lo que se dice en el audio.'
+  : (hasVisual ? '1. Las IMÁGENES/FRAMES son la fuente principal: deduce el producto/servicio y mensaje a partir de lo que muestran.' : '')}${hasVisual && transcripts.length > 0 ? '\n2. Las imágenes complementan: muestran el estilo visual y el producto. Úsalas para enriquecer detalles.' : ''}${hasManualContext ? `\n${(transcripts.length > 0 || hasVisual) ? '3' : '1'}. El contexto del anunciante AÑADE matices (categoría, oferta, marca), pero NO reemplaza lo que dice el video. Si el contexto contradice el audio, prioriza el audio.` : ''}
+- NO inventes producto/servicio que no aparezca en el video o la transcripción.${!hasManualContext && (transcripts.length > 0 || hasVisual) ? '\n- No tienes contexto adicional del anunciante: NO te inventes uno, derívalo 100% del contenido del video.' : ''}
 
 Genera exactamente en JSON estos 4 campos DIFERENTES entre sí:
 - "descriptions": 5 TEXTOS PRINCIPALES largos y persuasivos (${len.descMin}-${len.descMax} chars). Son el cuerpo del anuncio.
@@ -2403,15 +2493,18 @@ Genera exactamente en JSON estos 4 campos DIFERENTES entre sí:
 Máximo 1 emoji por elemento.`
     });
 
+    // Log diagnóstico: qué fuentes alimentan al modelo
+    console.log(`[batch ${adIndex}] sources → transcripts=${transcripts.length} frames=${framesToSend.length} manualContext=${hasManualContext ? 'YES' : 'no'}${hasManualContext ? ` ("${campaignContext.substring(0, 60)}${campaignContext.length > 60 ? '...' : ''}")` : ''}`);
+
     const completion = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      system: `Eres un experto copywriter de Facebook/Instagram Ads.\n\n${ctx.focus}\n\nREGLAS:\n- TÍTULOS: ${len.headlineRule}\n- DESCRIPCIONES: ${len.descRule}\n- Todo en español\n- MÁXIMO 1 emoji por elemento\n- Si hay contexto del negocio, ÚSALO — NO inventes un tipo de negocio diferente por las imágenes\n- Responde SOLO en JSON válido, sin markdown`,
+      model: CLAUDE_MODEL_PRINCIPAL,
+      system: `Eres un experto copywriter de Facebook/Instagram Ads.\n\n${ctx.focus}\n\nREGLAS:\n- TÍTULOS: ${len.headlineRule}\n- DESCRIPCIONES: ${len.descRule}\n- Todo en español\n- MÁXIMO 1 emoji por elemento\n- Tu fuente principal es la TRANSCRIPCIÓN del audio del video (si existe) y los frames/imágenes. El contexto textual del anunciante es secundario y enriquece, no reemplaza.\n- Si NO hay contexto textual del anunciante, deriva el producto/servicio 100% del video — no inventes uno.\n- Responde SOLO en JSON válido, sin markdown`,
       messages: [{ role: 'user', content: msgContent }],
       temperature: Math.min(0.7 + (adIndex * 0.05), 1.0),
       max_tokens: 2000
     });
 
-    const responseText = completion.content[0].text;
+    const responseText = extractClaudeText(completion);
     const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleanJson);
 

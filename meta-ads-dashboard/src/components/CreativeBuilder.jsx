@@ -407,14 +407,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const analyzeFlexGroupWithMedia = async (groupIndex) => {
     const group = flexibleAdGroups[groupIndex];
     if (!group || group.mediaItems.length === 0) return;
-    // Build mediaItems array: images use url, videos include sourceUrl for multi-frame extraction
+    // Build mediaItems array: images use url, videos include sourceUrl/videoId for transcription
+    // videoId lets the backend resolve sourceUrl on-demand when Meta's bulk listing returns it empty
     const mediaItemsPayload = group.mediaItems.map(item => ({
       type: item.type,
       url: item.url || item.thumbnailUrl || '',
       thumbnailUrl: item.thumbnailUrl || '',
-      sourceUrl: item.sourceUrl || '',  // set for library videos
+      sourceUrl: item.sourceUrl || '',
+      videoId: item.videoId || '',
       name: item.name || ''
-    })).filter(item => item.url || item.thumbnailUrl || item.sourceUrl);
+    })).filter(item => item.url || item.thumbnailUrl || item.sourceUrl || item.videoId);
     if (mediaItemsPayload.length === 0) return;
     const hasVideos = mediaItemsPayload.some(i => i.type === 'video' && i.sourceUrl);
     updateFlexGroup(groupIndex, { analyzingMedia: true, uploadProgress: `Analizando ${group.mediaItems.length} medio(s) con IA${hasVideos ? ' (extrayendo frames de videos...)' : ''}...` });
@@ -426,7 +428,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const destType = templateAdConfig.destinationConfig?.type || '';
       const result = await metaService.analyzeMediaUrlBatch(
         mediaItemsPayload, groupIndex, category, objective, templateName, destType, textLength,
-        campaignContext ? campaignContext : (campaignName ? `Campaña: ${campaignName}` : '')
+        // Solo enviar contexto si el usuario lo escribió manualmente.
+        // Sin contexto manual, el modelo debe basarse en la transcripción del audio + frames.
+        campaignContext ? campaignContext.trim() : ''
       );
       if (result.success && result.data) {
         const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
@@ -464,11 +468,9 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
     // Construir payload de media del anuncio
     const mediaItems = [];
     if (ad.videoId) {
-      // Video: usar thumbnailUrl como imagen para análisis visual
+      // Video: enviar como video con videoId para que el backend resuelva sourceUrl y transcriba con Whisper
       const thumbUrl = ad.videoThumbnailUrl || ad.thumbnailUrl || ad.imageUrl || '';
-      if (thumbUrl) {
-        mediaItems.push({ type: 'image', url: thumbUrl, thumbnailUrl: thumbUrl, sourceUrl: '', name: ad.adName || '' });
-      }
+      mediaItems.push({ type: 'video', url: thumbUrl, thumbnailUrl: thumbUrl, sourceUrl: ad.videoSourceUrl || '', videoId: ad.videoId, name: ad.adName || '' });
     } else if (ad.imageUrl) {
       mediaItems.push({ type: 'image', url: ad.imageUrl, thumbnailUrl: '', sourceUrl: '', name: ad.adName || '' });
     }
@@ -487,7 +489,8 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
       const destType = templateAdConfig.destinationConfig?.type || '';
       const result = await metaService.analyzeMediaUrlBatch(
         mediaItems, adIndex, category, objective, templateName, destType, textLength,
-        campaignContext ? campaignContext : (campaignName ? `Campaña: ${campaignName}` : '')
+        // Solo enviar contexto manual; sin él, el modelo se basa en transcripción + frames.
+        campaignContext ? campaignContext.trim() : ''
       );
       if (result.success && result.data) {
         const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
@@ -1005,20 +1008,100 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   // Seleccionar video de la biblioteca (per-ad)
   const handleAdSelectLibraryVideo = (adIndex, video) => {
     const thumbUrl = video.thumbnails?.data?.[0]?.uri || video.picture || '';
+    const videoSourceUrl = video.source || '';
+    const videoName = video.title || video.name || '';
     updateAd(adIndex, {
       videoId: video.id,
       videoThumbnailUrl: thumbUrl,
+      videoSourceUrl, // para que "Regenerar" reuse la URL sin re-resolverla
       imageUrl: '',
       imageHash: '',
-      uploadProgress: `Video seleccionado: ${video.title || tr('no_title', lang)}`
+      uploadProgress: `Video seleccionado: ${videoName || tr('no_title', lang)}`
     });
-    // Analyze the actual video (source URL) via backend for Whisper transcription
-    // Falls back to thumbnail analysis if no source URL
-    const videoSourceUrl = video.source || '';
-    if (videoSourceUrl) {
-      analyzeLibraryMedia(adIndex, videoSourceUrl, 'video');
+    // Usar el mismo flujo que "Regenerar con IA": batch endpoint con Whisper + multi-frame.
+    // Esto garantiza que los copys de la PRIMERA pasada reflejen lo que se DICE en el video,
+    // no solo lo que se ve en un frame estático.
+    if (videoSourceUrl || video.id) {
+      analyzeLibraryVideoBatch(adIndex, {
+        videoId: video.id,
+        sourceUrl: videoSourceUrl,
+        thumbnailUrl: thumbUrl,
+        name: videoName
+      });
     } else if (thumbUrl) {
       analyzeLibraryMedia(adIndex, thumbUrl, 'image');
+    }
+  };
+
+  // Helper: Analiza un video de la biblioteca usando el endpoint batch (Whisper + multi-frame).
+  // Espejo del flujo de regenerateAdContent, pero invocado al seleccionar el video por primera vez.
+  const analyzeLibraryVideoBatch = async (adIndex, videoInfo) => {
+    updateAd(adIndex, { analyzingMedia: true, uploadProgress: tr('download_analyzing', lang) });
+    try {
+      const metaService = new MetaAdsService(accessToken);
+      const category = selectedTemplate?.category || '';
+      const objective = selectedTemplate?.objective || '';
+      const templateName = selectedTemplate?.name || '';
+      const destType = templateAdConfig.destinationConfig?.type || '';
+
+      const mediaItems = [{
+        type: 'video',
+        url: videoInfo.thumbnailUrl || '',
+        thumbnailUrl: videoInfo.thumbnailUrl || '',
+        sourceUrl: videoInfo.sourceUrl || '',
+        videoId: videoInfo.videoId || '',
+        name: videoInfo.name || ''
+      }];
+
+      const result = await metaService.analyzeMediaUrlBatch(
+        mediaItems, adIndex, category, objective, templateName, destType, textLength,
+        campaignContext ? campaignContext.trim() : ''
+      );
+
+      if (result.success && result.data) {
+        const effectiveDestination = destinationOptions ? selectedDestination : templateAdSetConfig?.conversionLocation;
+        const isWhatsApp = effectiveDestination === 'WHATSAPP';
+        const isMessenger = effectiveDestination === 'MESSENGER';
+        const isIgDirect = effectiveDestination === 'INSTAGRAM_DIRECT';
+        const isIgProfile = effectiveDestination === 'INSTAGRAM_PROFILE';
+        const isMessaging = isMessenger || isIgDirect;
+        const messagingCta = isWhatsApp ? 'WHATSAPP_MESSAGE' : isIgDirect ? 'INSTAGRAM_MESSAGE' : 'MESSAGE_PAGE';
+        const defaultCta = isIgProfile ? 'VIEW_INSTAGRAM_PROFILE' : (isMessaging || isWhatsApp) ? messagingCta : 'LEARN_MORE';
+        updateAd(adIndex, {
+          headlines: result.data.headlines?.length ? result.data.headlines : ['', '', '', '', ''],
+          descriptions: result.data.descriptions?.length ? result.data.descriptions : ['', '', '', '', ''],
+          linkDescriptions: result.data.linkDescriptions?.length ? result.data.linkDescriptions : ['', '', '', '', ''],
+          ...((isWhatsApp || isMessaging || isIgProfile)
+            ? { ctas: [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }
+            : { ctas: result.data.ctas?.length ? result.data.ctas : [defaultCta, defaultCta, defaultCta, defaultCta, defaultCta] }),
+          analyzingMedia: false,
+          contentGenerated: true,
+          uploadProgress: `Contenido generado (${result.data.method || 'video'})`,
+          showEditContent: true
+        });
+        console.log(`Ad ${adIndex}: Library video content generated via ${result.data.method}`);
+      } else {
+        // Si el batch falla (timeout, sin sourceUrl resoluble, etc.), cae al thumbnail visual
+        console.warn(`Ad ${adIndex}: batch video analysis failed (${result.error}). Falling back to thumbnail.`);
+        if (videoInfo.thumbnailUrl) {
+          analyzeLibraryMedia(adIndex, videoInfo.thumbnailUrl, 'image');
+        } else {
+          updateAd(adIndex, {
+            analyzingMedia: false,
+            uploadProgress: `Video seleccionado. IA: ${result.error || 'Error generando contenido'}`
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Library video batch analysis error:', err);
+      if (videoInfo.thumbnailUrl) {
+        analyzeLibraryMedia(adIndex, videoInfo.thumbnailUrl, 'image');
+      } else {
+        updateAd(adIndex, {
+          analyzingMedia: false,
+          uploadProgress: `Video seleccionado. Error IA: ${err.message}`
+        });
+      }
     }
   };
 
