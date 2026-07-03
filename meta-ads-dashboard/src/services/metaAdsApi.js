@@ -2248,8 +2248,8 @@ class MetaAdsService {
       if (response.data?.error) {
         const err = response.data.error;
         const errorMsg = err.error_user_msg || err.message || 'Error desconocido';
-        console.error('Flexible ad creation FAILED (200 with error):', errorMsg);
-        return { success: false, error: errorMsg, errorSubcode: err.error_subcode };
+        console.error('Flexible ad creation FAILED (200 with error):', JSON.stringify(err, null, 2));
+        return { success: false, error: errorMsg, errorSubcode: err.error_subcode, errorData: err.error_data };
       }
       console.log('Flexible ad creation SUCCESS:', JSON.stringify(response.data));
       return { success: true, data: response.data };
@@ -2257,7 +2257,7 @@ class MetaAdsService {
       console.error('Flexible ad creation FAILED:', JSON.stringify(error.response?.data, null, 2) || error.message);
       const errData = error.response?.data?.error;
       const errorMsg = errData?.error_user_msg || errData?.message || error.message;
-      return { success: false, error: errorMsg, errorSubcode: errData?.error_subcode };
+      return { success: false, error: errorMsg, errorSubcode: errData?.error_subcode, errorData: errData?.error_data };
     }
   }
 
@@ -2347,7 +2347,9 @@ class MetaAdsService {
       const stdCreativeFeatures = {
         text_optimizations: { enroll_status: 'OPT_IN' },
         image_touchups: { enroll_status: 'OPT_IN' },
-        inline_comment: { enroll_status: 'OPT_IN' }
+        inline_comment: { enroll_status: 'OPT_IN' },
+        standard_enhancements: { enroll_status: 'OPT_IN' },
+        image_templates: { enroll_status: 'OPT_IN' }
       };
       if (!isMessagingCTA) {
         stdCreativeFeatures.enhance_cta = { enroll_status: 'OPT_IN' };
@@ -2538,7 +2540,9 @@ class MetaAdsService {
       const creativeFeatures = {
         text_optimizations: { enroll_status: 'OPT_IN' },
         image_touchups: { enroll_status: 'OPT_IN' },
-        inline_comment: { enroll_status: 'OPT_IN' }
+        inline_comment: { enroll_status: 'OPT_IN' },
+        standard_enhancements: { enroll_status: 'OPT_IN' },
+        image_templates: { enroll_status: 'OPT_IN' }
       };
       if (!isWhatsApp && !isInstagramDM) {
         creativeFeatures.enhance_cta = { enroll_status: 'OPT_IN' };
@@ -3462,14 +3466,16 @@ class MetaAdsService {
     }
 
     // WhatsApp: isDynamicCreative con asset_feed_spec (5+5+5) para modos dynamic/per-ad
-    // EXCEPCIÓN: OUTCOME_SALES y OUTCOME_ENGAGEMENT + WhatsApp NO soportan DC (error 1885392)
-    // Meta acepta el AdSet+Creative pero rechaza el Ad. Forzar standard creative para estos objetivos.
+    // Meta rechaza el Ad (no el AdSet ni el Creative) con error 1885392 "el contenido dinámico
+    // no admite el objetivo de la campaña" — confirmado ya para OUTCOME_SALES, OUTCOME_ENGAGEMENT,
+    // OUTCOME_LEADS y ahora también OUTCOME_TRAFFIC. Es decir, DC (asset_feed_spec) simplemente no
+    // funciona para destino WhatsApp sin importar el objetivo — bloquearlo siempre evita el
+    // round-trip fallido (AdSet+Creative creados igual, Ad rechazado) y el AdSet huérfano que deja.
     // FLEXIBLE mode: no usa isDynamicCreative, usa creative_asset_groups_spec en /ads
     const useFlexible = adSetMode === 'flexible';
-    const dcBlockedObjectives = ['OUTCOME_SALES', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS'];
-    const useDynamicCreative = !useFlexible && adSetMode !== 'single' && !dcBlockedObjectives.includes(objective);
-    if (!useFlexible && adSetMode !== 'single' && dcBlockedObjectives.includes(objective)) {
-      console.warn(`WhatsApp + ${objective}: DC not supported (error 1885392). Using standard creatives instead.`);
+    const useDynamicCreative = false;
+    if (!useFlexible && adSetMode !== 'single') {
+      console.warn(`WhatsApp + ${objective}: DC not supported (error 1885392) for any objective. Using standard creatives instead.`);
     }
 
     try {
@@ -3818,6 +3824,17 @@ class MetaAdsService {
         if (!adResult.success && useDynamicCreative &&
             (adResult.error?.includes('1885392') || adResult.error?.includes('contenido dinámico no admite') || adResult.error?.includes('dynamic creative'))) {
           console.warn(`Ad${adLabel}: DC not supported for this objective+destination. Falling back to standard creative...`);
+
+          // El AdSet original (creado para DC) queda sin ningún anuncio porque Meta rechaza el Ad,
+          // no el AdSet ni el Creative — hay que borrarlo para no dejar basura huérfana en la cuenta.
+          const orphanedAdSetId = sharedAdSetId;
+          results.adSets = results.adSets.filter(as => as.id !== orphanedAdSetId);
+          try {
+            await this.deleteAdSet(orphanedAdSetId);
+            console.log(`  AdSet original${adLabel} (sin DC) eliminado: ${orphanedAdSetId}`);
+          } catch (delErr) {
+            console.warn(`  No se pudo eliminar AdSet huérfano ${orphanedAdSetId}:`, delErr.message);
+          }
 
           // 1. Crear nuevo AdSet SIN isDynamicCreative
           const adAudienceLabel = (adSetMode === 'per-ad' && ad.audienceName) ? ` (${ad.audienceName})` : audPrefix;
@@ -5095,14 +5112,19 @@ class MetaAdsService {
               continue;
             }
 
-            console.warn(`Flexible Ad${audPrefix}${groupLabel} falló, probando Dynamic Creative clásico:`, flexResult.error);
+            const flexErrDetail = [
+              flexResult.error,
+              flexResult.errorSubcode ? `subcode ${flexResult.errorSubcode}` : null,
+              flexResult.errorData?.blame_field_specs ? `campos: ${JSON.stringify(flexResult.errorData.blame_field_specs)}` : null
+            ].filter(Boolean).join(' | ');
+            console.warn(`Flexible Ad${audPrefix}${groupLabel} falló, probando Dynamic Creative clásico:`, flexErrDetail);
 
             // Fallback: AdSet dedicado con Dynamic Creative clásico (solo admite 1 medio por
             // AdSet), usando el primer medio del grupo — mejor un anuncio con 1 video/imagen
             // que ningún anuncio.
             const firstMedia = flexGroup.mediaItems[0];
             if (!firstMedia) {
-              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (sin medios para fallback a DC)`);
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexErrDetail} (sin medios para fallback a DC)`);
               continue;
             }
 
@@ -5121,7 +5143,7 @@ class MetaAdsService {
             });
 
             if (!dcFallbackAdSetResult.success) {
-              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (fallback AdSet DC también falló: ${dcFallbackAdSetResult.error})`);
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexErrDetail} (fallback AdSet DC también falló: ${dcFallbackAdSetResult.error})`);
               continue;
             }
 
@@ -5146,7 +5168,7 @@ class MetaAdsService {
               // ningún otro grupo sí logró crear su Flexible Ad ahí.
               console.log(`  Fallback a Dynamic Creative clásico exitoso${audPrefix}${groupLabel}`);
             } else {
-              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexResult.error} (fallback a DC clásico también falló)`);
+              results.errors.push(`Flexible Ad${audPrefix}${groupLabel}: ${flexErrDetail} (fallback a DC clásico también falló)`);
             }
           }
 

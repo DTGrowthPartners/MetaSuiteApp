@@ -261,9 +261,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
   const templateRequirements = getTemplateRequirements(selectedTemplate);
 
   // DC (Dynamic Creative / 5+5+5) no está soportado en estas combinaciones por Meta
+  // (error 1885392: "el contenido dinámico no admite el objetivo de la campaña"). Confirmado en
+  // producción para WhatsApp con OUTCOME_SALES y también con OUTCOME_TRAFFIC — el objetivo no
+  // importa, WhatsApp como destino simplemente no admite DC vía API.
   const isDCBlocked =
     selectedTemplate?.objective === 'OUTCOME_ENGAGEMENT' ||
-    (selectedTemplate?.objective === 'OUTCOME_SALES' && templateAdSetConfig?.conversionLocation === 'WHATSAPP');
+    templateAdSetConfig?.conversionLocation === 'WHATSAPP';
 
   const [campaignName, setCampaignName] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -2605,12 +2608,14 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               <strong>{tr('per_ad', lang)}</strong>
               <small>{tr('per_ad_desc', lang)}</small>
             </button>
-            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].includes(selectedTemplate?.objective) &&
-              // Meta rechaza Flexible Ads para el optimization_goal VISIT_INSTAGRAM_PROFILE
-              // (error_subcode 3858343: "el objetivo no admite el formato flexible"), confirmado
-              // en producción — el fallback a DC clásico funciona bien, pero mejor no ofrecer un
-              // botón que siempre va a fallar y generar ruido.
-              templateAdSetConfig?.conversionLocation !== 'INSTAGRAM_PROFILE' && (
+            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) &&
+              // WhatsApp usa OUTCOME_SALES + optimization_goal CONVERSATIONS por defecto, pero
+              // Meta rechaza Flexible Ads ahí igual (error_subcode 3858343), confirmado en
+              // producción junto con VISIT_INSTAGRAM_PROFILE (IG Profile) y LANDING_PAGE_VIEWS
+              // (Website) — el objetivo alto nivel no predice si Meta lo acepta, el
+              // optimization_goal real sí importa. El fallback a DC clásico funciona bien, pero
+              // mejor no ofrecer un botón que siempre va a fallar y generar ruido.
+              templateAdSetConfig?.conversionLocation !== 'WHATSAPP' && (
               <button
                 type="button"
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
