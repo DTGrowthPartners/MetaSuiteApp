@@ -2037,10 +2037,16 @@ class MetaAdsService {
       formData.append('status', status);
 
       // Creative Enhancements (Advantage+ Creative) — campo separado del Ad
+      // NOTA: "standard_enhancements" quedó obsoleto (error_subcode 3858504: "Incluir el campo
+      // de mejoras estándar en el contenido quedó obsoleto. Elige configurar funciones
+      // individuales"). Meta rechaza el Ad completo si se envía. Enrolamos funciones
+      // individuales en su lugar (mismo patrón que createStandardAdCreative/AssetFeedSpec).
       if (creativeEnhancements) {
         formData.append('degrees_of_freedom_spec', JSON.stringify({
           creative_features_spec: {
-            standard_enhancements: { enroll_status: 'OPT_IN' }
+            text_optimizations: { enroll_status: 'OPT_IN' },
+            image_touchups: { enroll_status: 'OPT_IN' },
+            inline_comment: { enroll_status: 'OPT_IN' }
           }
         }));
       }
@@ -2344,11 +2350,12 @@ class MetaAdsService {
 
       // Advantage+ creative features — NO enhance_cta para messaging CTAs
       // (enhance_cta puede inyectar link en CTA value, incompatible con WHATSAPP_MESSAGE/MESSAGE_PAGE/INSTAGRAM_MESSAGE)
+      // "standard_enhancements" quedó obsoleto (error_subcode 3858504) — Meta rechaza el
+      // creative completo si se envía. Solo funciones individuales.
       const stdCreativeFeatures = {
         text_optimizations: { enroll_status: 'OPT_IN' },
         image_touchups: { enroll_status: 'OPT_IN' },
         inline_comment: { enroll_status: 'OPT_IN' },
-        standard_enhancements: { enroll_status: 'OPT_IN' },
         image_templates: { enroll_status: 'OPT_IN' }
       };
       if (!isMessagingCTA) {
@@ -2537,11 +2544,12 @@ class MetaAdsService {
 
       // Advantage+ creative features — NO enhance_cta para WhatsApp/Messaging
       // (enhance_cta puede inyectar link en CTA value, incompatible con WHATSAPP_MESSAGE)
+      // "standard_enhancements" quedó obsoleto (error_subcode 3858504) — Meta rechaza el
+      // creative completo si se envía. Solo funciones individuales.
       const creativeFeatures = {
         text_optimizations: { enroll_status: 'OPT_IN' },
         image_touchups: { enroll_status: 'OPT_IN' },
         inline_comment: { enroll_status: 'OPT_IN' },
-        standard_enhancements: { enroll_status: 'OPT_IN' },
         image_templates: { enroll_status: 'OPT_IN' }
       };
       if (!isWhatsApp && !isInstagramDM) {
