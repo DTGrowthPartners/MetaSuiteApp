@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import tr from '../translations';
 import { DonutChart, HBarChart, CompareBars } from './ui/Charts';
+import PageHero from './ui/PageHero';
+import { ChevronLeft, RefreshCw, FileText, Download } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
 
@@ -762,77 +764,54 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
     return `${parseInt(day)} ${months[parseInt(m)-1]} ${y}`;
   }
 
+  const periods = [
+    { key: 'yesterday', label: tr('yesterday', lang), date: formatDate(dateRange?.yesterday) },
+    { key: 'today', label: tr('today', lang), date: formatDate(dateRange?.today) },
+    { key: 'lastMonth', label: tr('last_month', lang), date: dateRange?.lastMonth?.label || '' },
+  ];
+
   return (
-    <div className="report-page">
-      <header className="report-header">
-        <div className="report-header-info">
-          {window.location.search && (
-            <button
-              onClick={() => { window.location.href = '/reportes'; }}
-              style={{
-                background: 'rgba(25, 155, 228,0.15)', border: '1px solid rgba(25, 155, 228,0.3)',
-                color: '#4CCCF4', borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, marginBottom: 8
-              }}
-            >
-              ← Reportes
+    <div className="report-page report-page--app">
+      <PageHero
+        kicker={businessName ? `${businessName} · Reporte de cuenta` : 'Reporte de cuenta'}
+        title={name}
+        actions={
+          window.location.search && (
+            <button className="report-back-btn" onClick={() => { window.location.href = '/reportes'; }}>
+              <ChevronLeft size={16} /> Reportes
             </button>
-          )}
-          <h1 className="report-title">{name}</h1>
-          <span className="report-business">{businessName}</span>
+          )
+        }
+      />
+
+      <div className="report-subbar">
+        <div className="report-period">
+          {periods.map(p => (
+            <button
+              key={p.key}
+              className={`report-period-btn ${viewMode === p.key ? 'active' : ''}`}
+              onClick={() => setViewMode(p.key)}
+            >
+              <span>{p.label}</span>
+              {p.date && <small>{p.date}</small>}
+            </button>
+          ))}
         </div>
-        <div className="report-header-meta">
+        <div className="report-actions">
           {lastUpdate && (
             <span className="report-updated">
-              Actualizado: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-              {data.cached && ' (cache)'}
+              Actualizado {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}{data.cached && ' · cache'}
             </span>
           )}
-        </div>
-      </header>
-
-      {/* Day Switch */}
-      <div className="report-day-switch-wrap">
-        <div className="report-day-switch">
-          <button className={`report-day-btn ${viewMode === 'yesterday' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('yesterday')}>
-            {tr('yesterday', lang)}<span className="report-day-date">{formatDate(dateRange?.yesterday)}</span>
-          </button>
-          <button className={`report-day-btn ${viewMode === 'today' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('today')}>
-            {tr('today', lang)}<span className="report-day-date">{formatDate(dateRange?.today)}</span>
-          </button>
-          <button className={`report-day-btn ${viewMode === 'lastMonth' ? 'report-day-btn--active' : ''}`} onClick={() => setViewMode('lastMonth')}>
-            {tr('last_month', lang)}<span className="report-day-date">{dateRange?.lastMonth?.label || ''}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      {viewMode === 'lastMonth' ? (
-        <MonthlyReportView data={data} locations={locations} lang={lang} />
-      ) : (
-        <DailyReportView
-          campaigns={campaigns}
-          insightsKey={viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday'}
-          viewMode={viewMode}
-          locations={locations}
-          lang={lang}
-        />
-      )}
-
-      <footer className="report-footer">
-        <span className="report-footer-brand"><span className="font-display">Faro</span> · Meta Ads Command Center</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => {
               const s = window.location.search || '';
               const sp = s ? '&' : '?';
               window.open(`${API_BASE}/report/${slug}/pdf${s}${sp}accessToken=${encodeURIComponent(accessToken)}`, '_blank');
             }}
-            className="report-refresh-btn"
-            disabled={!data?.accountId}
-            title="Generar informe PDF del mes pasado"
+            className="report-action-btn" disabled={!data?.accountId} title="Generar informe PDF del mes pasado"
           >
-            {tr('pdf_month', lang)}
+            <FileText size={15} /> {tr('pdf_month', lang)}
           </button>
           <button
             onClick={() => {
@@ -842,16 +821,32 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
               const until = dateRange?.lastMonth?.until || '';
               window.open(`${API_BASE}/csv/${accountId}?accessToken=${encodeURIComponent(accessToken)}&since=${since}&until=${until}&level=campaign`, '_blank');
             }}
-            className="report-refresh-btn"
-            disabled={!data?.accountId}
-            title="Descargar CSV del mes pasado"
+            className="report-action-btn" disabled={!data?.accountId} title="Descargar CSV del mes pasado"
           >
-            {tr('csv_month', lang)}
+            <Download size={15} /> {tr('csv_month', lang)}
           </button>
-          <button onClick={fetchReport} className="report-refresh-btn" disabled={loading}>
-            {loading ? tr('updating', lang) : tr('refresh', lang)}
+          <button onClick={fetchReport} className="report-action-btn report-action-btn--primary" disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'spin' : ''} /> {loading ? tr('updating', lang) : tr('refresh', lang)}
           </button>
         </div>
+      </div>
+
+      <div className="report-content">
+        {viewMode === 'lastMonth' ? (
+          <MonthlyReportView data={data} locations={locations} lang={lang} />
+        ) : (
+          <DailyReportView
+            campaigns={campaigns}
+            insightsKey={viewMode === 'yesterday' ? 'insightsYesterday' : 'insightsToday'}
+            viewMode={viewMode}
+            locations={locations}
+            lang={lang}
+          />
+        )}
+      </div>
+
+      <footer className="report-footer">
+        <span className="report-footer-brand"><span className="font-display">Faro</span> · Meta Ads Command Center</span>
       </footer>
     </div>
   );

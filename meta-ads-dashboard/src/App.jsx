@@ -4,8 +4,9 @@ import AccountDashboard from './components/AccountDashboard';
 import CampaignReport from './components/CampaignReport';
 import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
-import { LogOut, Loader2, BarChart3 } from 'lucide-react';
+import { LogOut, Loader2, BarChart3, Megaphone, Users, Menu, X, TrendingUp, Target, Wallet, Database, Search } from 'lucide-react';
 import FaroLogo, { FaroMark } from './components/ui/FaroLogo';
+import PageHero, { HeroStat } from './components/ui/PageHero';
 import tr from './translations';
 import './App.css';
 
@@ -176,45 +177,49 @@ function LoginScreen({ onLogin, lang, setLang }) {
   };
 
   return (
-    <div className="login-screen">
-      {/* Animated background orbs */}
-      <div className="login-bg-orb login-bg-orb-1" />
-      <div className="login-bg-orb login-bg-orb-2" />
-      <div className="login-bg-orb login-bg-orb-3" />
-
-      <div className="login-card">
-        {/* Logo */}
-        <div className="login-logo">
-          <div className="login-logo-icon">
-            <FaroMark size={58} radius={0.3} glow />
+    <div className="login-split">
+      {/* ===== Brand side ===== */}
+      <aside className="login-brandside">
+        <div className="login-bg-orb login-bg-orb-1" />
+        <div className="login-bg-orb login-bg-orb-2" />
+        <div className="login-brandside-inner">
+          <FaroLogo size={40} glow />
+          <div className="login-hero">
+            <h1 className="login-hero-title font-display">Tu centro de comando<br />para Meta Ads</h1>
+            <p className="login-hero-sub">
+              Crea campañas, construye públicos y monitorea el rendimiento de todas tus cuentas — desde un solo lugar.
+            </p>
           </div>
-          <h1 className="login-title font-display">Faro</h1>
-          <span className="login-brand">Meta Ads Command Center</span>
+          <ul className="login-features">
+            <li><span className="login-feat-ic"><Megaphone size={18} /></span> Constructor de campañas con plantillas</li>
+            <li><span className="login-feat-ic"><Users size={18} /></span> Creación de públicos personalizados</li>
+            <li><span className="login-feat-ic"><BarChart3 size={18} /></span> Reportes en vivo con alertas de urgencia</li>
+          </ul>
+          <div className="login-brand-foot">Faro · Meta Ads Command Center</div>
         </div>
-        <p className="login-subtitle">{tr('login_subtitle', lang)}</p>
+      </aside>
 
-        {/* Facebook Login Button */}
-        <button
-          onClick={handleFacebookLogin}
-          disabled={loading || !fbReady}
-          className="login-fb-btn"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          {loading ? tr('login_connecting', lang) : tr('login_button', lang)}
-        </button>
+      {/* ===== Auth side ===== */}
+      <main className="login-authside">
+        <div className="login-auth-card">
+          <div className="login-auth-mark"><FaroMark size={52} radius={0.3} glow /></div>
+          <h2 className="login-auth-title font-display">Inicia sesión</h2>
+          <p className="login-auth-sub">{tr('login_subtitle', lang)}</p>
 
-        {/* Language Switch — positioned at bottom of card */}
-        <div style={{ position: 'absolute', bottom: '16px', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: 500, padding: '4px 8px' }}>
+          <button onClick={handleFacebookLogin} disabled={loading || !fbReady} className="login-fb-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            {loading ? tr('login_connecting', lang) : tr('login_button', lang)}
+          </button>
+
+          {error && <div className="login-error">{error}</div>}
+
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="login-lang">
             {lang === 'es' ? '🇺🇸 English' : '🇨🇴 Español'}
           </button>
         </div>
-
-        {/* Error */}
-        {error && <div className="login-error">{error}</div>}
-      </div>
+      </main>
     </div>
   );
 }
@@ -284,6 +289,8 @@ function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  const [navOpen, setNavOpen] = useState(false);
+
   const handleLogin = useCallback((token, userInfo = {}) => {
     localStorage.setItem('meta_access_token', token);
     localStorage.setItem('meta_user_name', userInfo.name || 'Usuario');
@@ -347,101 +354,103 @@ function App() {
   return (
     <div className="app">
       <ParticleBackground />
-      {/* Navigation Header */}
-      <nav className="main-navigation">
-        <div className="nav-brand">
+      {/* ===== Sidebar ===== */}
+      <aside className={`sidebar ${navOpen ? 'sidebar--open' : ''}`}>
+        <div className="sidebar-top">
           <FaroLogo size={30} />
+          <button className="sidebar-close" onClick={() => setNavOpen(false)} aria-label="Cerrar menú"><X size={18} /></button>
         </div>
-        <div className="nav-links">
+
+        <nav className="sidebar-nav">
+          <span className="sidebar-nav-label">Operación</span>
           <button
-            className={`nav-link ${page === 'main' && !reportSlug && !isReportsHub ? 'active' : ''}`}
+            className={`side-link ${page === 'main' && !reportSlug && !isReportsHub ? 'active' : ''}`}
             onClick={() => {
+              setNavOpen(false);
               if (window.location.pathname !== '/') { window.location.href = '/'; return; }
               window.location.hash = ''; setPage('main');
             }}
           >
-            {tr('campaigns', lang)}
+            <Megaphone size={19} /> <span>{tr('campaigns', lang)}</span>
           </button>
           <button
-            className={`nav-link ${page === 'audiences' && !reportSlug && !isReportsHub ? 'active' : ''}`}
+            className={`side-link ${page === 'audiences' && !reportSlug && !isReportsHub ? 'active' : ''}`}
             onClick={() => {
+              setNavOpen(false);
               if (window.location.pathname !== '/') { window.location.href = '/#audiences'; return; }
               window.location.hash = '#audiences'; setPage('audiences');
             }}
           >
-            {tr('audiences', lang)}
+            <Users size={19} /> <span>{tr('audiences', lang)}</span>
           </button>
+          <span className="sidebar-nav-label">Análisis</span>
           <button
-            className={`nav-link ${isReportsHub || reportSlug ? 'active' : ''}`}
+            className={`side-link ${isReportsHub || reportSlug ? 'active' : ''}`}
             onClick={() => { window.location.href = '/reportes'; }}
           >
-            <BarChart3 size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />Reportes
+            <BarChart3 size={19} /> <span>Reportes</span>
           </button>
-        </div>
-        <div className="nav-info">
-          {loadingAccounts ? (
-            <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {tr('loading', lang)}</span>
-          ) : accountsError ? (
-            <span className="account-count account-count--error">Error</span>
-          ) : (
-            <span className="account-count" title="Ad accounts loaded via business_management permission from all your Business Managers">
-              {adAccounts.length} {tr('accounts_count', lang)}
-              {(() => {
-                const bmSet = new Set(adAccounts.map(a => a.business?.id).filter(Boolean));
-                return bmSet.size > 0 ? ` · ${bmSet.size} ${tr('business_managers_count', lang)}` : '';
-              })()}
-            </span>
-          )}
+        </nav>
 
-          {/* Language Switch */}
-          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'rgba(25,155,228,0.14)', border: '1px solid rgba(25,155,228,0.32)', color: '#4CCCF4', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
-            {lang === 'es' ? '🇺🇸 EN' : '🇨🇴 ES'}
-          </button>
-
-          {/* User info + Logout */}
-          <div className="nav-user">
-            {userPicture && (
-              <img
-                src={userPicture}
-                alt=""
-                className="nav-user-avatar"
-              />
+        <div className="sidebar-foot">
+          <div className="sidebar-accounts">
+            {loadingAccounts ? (
+              <span className="account-count"><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {tr('loading', lang)}</span>
+            ) : accountsError ? (
+              <span className="account-count account-count--error">Error de cuentas</span>
+            ) : (
+              <span className="account-count" title="Cuentas cargadas vía business_management">
+                {adAccounts.length} {tr('accounts_count', lang)}
+                {(() => {
+                  const bmSet = new Set(adAccounts.map(a => a.business?.id).filter(Boolean));
+                  return bmSet.size > 0 ? ` · ${bmSet.size} BM` : '';
+                })()}
+              </span>
             )}
-            <span className="nav-user-name">
-              {userName || 'Usuario'}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="nav-logout-btn"
-              title="Cerrar sesión y cambiar cuenta"
-            >
+          </div>
+          <div className="sidebar-user">
+            {userPicture
+              ? <img src={userPicture} alt="" className="nav-user-avatar" />
+              : <span className="nav-user-avatar nav-user-avatar--fallback">{(userName || 'U').charAt(0).toUpperCase()}</span>}
+            <span className="nav-user-name">{userName || 'Usuario'}</span>
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="sidebar-lang" title="Cambiar idioma">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+            <button onClick={handleLogout} className="nav-logout-btn" title="Cerrar sesión">
               <LogOut size={15} />
             </button>
           </div>
         </div>
-      </nav>
+      </aside>
+      {navOpen && <div className="sidebar-scrim" onClick={() => setNavOpen(false)} />}
 
-      {/* Main Content */}
-      <main className="main-content">
-        {isReportsHub ? (
-          <ReportsHub adAccounts={adAccounts} loadingAccounts={loadingAccounts} accessToken={accessToken} />
-        ) : reportSlug ? (
-          <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} lang={lang} />
-        ) : page === 'dashboard' ? (
-          <AccountDashboard
-            adAccounts={adAccounts}
-            onBack={() => { window.location.hash = ''; setPage('main'); }}
-          />
-        ) : page === 'audiences' ? (
-          <AudienceCreator
-            accessToken={accessToken}
-            adAccounts={adAccounts}
-            onBack={() => { window.location.hash = ''; setPage('main'); }}
-          />
-        ) : (
-          <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} lang={lang} />
-        )}
-      </main>
+      {/* ===== Main ===== */}
+      <div className="app-main">
+        <button className="mobile-nav-toggle" onClick={() => setNavOpen(true)} aria-label="Abrir menú">
+          <Menu size={20} />
+          <FaroLogo size={24} wordSize={16} />
+        </button>
+        <main className="main-content">
+          {isReportsHub ? (
+            <ReportsHub adAccounts={adAccounts} loadingAccounts={loadingAccounts} accessToken={accessToken} />
+          ) : reportSlug ? (
+            <CampaignReport slug={reportSlug} accessToken={accessToken} adAccounts={adAccounts} loadingAccounts={loadingAccounts} lang={lang} />
+          ) : page === 'dashboard' ? (
+            <AccountDashboard
+              adAccounts={adAccounts}
+              onBack={() => { window.location.hash = ''; setPage('main'); }}
+            />
+          ) : page === 'audiences' ? (
+            <AudienceCreator
+              accessToken={accessToken}
+              adAccounts={adAccounts}
+              onBack={() => { window.location.hash = ''; setPage('main'); }}
+            />
+          ) : (
+            <CreativeBuilder adAccounts={adAccounts} accessToken={accessToken} lang={lang} />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -603,236 +612,166 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
     const pctSpend = formatPct(t.spend || 0, y.spend || 0);
 
     return (
-      <div
-        onClick={() => openReport(acc)}
-        style={{
-          cursor: 'pointer',
-          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(10,14,20,0.9))',
-          border: '1px solid rgba(239,68,68,0.35)', borderRadius: 14, padding: 16,
-          transition: 'all 0.15s ease'
-        }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.7)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+      <div className="hub-urgent-card" onClick={() => openReport(acc)}>
+        <div className="hub-urgent-head">
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#EAF1F8', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
-            <div style={{ fontSize: 10, color: '#566575' }}>{acc.business?.name || '—'}</div>
+            <div className="hub-urgent-name">{acc.name}</div>
+            <div className="hub-urgent-biz">{acc.business?.name || '—'}</div>
           </div>
-          <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999, background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>URGENTE</span>
+          <span className="hub-urgent-tag">URGENTE</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10, paddingTop: 10, borderTop: '1px solid rgba(25,155,228,0.15)' }}>
+        <div className="hub-urgent-grid2">
           <div>
-            <div style={{ fontSize: 9, color: '#566575', textTransform: 'uppercase', marginBottom: 2 }}>Ayer</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#EAF1F8' }}>{formatCOP(y.spend || 0)}</div>
-            <div style={{ fontSize: 10, color: '#8FA3B5' }}>{y.results || 0} {y.label || 'resultados'}</div>
+            <div className="hub-urgent-k">Ayer</div>
+            <div className="hub-urgent-v tnum">{formatCOP(y.spend || 0)}</div>
+            <div className="hub-urgent-sub">{y.results || 0} {y.label || 'resultados'}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: '#566575', textTransform: 'uppercase', marginBottom: 2 }}>Hoy {pctSpend && <span style={{ color: (t.spend || 0) < (y.spend || 0) ? '#f87171' : '#4ade80' }}>· {pctSpend}</span>}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#EAF1F8' }}>{formatCOP(t.spend || 0)}</div>
-            <div style={{ fontSize: 10, color: '#8FA3B5' }}>{t.results || 0} {t.label || 'resultados'}</div>
+            <div className="hub-urgent-k">Hoy {pctSpend && <span style={{ color: (t.spend || 0) < (y.spend || 0) ? '#f87171' : '#4ade80' }}>· {pctSpend}</span>}</div>
+            <div className="hub-urgent-v tnum">{formatCOP(t.spend || 0)}</div>
+            <div className="hub-urgent-sub">{t.results || 0} {t.label || 'resultados'}</div>
           </div>
         </div>
         {alerts.slice(0, 2).map((a, i) => (
-          <div key={i} style={{ fontSize: 10, color: '#fca5a5', padding: '4px 8px', background: 'rgba(239,68,68,0.1)', borderRadius: 6, marginTop: 4 }}>
-            ⚠ {a}
-          </div>
+          <div key={i} className="hub-urgent-alert">⚠ {a}</div>
         ))}
       </div>
     );
   };
 
+  const okCount = Object.values(summary).filter(s => s.ok).length;
+  const spendTone = (formatPct(totalSpendToday, totalSpendYesterday) || '').startsWith('-') ? 'down' : 'up';
+  const resTone = (formatPct(totalResultsToday, totalResultsYesterday) || '').startsWith('-') ? 'down' : 'up';
+
+  const statusCards = [
+    { key: 'urgent', label: 'Urgentes', sub: 'Gasto sin resultados', color: '#f87171', count: statusCounts.urgent },
+    { key: 'review', label: 'En observación', sub: 'Anomalías detectadas', color: '#fbbf24', count: statusCounts.review },
+    { key: 'healthy', label: 'Saludables', sub: 'Dentro de parámetros', color: '#4ade80', count: statusCounts.healthy },
+    { key: 'inactive', label: 'Sin gasto', sub: 'Sin operación', color: '#8FA3B5', count: statusCounts.inactive },
+  ];
+  const tabs = [
+    { key: 'all', label: `Todas (${enriched.length})`, dot: '#4CCCF4' },
+    { key: 'urgent', label: `Urgentes (${statusCounts.urgent})`, dot: '#f87171' },
+    { key: 'review', label: `Revisar (${statusCounts.review})`, dot: '#fbbf24' },
+    { key: 'healthy', label: `Saludables (${statusCounts.healthy})`, dot: '#4ade80' },
+    { key: 'inactive', label: `Inactivas (${statusCounts.inactive})`, dot: '#8FA3B5' },
+  ];
+
   return (
-    <div style={{ padding: '24px 20px', maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#EAF1F8', margin: 0, marginBottom: 4 }}>
-          <BarChart3 size={24} style={{ verticalAlign: 'middle', marginRight: 10, color: '#4CCCF4' }} />
-          Reportes
-        </h1>
-        <p style={{ color: '#8FA3B5', margin: 0, fontSize: 13 }}>
-          Campaign performance data from all your Meta ad accounts (loaded via business_management and ads_read). Accounts that need attention today, sorted by urgency.
-        </p>
-      </div>
+    <>
+      <PageHero
+        kicker="Centro de reportes · Meta Ads"
+        title="Reportes"
+        subtitle="Rendimiento de todas tus cuentas publicitarias, ordenado por urgencia. Ve de un vistazo dónde se está gastando presupuesto sin resultados."
+        stats={<>
+          <HeroStat icon={<TrendingUp size={20} />} label="Gasto hoy" value={formatCOP(totalSpendToday)} delta={formatPct(totalSpendToday, totalSpendYesterday)} deltaTone={spendTone} />
+          <HeroStat icon={<Target size={20} />} label="Resultados hoy" value={totalResultsToday.toLocaleString('es-CO')} delta={formatPct(totalResultsToday, totalResultsYesterday)} deltaTone={resTone} />
+          <HeroStat icon={<Wallet size={20} />} label="Gasto ayer" value={formatCOP(totalSpendYesterday)} />
+          <HeroStat icon={<Database size={20} />} label="Cuentas con datos" value={`${okCount} / ${adAccounts.length}`} />
+        </>}
+      />
 
-      {/* KPI bar */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <KpiTile
-          icon={<span style={{ fontSize: 14 }}>🔴</span>}
-          label="Cuentas urgentes" value={statusCounts.urgent}
-          sub="Gasto sin resultados" color="#f87171"
-          active={filter === 'urgent'} onClick={() => setFilter('urgent')}
-        />
-        <KpiTile
-          icon={<span style={{ fontSize: 14 }}>🟡</span>}
-          label="En observación" value={statusCounts.review}
-          sub="Anomalías detectadas" color="#fbbf24"
-          active={filter === 'review'} onClick={() => setFilter('review')}
-        />
-        <KpiTile
-          icon={<span style={{ fontSize: 14 }}>🟢</span>}
-          label="Saludables" value={statusCounts.healthy}
-          sub="Dentro de parámetros" color="#4ade80"
-          active={filter === 'healthy'} onClick={() => setFilter('healthy')}
-        />
-        <KpiTile
-          icon={<span style={{ fontSize: 14 }}>⚫</span>}
-          label="Sin gasto" value={statusCounts.inactive}
-          sub="Sin operación" color="#8FA3B5"
-          active={filter === 'inactive'} onClick={() => setFilter('inactive')}
-        />
-      </div>
-
-      {/* Totales portafolio */}
-      <div style={{
-        display: 'flex', gap: 24, marginBottom: 20, padding: '12px 18px',
-        background: 'rgba(10,14,20,0.5)', borderRadius: 12, border: '1px solid rgba(25,155,228,0.15)',
-        flexWrap: 'wrap'
-      }}>
-        <div>
-          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto hoy (portafolio)</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>
-            {formatCOP(totalSpendToday)} <span style={{ fontSize: 11, color: formatPct(totalSpendToday, totalSpendYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalSpendToday, totalSpendYesterday)}</span>
+      <div className="page-body">
+        {/* Segmentación por estado (filtros) */}
+        <section className="page-section">
+          <div className="hub-status-grid">
+            {statusCards.map(c => (
+              <button key={c.key} className={`hub-status-card ${filter === c.key ? 'active' : ''}`} onClick={() => setFilter(c.key)}>
+                <div className="hub-status-top">
+                  <span className="hub-status-dot" style={{ background: c.color, color: c.color }} />
+                  <span className="hub-status-label">{c.label}</span>
+                </div>
+                <div className="hub-status-count" style={{ color: c.count > 0 ? c.color : 'var(--text-muted)' }}>{c.count}</div>
+                <div className="hub-status-sub">{c.sub}</div>
+              </button>
+            ))}
           </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Resultados hoy</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>
-            {totalResultsToday} <span style={{ fontSize: 11, color: formatPct(totalResultsToday, totalResultsYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalResultsToday, totalResultsYesterday)}</span>
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto ayer</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>{formatCOP(totalSpendYesterday)}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cuentas con datos</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>{Object.values(summary).filter(s => s.ok).length} / {adAccounts.length}</div>
-        </div>
-        {loadingSummary && <div style={{ color: '#8FA3B5', fontSize: 12, alignSelf: 'center' }}><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> Cargando métricas...</div>}
-      </div>
+        </section>
 
-      {/* Urgencias Hoy — cards grandes */}
-      {urgentAccounts.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f87171', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            🔴 Urgencias Hoy <span style={{ color: '#566575', fontSize: 12, fontWeight: 500 }}>· {urgentAccounts.length} cuentas requieren decisión</span>
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-            {urgentAccounts.slice(0, 9).map(acc => <UrgencyCard key={acc.normId} acc={acc} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Buscador + tabs */}
-      <div style={{ marginBottom: 12 }}>
-        <input
-          type="text"
-          placeholder="🔍 Buscar cuenta o negocio..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          style={{
-            width: '100%', padding: '10px 14px', marginBottom: 10,
-            background: 'rgba(10,14,20,0.6)', border: '1px solid rgba(25,155,228,0.2)',
-            borderRadius: 10, color: '#EAF1F8', fontSize: 13, outline: 'none'
-          }}
-        />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {[
-            { key: 'all', label: `Todas (${enriched.length})` },
-            { key: 'urgent', label: `🔴 Urgentes (${statusCounts.urgent})` },
-            { key: 'review', label: `🟡 Revisar (${statusCounts.review})` },
-            { key: 'healthy', label: `🟢 Saludables (${statusCounts.healthy})` },
-            { key: 'inactive', label: `⚫ Inactivas (${statusCounts.inactive})` }
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setFilter(t.key)}
-              style={{
-                padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                background: filter === t.key ? 'rgba(25,155,228,0.25)' : 'rgba(10,14,20,0.6)',
-                border: `1px solid ${filter === t.key ? 'rgba(25,155,228,0.6)' : 'rgba(25,155,228,0.15)'}`,
-                color: filter === t.key ? '#EAF1F8' : '#8FA3B5'
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tabla compacta de todas las cuentas */}
-      <div style={{
-        background: 'rgba(10,14,20,0.5)', border: '1px solid rgba(25,155,228,0.15)',
-        borderRadius: 12, overflow: 'hidden'
-      }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
-          padding: '10px 14px', background: 'rgba(10,14,20,0.8)',
-          borderBottom: '1px solid rgba(25,155,228,0.15)',
-          fontSize: 10, fontWeight: 700, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5
-        }}>
-          <div>Cuenta</div>
-          <div>Estado</div>
-          <div>Gasto ayer</div>
-          <div>Gasto hoy</div>
-          <div>Resultados hoy</div>
-          <div style={{ textAlign: 'right' }}>Acción</div>
-        </div>
-        {ordered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: '#8FA3B5', fontSize: 13 }}>
-            {loadingSummary ? 'Cargando datos de las cuentas...' : 'No hay cuentas en esta categoría.'}
-          </div>
-        ) : ordered.map(acc => {
-          const s = acc.summary;
-          const stStyle = STATUS_STYLES[acc.status];
-          return (
-            <div
-              key={acc.normId}
-              onClick={() => openReport(acc)}
-              style={{
-                display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
-                padding: '12px 14px', cursor: 'pointer',
-                borderBottom: '1px solid rgba(25,155,228,0.08)',
-                fontSize: 12, color: '#EAF1F8', alignItems: 'center',
-                transition: 'background 0.1s ease'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(25,155,228,0.06)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
-                <div style={{ fontSize: 10, color: '#566575' }}>{acc.business?.name || '—'}</div>
-              </div>
-              <div>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999,
-                  background: stStyle.bg, color: stStyle.color, border: `1px solid ${stStyle.border}`
-                }}>{stStyle.label}</span>
-              </div>
-              <div style={{ color: '#B7C4D0' }}>{formatCOP(s?.yesterday?.spend || 0)}</div>
-              <div style={{ color: '#B7C4D0' }}>
-                {formatCOP(s?.today?.spend || 0)}
-                {s?.yesterday?.spend > 0 && (
-                  <span style={{ fontSize: 10, marginLeft: 6, color: (s.today?.spend || 0) < (s.yesterday?.spend || 0) ? '#f87171' : '#4ade80' }}>
-                    {formatPct(s.today?.spend || 0, s.yesterday?.spend || 0)}
-                  </span>
-                )}
-              </div>
-              <div>
-                <span style={{ fontWeight: 600, color: (s?.today?.results || 0) === 0 && (s?.today?.spend || 0) > 0 ? '#f87171' : '#EAF1F8' }}>
-                  {s?.today?.results || 0}
-                </span>
-                <span style={{ fontSize: 10, color: '#566575', marginLeft: 4 }}>{s?.today?.label || ''}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: 11, color: '#4CCCF4', fontWeight: 600 }}>Ver →</span>
-              </div>
+        {/* Urgencias */}
+        {urgentAccounts.length > 0 && (
+          <section className="page-section">
+            <div className="page-section-head">
+              <h2 className="page-section-title">
+                <span className="hub-status-dot" style={{ background: '#f87171', color: '#f87171' }} /> Urgencias de hoy
+              </h2>
+              <span className="page-section-note">{urgentAccounts.length} cuentas requieren decisión</span>
             </div>
-          );
-        })}
+            <div className="hub-urgent-grid">
+              {urgentAccounts.slice(0, 9).map(acc => <UrgencyCard key={acc.normId} acc={acc} />)}
+            </div>
+          </section>
+        )}
+
+        {/* Todas las cuentas */}
+        <section className="page-section">
+          <div className="page-section-head">
+            <h2 className="page-section-title">Todas las cuentas</h2>
+            {loadingSummary && (
+              <span className="page-section-note"><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle', marginRight: 6 }} />Cargando métricas…</span>
+            )}
+          </div>
+
+          <div className="hub-toolbar">
+            <label className="hub-search">
+              <Search size={16} color="var(--text-muted)" />
+              <input type="text" placeholder="Buscar cuenta o negocio…" value={query} onChange={e => setQuery(e.target.value)} />
+            </label>
+            <div className="hub-tabs">
+              {tabs.map(t => (
+                <button key={t.key} className={`hub-tab ${filter === t.key ? 'active' : ''}`} onClick={() => setFilter(t.key)}>
+                  <span className="hub-tab-dot" style={{ background: t.dot }} />{t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="hub-table">
+            <div className="hub-thead">
+              <div>Cuenta</div>
+              <div>Estado</div>
+              <div className="hub-cell-hide">Gasto ayer</div>
+              <div className="hub-cell-hide">Gasto hoy</div>
+              <div className="hub-cell-hide">Resultados hoy</div>
+              <div style={{ textAlign: 'right' }}>Ver</div>
+            </div>
+            {ordered.length === 0 ? (
+              <div className="hub-empty">{loadingSummary ? 'Cargando datos de las cuentas…' : 'No hay cuentas en esta categoría.'}</div>
+            ) : ordered.map(acc => {
+              const s = acc.summary;
+              const stStyle = STATUS_STYLES[acc.status];
+              return (
+                <div key={acc.normId} className="hub-row" onClick={() => openReport(acc)}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="hub-acc-name">{acc.name}</div>
+                    <div className="hub-acc-biz">{acc.business?.name || '—'}</div>
+                  </div>
+                  <div>
+                    <span className="hub-badge" style={{ background: stStyle.bg, color: stStyle.color, border: `1px solid ${stStyle.border}` }}>{stStyle.label}</span>
+                  </div>
+                  <div className="hub-cell-num hub-cell-hide">{formatCOP(s?.yesterday?.spend || 0)}</div>
+                  <div className="hub-cell-num hub-cell-hide">
+                    {formatCOP(s?.today?.spend || 0)}
+                    {s?.yesterday?.spend > 0 && (
+                      <span style={{ fontSize: 11, marginLeft: 6, color: (s.today?.spend || 0) < (s.yesterday?.spend || 0) ? '#f87171' : '#4ade80' }}>
+                        {formatPct(s.today?.spend || 0, s.yesterday?.spend || 0)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="hub-cell-hide">
+                    <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: (s?.today?.results || 0) === 0 && (s?.today?.spend || 0) > 0 ? '#f87171' : 'var(--text-primary)' }}>
+                      {s?.today?.results || 0}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 5 }}>{s?.today?.label || ''}</span>
+                  </div>
+                  <div className="hub-see">Ver →</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
-    </div>
+    </>
   );
 }
 

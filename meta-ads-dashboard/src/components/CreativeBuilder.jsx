@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from './ui/CustomSelect';
 import FaroLogo from './ui/FaroLogo';
+import PageHero from './ui/PageHero';
 import './CreativeBuilder.css';
 
 // Mapa de nombres de icono (string) a componentes Lucide
@@ -4695,6 +4696,12 @@ export default function CreativeBuilder({ adAccounts, accessToken, lang }) {
 
   return (
     <div className="creative-builder">
+      <PageHero
+        kicker="Constructor · Meta Ads"
+        title="Constructor de campañas"
+        subtitle="Elige una plantilla, sube tus creativos y publica campañas en Meta en minutos."
+      />
+      <div className="builder-inner">
       <div className="progress-steps">
         <div className={`progress-step ${getStepStatus('templates')}`}>
           <span className="step-number">1</span>
@@ -4735,6 +4742,7 @@ export default function CreativeBuilder({ adAccounts, accessToken, lang }) {
             lang={lang}
           />
         )}
+      </div>
       </div>
     </div>
   );

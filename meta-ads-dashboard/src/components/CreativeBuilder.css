@@ -2,11 +2,15 @@
    CREATIVE BUILDER - Main Layout
    ============================================ */
 .creative-builder {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 24px 20px;
   animation: fadeIn 0.4s var(--ease) both;
 }
+.builder-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 44px 56px;
+}
+@media (max-width: 1024px) { .builder-inner { padding: 24px 22px 44px; } }
+@media (max-width: 560px) { .builder-inner { padding: 20px 16px 40px; } }
 
 /* ============================================
    PROGRESS STEPS
@@ -15,11 +19,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 24px;
-  padding: 16px 24px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  margin-bottom: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
   animation: fadeInDown 0.5s var(--ease) both;
 }
 
@@ -92,10 +95,10 @@
    BUILDER CONTENT
    ============================================ */
 .builder-content {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  padding: 28px;
   animation: fadeInUp 0.5s var(--ease) both;
   animation-delay: 0.1s;
   position: relative;
@@ -1572,12 +1575,14 @@
 }
 
 .template-selector h2 {
-  margin: 0 0 6px;
-  color: var(--text-primary);
-  font-size: 22px;
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
+.template-selector > .subtitle { display: none; }
 
 /* Category Filter */
 .category-filter {
@@ -1615,8 +1620,8 @@
 /* Templates Grid */
 .templates-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .templates-grid > * {
@@ -1635,11 +1640,11 @@
 .template-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.02);
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: all var(--duration) var(--ease);
   position: relative;
@@ -1682,13 +1687,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   position: relative;
   z-index: 1;
   background: var(--accent-subtle);
-  border-radius: var(--radius-xs);
+  border-radius: 13px;
+  border: 1px solid var(--border-accent);
   color: var(--accent);
   transition: all var(--duration) var(--ease);
 }
@@ -1706,10 +1712,11 @@
 }
 
 .template-content h3 {
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 0 0 6px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .template-category {

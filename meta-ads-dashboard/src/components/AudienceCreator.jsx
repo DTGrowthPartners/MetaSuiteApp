@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import MetaAdsService from '../services/metaAdsApi';
 import CustomSelect from './ui/CustomSelect';
+import PageHero from './ui/PageHero';
 import {
   Users, Instagram, MessageSquare, Video, ClipboardList,
   ArrowLeft, Check, Loader2, AlertCircle, Globe, Monitor
@@ -295,24 +296,45 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
     setError('');
   };
 
+  const acSteps = [
+    { key: 'account', label: 'Cuenta' },
+    { key: 'source', label: 'Origen' },
+    { key: 'config', label: 'Configurar' },
+  ];
+  const acIndex = ({ account: 0, source: 1, config: 2, done: 3 })[step] ?? 0;
+
   return (
-    <div className="builder-content" style={{ maxWidth: '700px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-        <button
-          type="button"
-          onClick={step === 'account' ? onBack : step === 'source' ? () => setStep('account') : step === 'config' ? () => setStep('source') : resetForm}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)' }}>Crear Público Personalizado</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-            {step === 'account' ? 'Selecciona la cuenta publicitaria' : step === 'source' ? 'Elige el origen del público' : step === 'config' ? 'Configura el público' : 'Público creado'}
-          </p>
+    <>
+      <PageHero
+        kicker="Segmentación · Meta Ads"
+        title="Públicos personalizados"
+        subtitle="Crea audiencias a partir de interacciones (mensajes, video, formularios, perfiles de IG/FB) para reactivar y escalar tus campañas."
+      />
+      <div className="builder-inner" style={{ maxWidth: '820px' }}>
+        <div className="progress-steps">
+          {acSteps.map((s, i) => (
+            <Fragment key={s.key}>
+              {i > 0 && <div className="step-connector" />}
+              <div className={`progress-step ${acIndex === i ? 'active' : acIndex > i ? 'completed' : ''}`}>
+                <span className="step-number">{i + 1}</span>
+                <span className="step-label">{s.label}</span>
+              </div>
+            </Fragment>
+          ))}
         </div>
-      </div>
+        <div className="builder-content">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+            <button
+              type="button"
+              onClick={step === 'account' ? onBack : step === 'source' ? () => setStep('account') : step === 'config' ? () => setStep('source') : resetForm}
+              className="report-back-btn"
+            >
+              <ArrowLeft size={16} /> {step === 'account' ? 'Volver' : 'Atrás'}
+            </button>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              {step === 'account' ? 'Selecciona la cuenta publicitaria' : step === 'source' ? 'Elige el origen del público' : step === 'config' ? 'Configura el público' : 'Público creado'}
+            </span>
+          </div>
 
       {/* Step 1: Account Selection */}
       {step === 'account' && (
@@ -600,6 +622,8 @@ export default function AudienceCreator({ accessToken, adAccounts, pages, onBack
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
