@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
     <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4A9FFF"/>
-      <stop offset="100%" stop-color="#7C5CFC"/>
+      <stop offset="0%" stop-color="#199BE4"/>
+      <stop offset="100%" stop-color="#4CCCF4"/>
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="8" fill="url(#g)"/>
-  <path d="M9 10 L3 6" stroke="white" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
-  <path d="M23 10 L29 6" stroke="white" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
-  <path d="M12 9 L20 9 L16 4 Z" fill="white"/>
-  <rect x="13" y="9" width="6" height="3.5" fill="white"/>
-  <path d="M13.5 12.5 L18.5 12.5 L21 27 L11 27 Z" fill="white"/>
+  <!-- Faro: beam of light + lamp + base -->
+  <path d="M16 12 L27 5.5 L27 9 L16 14 Z" fill="white" opacity="0.55"/>
+  <path d="M16 12 L27 18.5 L27 15 L16 10 Z" fill="white" opacity="0.30"/>
+  <circle cx="13" cy="12" r="3.4" fill="white"/>
+  <path d="M11 15 L15 15 L16.4 26 L9.6 26 Z" fill="white"/>
 </svg>

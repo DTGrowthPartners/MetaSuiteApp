@@ -22,7 +22,7 @@
   right: -20%;
   width: 55%;
   height: 75%;
-  background: radial-gradient(circle, rgba(124, 92, 252, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(76, 204, 244, 0.06) 0%, transparent 70%);
   pointer-events: none;
   animation: float 9s var(--ease) infinite;
 }
@@ -34,7 +34,7 @@
   left: -15%;
   width: 50%;
   height: 70%;
-  background: radial-gradient(circle, rgba(74, 159, 255, 0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(25, 155, 228, 0.05) 0%, transparent 70%);
   pointer-events: none;
   animation: float 11s var(--ease) infinite reverse;
 }
@@ -150,7 +150,7 @@
   border-color: var(--accent);
   box-shadow:
     0 0 0 3px var(--accent-subtle),
-    0 0 20px rgba(74, 159, 255, 0.08);
+    0 0 20px rgba(25, 155, 228, 0.08);
   background: var(--bg-elevated);
 }
 
@@ -208,8 +208,8 @@
 .api-key-card .submit-button:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 24px rgba(74, 159, 255, 0.3),
-    0 0 0 1px rgba(74, 159, 255, 0.15);
+    0 8px 24px rgba(25, 155, 228, 0.3),
+    0 0 0 1px rgba(25, 155, 228, 0.15);
 }
 
 .api-key-card .submit-button:hover::before {
@@ -218,7 +218,7 @@
 
 .api-key-card .submit-button:active {
   transform: translateY(0) scale(0.98);
-  box-shadow: 0 4px 12px rgba(74, 159, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(25, 155, 228, 0.2);
 }
 
 .api-key-card .submit-button:disabled {
@@ -253,7 +253,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(74, 159, 255, 0.2) 50%,
+    rgba(25, 155, 228, 0.2) 50%,
     transparent 100%
   );
 }

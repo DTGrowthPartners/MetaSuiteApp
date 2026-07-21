@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import tr from '../translations';
+import { DonutChart, HBarChart, CompareBars } from './ui/Charts';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://metasuite.dtgrowthpartners.com/api';
 
@@ -70,7 +71,7 @@ function cleanName(campaignName, locations = []) {
 
 // Agregar métricas de una lista de campañas
 function aggregateCampaigns(list, insightsKey) {
-  let spend = 0, impressions = 0, reach = 0, conversations = 0, firstReplies = 0;
+  let spend = 0, impressions = 0, reach = 0, conversations = 0, firstReplies = 0, linkClicks = 0;
   for (const c of list) {
     const ins = c[insightsKey] || {};
     spend += parseFloat(ins.spend || 0);
@@ -79,9 +80,16 @@ function aggregateCampaigns(list, insightsKey) {
     const a = extractActions(ins);
     conversations += a.conversations;
     firstReplies += a.firstReplies;
+    linkClicks += a.linkClicks;
   }
   const msgs = Math.max(conversations, firstReplies);
-  return { spend, impressions, reach, conversations, firstReplies, msgs, cpr: msgs > 0 ? spend / msgs : 0 };
+  return {
+    spend, impressions, reach, conversations, firstReplies, linkClicks, msgs,
+    cpr: msgs > 0 ? spend / msgs : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+    ctr: impressions > 0 ? (linkClicks / impressions) * 100 : 0,
+    frequency: reach > 0 ? impressions / reach : 0,
+  };
 }
 
 // Badge de cambio porcentual
@@ -242,10 +250,75 @@ function MonthlyReportView({ data, locations, lang }) {
             <span className="monthly-metric-label">Nuevos Contactos</span>
             <ChangeBadge current={convTotals.firstReplies} previous={prevConvTotals.firstReplies} />
           </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{totals.cpm > 0 ? formatCOP(totals.cpm) : '-'}</span>
+            <span className="monthly-metric-label">CPM (Costo x Mil Impr.)</span>
+            <ChangeBadge current={totals.cpm} previous={prev.cpm} invertColor />
+          </div>
+          <div className="monthly-metric-card">
+            <span className="monthly-metric-value">{totals.frequency > 0 ? totals.frequency.toFixed(1) : '-'}</span>
+            <span className="monthly-metric-label">Frecuencia Promedio</span>
+          </div>
           {pageFollowers !== null && (
             <div className="monthly-metric-card">
               <span className="monthly-metric-value">{formatCompact(pageFollowers)}</span>
               <span className="monthly-metric-label">Seguidores de la Página{pageEngagement.pageName ? ` (${pageEngagement.pageName})` : ''}</span>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Sección 1b: Análisis Visual */}
+      <section className="monthly-section">
+        <h2 className="monthly-section-title">Análisis Visual</h2>
+        <div className="report-chart-grid">
+          {sedeTotals.length > 0 && (
+            <div className="report-chart-card">
+              <div className="report-chart-title">Distribución de inversión por sede</div>
+              <DonutChart
+                data={sedeTotals.map(s => ({ name: s.loc, value: Math.round(s.spend) }))}
+                fmt={formatCOP}
+                centerLabel="Inversión"
+                centerValue={formatCompact(totals.spend)}
+              />
+            </div>
+          )}
+          {sedeTotals.filter(s => s.cpr > 0).length > 0 && (
+            <div className="report-chart-card">
+              <div className="report-chart-title">Costo por resultado por sede</div>
+              <HBarChart
+                data={sedeTotals.filter(s => s.cpr > 0).map(s => ({ name: s.loc, value: Math.round(s.cpr) }))}
+                fmt={formatCOP}
+                barLabel="CPR"
+              />
+            </div>
+          )}
+          {campaignsWithCPR.length > 0 && (
+            <div className="report-chart-card">
+              <div className="report-chart-title">Top campañas por mensajes</div>
+              <HBarChart
+                data={campaignsWithCPR.map(c => ({ name: c.name.length > 18 ? c.name.slice(0, 17) + '…' : c.name, value: c.msgs }))}
+                fmt={v => formatCompact(v)}
+                barLabel="Mensajes"
+              />
+            </div>
+          )}
+          {prevConvTotals.conversations > 0 && (
+            <div className="report-chart-card">
+              <div className="report-chart-title">Comparativa mensual</div>
+              <CompareBars
+                data={[
+                  { name: 'Mensajes', a: prevConvTotals.conversations, b: convTotals.conversations },
+                  { name: 'Contactos', a: prevConvTotals.firstReplies, b: convTotals.firstReplies },
+                ]}
+                seriesA={dateRange?.monthBeforeLast?.label || 'Mes anterior'}
+                seriesB={dateRange?.lastMonth?.label || 'Mes actual'}
+                fmt={v => formatCompact(v)}
+              />
+              <div className="report-chart-legend">
+                <span><i style={{ background: '#4CCCF4' }} />{dateRange?.monthBeforeLast?.label || 'Mes anterior'}</span>
+                <span><i style={{ background: '#199BE4' }} />{dateRange?.lastMonth?.label || 'Mes actual'}</span>
+              </div>
             </div>
           )}
         </div>
@@ -523,6 +596,30 @@ function DailyReportView({ campaigns, insightsKey, viewMode, locations, lang }) 
         </div>
       </section>
 
+      {sortedLocs.length >= 2 && (
+        <section className="monthly-section">
+          <div className="report-chart-grid">
+            <div className="report-chart-card">
+              <div className="report-chart-title">Inversión por sede</div>
+              <DonutChart
+                data={sortedLocs.map(loc => ({ name: loc, value: Math.round(getGroupTotals(grouped[loc]).spend) }))}
+                fmt={formatCOP}
+                centerLabel="Total"
+                centerValue={formatCompact(grand.spend)}
+              />
+            </div>
+            <div className="report-chart-card">
+              <div className="report-chart-title">Resultados por sede</div>
+              <HBarChart
+                data={sortedLocs.map(loc => ({ name: loc, value: getGroupTotals(grouped[loc]).total }))}
+                fmt={v => formatCompact(v)}
+                barLabel="Resultados"
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
       {active.length === 0 && (
         <div className="report-no-data">{viewMode === 'yesterday' ? tr('no_data_yesterday', lang) : tr('no_data_today', lang)}</div>
       )}
@@ -673,8 +770,8 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
             <button
               onClick={() => { window.location.href = '/reportes'; }}
               style={{
-                background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
-                color: '#a5b4fc', borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+                background: 'rgba(25, 155, 228,0.15)', border: '1px solid rgba(25, 155, 228,0.3)',
+                color: '#4CCCF4', borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600, marginBottom: 8
               }}
             >
@@ -723,7 +820,7 @@ export default function CampaignReport({ slug, accessToken, adAccounts = [], loa
       )}
 
       <footer className="report-footer">
-        <span>Meta Suite — DT Growth Partners</span>
+        <span className="report-footer-brand"><span className="font-display">Faro</span> · Meta Ads Command Center</span>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => {

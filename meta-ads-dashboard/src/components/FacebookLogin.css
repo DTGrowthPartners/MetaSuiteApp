@@ -22,7 +22,7 @@
   left: -20%;
   width: 60%;
   height: 80%;
-  background: radial-gradient(circle, rgba(74, 159, 255, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(25, 155, 228, 0.06) 0%, transparent 70%);
   pointer-events: none;
   animation: float 8s var(--ease) infinite;
 }
@@ -34,7 +34,7 @@
   right: -15%;
   width: 50%;
   height: 70%;
-  background: radial-gradient(circle, rgba(124, 92, 252, 0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(76, 204, 244, 0.05) 0%, transparent 70%);
   pointer-events: none;
   animation: float 10s var(--ease) infinite reverse;
 }
@@ -136,8 +136,8 @@
 .fb-login-button:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 24px rgba(74, 159, 255, 0.3),
-    0 0 0 1px rgba(74, 159, 255, 0.2);
+    0 8px 24px rgba(25, 155, 228, 0.3),
+    0 0 0 1px rgba(25, 155, 228, 0.2);
   animation: gradient-shift 3s ease infinite;
   background-size: 200% 200%;
 }
@@ -148,7 +148,7 @@
 
 .fb-login-button:active {
   transform: translateY(0) scale(0.98);
-  box-shadow: 0 4px 12px rgba(74, 159, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(25, 155, 228, 0.2);
 }
 
 .fb-login-button:disabled {
@@ -250,7 +250,7 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 16px;
-  box-shadow: 0 0 16px rgba(74, 159, 255, 0.1);
+  box-shadow: 0 0 16px rgba(25, 155, 228, 0.1);
 }
 
 /* ---- Input Group ---- */
@@ -301,7 +301,7 @@
   border-color: var(--accent);
   box-shadow:
     0 0 0 3px var(--accent-subtle),
-    0 0 20px rgba(74, 159, 255, 0.08);
+    0 0 20px rgba(25, 155, 228, 0.08);
   background: var(--bg-elevated);
 }
 
@@ -365,8 +365,8 @@
 .submit-button:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 24px rgba(74, 159, 255, 0.3),
-    0 0 0 1px rgba(74, 159, 255, 0.15);
+    0 8px 24px rgba(25, 155, 228, 0.3),
+    0 0 0 1px rgba(25, 155, 228, 0.15);
 }
 
 .submit-button:hover::before {
@@ -449,7 +449,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(74, 159, 255, 0.2) 50%,
+    rgba(25, 155, 228, 0.2) 50%,
     transparent 100%
   );
 }

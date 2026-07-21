@@ -58,13 +58,13 @@
   background: var(--gradient-accent);
   border-color: transparent;
   color: white;
-  box-shadow: 0 0 16px rgba(74, 159, 255, 0.3);
+  box-shadow: 0 0 16px rgba(25, 155, 228, 0.3);
   animation: stepPulse 2s ease-in-out infinite;
 }
 
 @keyframes stepPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(74, 159, 255, 0.2); }
-  50% { box-shadow: 0 0 20px rgba(74, 159, 255, 0.45); }
+  0%, 100% { box-shadow: 0 0 8px rgba(25, 155, 228, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(25, 155, 228, 0.45); }
 }
 
 .progress-step.completed .step-number {
@@ -164,7 +164,7 @@
 .upload-zone:hover,
 .upload-zone.drag-active {
   border-color: var(--accent);
-  box-shadow: 0 0 24px rgba(74, 159, 255, 0.1);
+  box-shadow: 0 0 24px rgba(25, 155, 228, 0.1);
   transform: translateY(-2px);
 }
 
@@ -213,7 +213,7 @@
 
 .upload-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(74, 159, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(25, 155, 228, 0.3);
 }
 
 .upload-hint {
@@ -464,8 +464,8 @@
 }
 
 @keyframes pulseRing {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 159, 255, 0.15); }
-  50% { box-shadow: 0 0 16px 4px rgba(74, 159, 255, 0.25); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(25, 155, 228, 0.15); }
+  50% { box-shadow: 0 0 16px 4px rgba(25, 155, 228, 0.25); }
 }
 
 @keyframes rippleOut {
@@ -552,7 +552,7 @@
 .create-button:hover:not(:disabled),
 .done-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(74, 159, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(25, 155, 228, 0.3);
 }
 
 .submit-button:disabled,
@@ -825,7 +825,7 @@
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
-  box-shadow: 0 0 12px rgba(74, 159, 255, 0.15);
+  box-shadow: 0 0 12px rgba(25, 155, 228, 0.15);
 }
 
 /* Toggle Buttons (generic toggle for budget, bid strategy, Advantage+, placements, etc.) */
@@ -1609,7 +1609,7 @@
   background: var(--gradient-accent);
   border-color: transparent;
   color: white;
-  box-shadow: 0 2px 12px rgba(74, 159, 255, 0.25);
+  box-shadow: 0 2px 12px rgba(25, 155, 228, 0.25);
 }
 
 /* Templates Grid */
@@ -1998,7 +1998,7 @@
    AI SECTION
    ============================================ */
 .ai-section {
-  background: linear-gradient(135deg, rgba(74, 159, 255, 0.06) 0%, rgba(124, 92, 252, 0.06) 100%);
+  background: linear-gradient(135deg, rgba(25, 155, 228, 0.06) 0%, rgba(76, 204, 244, 0.06) 100%);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius);
   padding: 22px;
@@ -2084,7 +2084,7 @@
 
 .ai-generate-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(74, 159, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(25, 155, 228, 0.3);
 }
 
 .ai-generate-btn:disabled {
@@ -2146,7 +2146,7 @@
 .add-ad-btn:hover {
   background: var(--accent-subtle) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 159, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(25, 155, 228, 0.15);
 }
 
 .remove-ad-btn {
@@ -2204,7 +2204,7 @@
 .section-card:nth-child(6) { animation-delay: 0.3s; }
 .section-card:hover {
   border-color: var(--border-light);
-  box-shadow: 0 0 20px rgba(74, 159, 255, 0.04);
+  box-shadow: 0 0 20px rgba(25, 155, 228, 0.04);
 }
 .section-card h4 {
   color: var(--text-primary);
@@ -2262,7 +2262,7 @@
 .config-nav-item.active {
   color: var(--accent);
   background: var(--accent-subtle);
-  border-color: rgba(74, 159, 255, 0.3);
+  border-color: rgba(25, 155, 228, 0.3);
 }
 
 /* ============================================
@@ -2276,12 +2276,12 @@
   border-radius: 16px;
   font-size: 12px;
   background: var(--accent-subtle);
-  border: 1px solid rgba(74, 159, 255, 0.3);
+  border: 1px solid rgba(25, 155, 228, 0.3);
   color: var(--text-primary);
   transition: all 0.2s ease;
 }
 .chip:hover {
-  background: rgba(74, 159, 255, 0.15);
+  background: rgba(25, 155, 228, 0.15);
 }
 .chip-remove {
   cursor: pointer;
@@ -2403,7 +2403,7 @@
   color: var(--bg-primary);
 }
 .content-badge--cta {
-  background: #9c27b0;
+  background: #199BE4;
 }
 
 /* ============================================
@@ -2479,7 +2479,7 @@
 }
 .library-item.selected {
   border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(74, 159, 255, 0.2);
+  box-shadow: 0 0 10px rgba(25, 155, 228, 0.2);
 }
 .library-item-badge {
   position: absolute;
@@ -2588,8 +2588,8 @@
   border-color: var(--accent);
 }
 .content-input.filled {
-  border-color: rgba(74, 159, 255, 0.4);
-  background: rgba(74, 159, 255, 0.05);
+  border-color: rgba(25, 155, 228, 0.4);
+  background: rgba(25, 155, 228, 0.05);
 }
 .content-input.filled-desc {
   border-color: rgba(245, 158, 11, 0.4);
@@ -2605,14 +2605,14 @@
   padding: 7px 8px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border);
-  background: rgba(156, 39, 176, 0.08);
+  background: rgba(25,155,228,0.08);
   cursor: pointer;
   color: var(--text-primary);
   transition: border-color 0.2s ease;
 }
 .cta-select:focus {
   outline: none;
-  border-color: #9c27b0;
+  border-color: #199BE4;
 }
 
 /* ============================================
@@ -2891,7 +2891,7 @@
 
 .success-view-btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(74, 159, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(25, 155, 228, 0.35);
 }
 
 .success-view-btn-primary::before {

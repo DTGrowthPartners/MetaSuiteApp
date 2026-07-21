@@ -1,30 +1,38 @@
+/* ============================================
+   FARO — DESIGN SYSTEM
+   Palette: black · white · #199BE4 · #4CCCF4
+   Semáforo (red/amber/green) reserved for report alerts only.
+   Type: Space Grotesk (display) · Geist (UI/body)
+   ============================================ */
 :root {
-  /* Base palette */
-  --bg-primary: #0F1623;
-  --bg-secondary: #161E2E;
-  --bg-tertiary: #1C2536;
-  --bg-elevated: #232E42;
-  --bg-glass: rgba(22, 30, 46, 0.7);
+  /* Base palette — near-black with a whisper of cool depth */
+  --bg-primary: #05070A;
+  --bg-secondary: #0A0E14;
+  --bg-tertiary: #10151D;
+  --bg-elevated: #161D27;
+  --bg-glass: rgba(10, 14, 20, 0.72);
 
-  /* Accent */
-  --accent: #4A9FFF;
-  --accent-hover: #6BB3FF;
-  --accent-subtle: rgba(74, 159, 255, 0.10);
-  --accent-glow: rgba(74, 159, 255, 0.25);
-  --gradient-accent: linear-gradient(135deg, #4A9FFF 0%, #7C5CFC 100%);
-  --gradient-accent-soft: linear-gradient(135deg, rgba(74, 159, 255, 0.15) 0%, rgba(124, 92, 252, 0.15) 100%);
+  /* Accent — the two Faro blues */
+  --accent: #199BE4;
+  --accent-hover: #4CCCF4;
+  --accent-light: #4CCCF4;
+  --accent-subtle: rgba(25, 155, 228, 0.10);
+  --accent-glow: rgba(25, 155, 228, 0.28);
+  --gradient-accent: linear-gradient(135deg, #199BE4 0%, #4CCCF4 100%);
+  --gradient-accent-soft: linear-gradient(135deg, rgba(25, 155, 228, 0.16) 0%, rgba(76, 204, 244, 0.16) 100%);
+  --gradient-sheen: linear-gradient(135deg, rgba(76, 204, 244, 0.9) 0%, rgba(25, 155, 228, 0.9) 100%);
 
-  /* Text */
-  --text-primary: #E8EDF5;
-  --text-secondary: #8B9BB4;
-  --text-muted: #5A6A82;
+  /* Text — cool whites and grays (black + white + blue) */
+  --text-primary: #EAF1F8;
+  --text-secondary: #8FA3B5;
+  --text-muted: #566575;
 
   /* Borders */
   --border: rgba(255, 255, 255, 0.06);
-  --border-light: rgba(255, 255, 255, 0.10);
-  --border-accent: rgba(74, 159, 255, 0.25);
+  --border-light: rgba(255, 255, 255, 0.11);
+  --border-accent: rgba(25, 155, 228, 0.30);
 
-  /* Status */
+  /* Status — report semáforo / functional alerts ONLY */
   --success: #34D399;
   --success-bg: rgba(52, 211, 153, 0.10);
   --warning: #FBBF24;
@@ -33,11 +41,11 @@
   --error-bg: rgba(248, 113, 113, 0.10);
 
   /* Shadows & effects */
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.03);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.03);
-  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.2);
-  --shadow-glow: 0 0 30px rgba(74, 159, 255, 0.15);
-  --blur: blur(20px);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.28);
+  --shadow-glow: 0 0 34px rgba(25, 155, 228, 0.20);
+  --blur: blur(22px);
 
   /* Radius */
   --radius-xl: 20px;
@@ -55,6 +63,11 @@
   --font-2xl: 26px;
   --font-3xl: 32px;
 
+  /* Font families */
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Variable', ui-monospace, 'SF Mono', 'Menlo', monospace;
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -70,7 +83,7 @@
   --duration: 0.3s;
   --duration-slow: 0.5s;
 
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
   font-weight: 400;
   font-synthesis: none;
@@ -85,126 +98,119 @@ body {
   min-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
+  font-family: var(--font-sans);
 }
 
 * {
   box-sizing: border-box;
 }
 
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Tabular figures for metric-heavy numbers */
+.tnum, .report-td-num, .report-grand-value, .monthly-metric-value {
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 /* ============================================
    ANIMATIONS
    ============================================ */
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeInDown {
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
-
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-20px); }
   to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
-
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 159, 255, 0.3); }
-  50% { box-shadow: 0 0 20px 4px rgba(74, 159, 255, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(25, 155, 228, 0.32); }
+  50% { box-shadow: 0 0 22px 5px rgba(25, 155, 228, 0.16); }
 }
-
+@keyframes beacon-sweep {
+  0%   { opacity: 0.25; transform: rotate(-32deg); }
+  50%  { opacity: 0.9; }
+  100% { opacity: 0.25; transform: rotate(32deg); }
+}
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
 @keyframes gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
 @keyframes border-glow {
-  0%, 100% { border-color: rgba(74, 159, 255, 0.2); }
-  50% { border-color: rgba(74, 159, 255, 0.5); }
+  0%, 100% { border-color: rgba(25, 155, 228, 0.22); }
+  50% { border-color: rgba(76, 204, 244, 0.55); }
 }
 
 /* ============================================
-   GLOBAL SELECT / OPTION DARK THEME
+   SELECT / OPTION DARK THEME
    ============================================ */
 select option {
-  background: #161E2E;
-  color: #E8EDF5;
+  background: #0A0E14;
+  color: #EAF1F8;
 }
-
 select optgroup {
-  background: #161E2E;
-  color: #8B9BB4;
+  background: #0A0E14;
+  color: #8FA3B5;
 }
 
 /* ============================================
    SCROLLBAR
    ============================================ */
-
-::-webkit-scrollbar {
-  width: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(25, 155, 228, 0.22);
   border-radius: 10px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(76, 204, 244, 0.4);
 }
 
 /* ============================================
    UTILITY CLASSES
    ============================================ */
-
 .glass {
   background: var(--bg-glass);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--border-light);
 }
-
 .animate-in {
   animation: fadeInUp var(--duration-slow) var(--ease) both;
 }
-
 .animate-stagger > * {
   animation: fadeInUp var(--duration-slow) var(--ease) both;
 }
@@ -219,11 +225,18 @@ select optgroup {
 .animate-stagger > *:nth-child(9) { animation-delay: 0.45s; }
 .animate-stagger > *:nth-child(10) { animation-delay: 0.50s; }
 
-/* Utilities */
 .flex-1 { flex: 1; min-width: 0; }
 
-/* Selection */
 ::selection {
-  background: rgba(74, 159, 255, 0.3);
+  background: rgba(25, 155, 228, 0.32);
   color: #fff;
+}
+
+/* Gradient text helper */
+.text-gradient {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }

@@ -86,7 +86,7 @@
   left: 0;
   right: 0;
   z-index: 300;
-  background: #1e2840;
+  background: #161D27;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05);

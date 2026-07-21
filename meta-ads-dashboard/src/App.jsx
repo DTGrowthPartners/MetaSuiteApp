@@ -5,6 +5,7 @@ import CampaignReport from './components/CampaignReport';
 import AudienceCreator from './components/AudienceCreator';
 import MetaAdsService from './services/metaAdsApi';
 import { LogOut, Loader2, BarChart3 } from 'lucide-react';
+import FaroLogo, { FaroMark } from './components/ui/FaroLogo';
 import tr from './translations';
 import './App.css';
 
@@ -58,7 +59,7 @@ function ParticleBackground() {
         if (p.y > h) p.y = 0;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(74, 159, 255, ${p.opacity})`;
+        ctx.fillStyle = `rgba(76, 204, 244, ${p.opacity})`;
         ctx.fill();
       });
       for (let i = 0; i < particles.length; i++) {
@@ -70,7 +71,7 @@ function ParticleBackground() {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(74, 159, 255, ${0.06 * (1 - dist / 140)})`;
+            ctx.strokeStyle = `rgba(25, 155, 228, ${0.07 * (1 - dist / 140)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -104,16 +105,13 @@ function SplashScreen({ onFinish }) {
       <div className="splash-content">
         <div className="splash-logo-wrapper">
           <div className="splash-glow" />
-          <img
-            src="/DT-GROWTH-LOGO-DYCI6Arf.png"
-            alt="DT Growth Partners"
-            className="splash-logo"
-          />
+          <FaroMark size={96} radius={0.28} glow className="splash-mark" />
         </div>
+        <p className="splash-wordmark font-display">Faro</p>
         <div className="splash-bar-track">
           <div className="splash-bar-fill" />
         </div>
-        <p className="splash-tagline">Faro DT</p>
+        <p className="splash-tagline">Meta Ads Command Center</p>
       </div>
     </div>
   );
@@ -188,17 +186,10 @@ function LoginScreen({ onLogin, lang, setLang }) {
         {/* Logo */}
         <div className="login-logo">
           <div className="login-logo-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <path d="M6.75 7.5 L2.25 4.5" stroke="url(#g1)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M17.25 7.5 L21.75 4.5" stroke="url(#g1)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M9 6.75 L15 6.75 L12 3 Z" fill="url(#g1)" />
-              <rect x="9.75" y="6.75" width="4.5" height="2.6" fill="url(#g1)" />
-              <path d="M10.1 9.4 L13.9 9.4 L15.75 20.25 L8.25 20.25 Z" fill="url(#g1)" />
-              <defs><linearGradient id="g1" x1="3" y1="3" x2="21" y2="21"><stop stopColor="#4A9FFF"/><stop offset="1" stopColor="#7C5CFC"/></linearGradient></defs>
-            </svg>
+            <FaroMark size={58} radius={0.3} glow />
           </div>
-          <h1 className="login-title">Faro DT</h1>
-          <span className="login-brand">by DT Growth Partners</span>
+          <h1 className="login-title font-display">Faro</h1>
+          <span className="login-brand">Meta Ads Command Center</span>
         </div>
         <p className="login-subtitle">{tr('login_subtitle', lang)}</p>
 
@@ -216,7 +207,7 @@ function LoginScreen({ onLogin, lang, setLang }) {
 
         {/* Language Switch — positioned at bottom of card */}
         <div style={{ position: 'absolute', bottom: '16px', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '12px', fontWeight: 500, padding: '4px 8px' }}>
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: 500, padding: '4px 8px' }}>
             {lang === 'es' ? '🇺🇸 English' : '🇨🇴 Español'}
           </button>
         </div>
@@ -251,7 +242,7 @@ function App() {
       .catch(() => setLegalHtml('<p>Error cargando la página</p>'));
   }, [isLegalPage, pathname]);
   if (isLegalPage) {
-    if (!legalHtml) return <div style={{ background: '#0f172a', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0' }}>Cargando...</div>;
+    if (!legalHtml) return <div style={{ background: '#05070A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EAF1F8' }}>Cargando...</div>;
     return <div dangerouslySetInnerHTML={{ __html: legalHtml }} />;
   }
 
@@ -359,10 +350,7 @@ function App() {
       {/* Navigation Header */}
       <nav className="main-navigation">
         <div className="nav-brand">
-          <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" className="nav-logo-img" />
-          <div className="nav-brand-text">
-            <span className="nav-title">Faro DT</span>
-          </div>
+          <FaroLogo size={30} />
         </div>
         <div className="nav-links">
           <button
@@ -406,7 +394,7 @@ function App() {
           )}
 
           {/* Language Switch */}
-          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} style={{ background: 'rgba(25,155,228,0.14)', border: '1px solid rgba(25,155,228,0.32)', color: '#4CCCF4', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
             {lang === 'es' ? '🇺🇸 EN' : '🇨🇴 ES'}
           </button>
 
@@ -488,14 +476,14 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
 
   if (loadingAccounts) {
     return (
-      <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+      <div style={{ padding: 60, textAlign: 'center', color: '#8FA3B5' }}>
         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Cargando cuentas...
       </div>
     );
   }
 
   if (!adAccounts?.length) {
-    return <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>No hay cuentas publicitarias disponibles.</div>;
+    return <div style={{ padding: 60, textAlign: 'center', color: '#8FA3B5' }}>No hay cuentas publicitarias disponibles.</div>;
   }
 
   // Clasificar cada cuenta en urgent / review / healthy / inactive
@@ -581,7 +569,7 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
     urgent:   { color: '#f87171', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', label: 'URGENTE' },
     review:   { color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', label: 'REVISAR' },
     healthy:  { color: '#4ade80', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)', label: 'SALUDABLE' },
-    inactive: { color: '#94a3b8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)', label: 'INACTIVA' }
+    inactive: { color: '#8FA3B5', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)', label: 'INACTIVA' }
   };
 
   const KpiTile = ({ icon, label, value, sub, color, onClick, active }) => (
@@ -589,18 +577,18 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
       onClick={onClick}
       style={{
         flex: 1, minWidth: 180, textAlign: 'left', cursor: onClick ? 'pointer' : 'default',
-        background: active ? `${color}22` : 'rgba(15,23,42,0.6)',
-        border: `1px solid ${active ? color : 'rgba(99,102,241,0.2)'}`,
-        borderRadius: 14, padding: '16px 18px', color: '#e2e8f0',
+        background: active ? `${color}22` : 'rgba(10,14,20,0.6)',
+        border: `1px solid ${active ? color : 'rgba(25,155,228,0.2)'}`,
+        borderRadius: 14, padding: '16px 18px', color: '#EAF1F8',
         transition: 'all 0.15s ease'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         {icon}
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: '#8FA3B5' }}>{label}</span>
       </div>
       <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: '#566575', marginTop: 4 }}>{sub}</div>}
     </button>
   );
 
@@ -619,7 +607,7 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
         onClick={() => openReport(acc)}
         style={{
           cursor: 'pointer',
-          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(15,23,42,0.9))',
+          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(10,14,20,0.9))',
           border: '1px solid rgba(239,68,68,0.35)', borderRadius: 14, padding: 16,
           transition: 'all 0.15s ease'
         }}
@@ -628,21 +616,21 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
-            <div style={{ fontSize: 10, color: '#64748b' }}>{acc.business?.name || '—'}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#EAF1F8', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
+            <div style={{ fontSize: 10, color: '#566575' }}>{acc.business?.name || '—'}</div>
           </div>
           <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999, background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>URGENTE</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10, paddingTop: 10, borderTop: '1px solid rgba(99,102,241,0.15)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10, paddingTop: 10, borderTop: '1px solid rgba(25,155,228,0.15)' }}>
           <div>
-            <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>Ayer</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{formatCOP(y.spend || 0)}</div>
-            <div style={{ fontSize: 10, color: '#94a3b8' }}>{y.results || 0} {y.label || 'resultados'}</div>
+            <div style={{ fontSize: 9, color: '#566575', textTransform: 'uppercase', marginBottom: 2 }}>Ayer</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#EAF1F8' }}>{formatCOP(y.spend || 0)}</div>
+            <div style={{ fontSize: 10, color: '#8FA3B5' }}>{y.results || 0} {y.label || 'resultados'}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>Hoy {pctSpend && <span style={{ color: (t.spend || 0) < (y.spend || 0) ? '#f87171' : '#4ade80' }}>· {pctSpend}</span>}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{formatCOP(t.spend || 0)}</div>
-            <div style={{ fontSize: 10, color: '#94a3b8' }}>{t.results || 0} {t.label || 'resultados'}</div>
+            <div style={{ fontSize: 9, color: '#566575', textTransform: 'uppercase', marginBottom: 2 }}>Hoy {pctSpend && <span style={{ color: (t.spend || 0) < (y.spend || 0) ? '#f87171' : '#4ade80' }}>· {pctSpend}</span>}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#EAF1F8' }}>{formatCOP(t.spend || 0)}</div>
+            <div style={{ fontSize: 10, color: '#8FA3B5' }}>{t.results || 0} {t.label || 'resultados'}</div>
           </div>
         </div>
         {alerts.slice(0, 2).map((a, i) => (
@@ -658,11 +646,11 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
     <div style={{ padding: '24px 20px', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#e2e8f0', margin: 0, marginBottom: 4 }}>
-          <BarChart3 size={24} style={{ verticalAlign: 'middle', marginRight: 10, color: '#a5b4fc' }} />
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#EAF1F8', margin: 0, marginBottom: 4 }}>
+          <BarChart3 size={24} style={{ verticalAlign: 'middle', marginRight: 10, color: '#4CCCF4' }} />
           Reportes
         </h1>
-        <p style={{ color: '#94a3b8', margin: 0, fontSize: 13 }}>
+        <p style={{ color: '#8FA3B5', margin: 0, fontSize: 13 }}>
           Campaign performance data from all your Meta ad accounts (loaded via business_management and ads_read). Accounts that need attention today, sorted by urgency.
         </p>
       </div>
@@ -690,7 +678,7 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
         <KpiTile
           icon={<span style={{ fontSize: 14 }}>⚫</span>}
           label="Sin gasto" value={statusCounts.inactive}
-          sub="Sin operación" color="#94a3b8"
+          sub="Sin operación" color="#8FA3B5"
           active={filter === 'inactive'} onClick={() => setFilter('inactive')}
         />
       </div>
@@ -698,37 +686,37 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
       {/* Totales portafolio */}
       <div style={{
         display: 'flex', gap: 24, marginBottom: 20, padding: '12px 18px',
-        background: 'rgba(15,23,42,0.5)', borderRadius: 12, border: '1px solid rgba(99,102,241,0.15)',
+        background: 'rgba(10,14,20,0.5)', borderRadius: 12, border: '1px solid rgba(25,155,228,0.15)',
         flexWrap: 'wrap'
       }}>
         <div>
-          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto hoy (portafolio)</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto hoy (portafolio)</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>
             {formatCOP(totalSpendToday)} <span style={{ fontSize: 11, color: formatPct(totalSpendToday, totalSpendYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalSpendToday, totalSpendYesterday)}</span>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Resultados hoy</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Resultados hoy</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>
             {totalResultsToday} <span style={{ fontSize: 11, color: formatPct(totalResultsToday, totalResultsYesterday)?.startsWith('-') ? '#f87171' : '#4ade80', fontWeight: 500 }}>{formatPct(totalResultsToday, totalResultsYesterday)}</span>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto ayer</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>{formatCOP(totalSpendYesterday)}</div>
+          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gasto ayer</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>{formatCOP(totalSpendYesterday)}</div>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cuentas con datos</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>{Object.values(summary).filter(s => s.ok).length} / {adAccounts.length}</div>
+          <div style={{ fontSize: 10, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cuentas con datos</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#EAF1F8' }}>{Object.values(summary).filter(s => s.ok).length} / {adAccounts.length}</div>
         </div>
-        {loadingSummary && <div style={{ color: '#94a3b8', fontSize: 12, alignSelf: 'center' }}><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> Cargando métricas...</div>}
+        {loadingSummary && <div style={{ color: '#8FA3B5', fontSize: 12, alignSelf: 'center' }}><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> Cargando métricas...</div>}
       </div>
 
       {/* Urgencias Hoy — cards grandes */}
       {urgentAccounts.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f87171', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            🔴 Urgencias Hoy <span style={{ color: '#64748b', fontSize: 12, fontWeight: 500 }}>· {urgentAccounts.length} cuentas requieren decisión</span>
+            🔴 Urgencias Hoy <span style={{ color: '#566575', fontSize: 12, fontWeight: 500 }}>· {urgentAccounts.length} cuentas requieren decisión</span>
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
             {urgentAccounts.slice(0, 9).map(acc => <UrgencyCard key={acc.normId} acc={acc} />)}
@@ -745,8 +733,8 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
           onChange={e => setQuery(e.target.value)}
           style={{
             width: '100%', padding: '10px 14px', marginBottom: 10,
-            background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.2)',
-            borderRadius: 10, color: '#e2e8f0', fontSize: 13, outline: 'none'
+            background: 'rgba(10,14,20,0.6)', border: '1px solid rgba(25,155,228,0.2)',
+            borderRadius: 10, color: '#EAF1F8', fontSize: 13, outline: 'none'
           }}
         />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -762,9 +750,9 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
               onClick={() => setFilter(t.key)}
               style={{
                 padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                background: filter === t.key ? 'rgba(99,102,241,0.25)' : 'rgba(15,23,42,0.6)',
-                border: `1px solid ${filter === t.key ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.15)'}`,
-                color: filter === t.key ? '#e2e8f0' : '#94a3b8'
+                background: filter === t.key ? 'rgba(25,155,228,0.25)' : 'rgba(10,14,20,0.6)',
+                border: `1px solid ${filter === t.key ? 'rgba(25,155,228,0.6)' : 'rgba(25,155,228,0.15)'}`,
+                color: filter === t.key ? '#EAF1F8' : '#8FA3B5'
               }}
             >
               {t.label}
@@ -775,14 +763,14 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
 
       {/* Tabla compacta de todas las cuentas */}
       <div style={{
-        background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(99,102,241,0.15)',
+        background: 'rgba(10,14,20,0.5)', border: '1px solid rgba(25,155,228,0.15)',
         borderRadius: 12, overflow: 'hidden'
       }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
-          padding: '10px 14px', background: 'rgba(15,23,42,0.8)',
-          borderBottom: '1px solid rgba(99,102,241,0.15)',
-          fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5
+          padding: '10px 14px', background: 'rgba(10,14,20,0.8)',
+          borderBottom: '1px solid rgba(25,155,228,0.15)',
+          fontSize: 10, fontWeight: 700, color: '#566575', textTransform: 'uppercase', letterSpacing: 0.5
         }}>
           <div>Cuenta</div>
           <div>Estado</div>
@@ -792,7 +780,7 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
           <div style={{ textAlign: 'right' }}>Acción</div>
         </div>
         {ordered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+          <div style={{ padding: 30, textAlign: 'center', color: '#8FA3B5', fontSize: 13 }}>
             {loadingSummary ? 'Cargando datos de las cuentas...' : 'No hay cuentas en esta categoría.'}
           </div>
         ) : ordered.map(acc => {
@@ -805,16 +793,16 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
               style={{
                 display: 'grid', gridTemplateColumns: '1.6fr 90px 1fr 1fr 1fr 90px',
                 padding: '12px 14px', cursor: 'pointer',
-                borderBottom: '1px solid rgba(99,102,241,0.08)',
-                fontSize: 12, color: '#e2e8f0', alignItems: 'center',
+                borderBottom: '1px solid rgba(25,155,228,0.08)',
+                fontSize: 12, color: '#EAF1F8', alignItems: 'center',
                 transition: 'background 0.1s ease'
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.06)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(25,155,228,0.06)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.name}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>{acc.business?.name || '—'}</div>
+                <div style={{ fontSize: 10, color: '#566575' }}>{acc.business?.name || '—'}</div>
               </div>
               <div>
                 <span style={{
@@ -822,8 +810,8 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
                   background: stStyle.bg, color: stStyle.color, border: `1px solid ${stStyle.border}`
                 }}>{stStyle.label}</span>
               </div>
-              <div style={{ color: '#cbd5e1' }}>{formatCOP(s?.yesterday?.spend || 0)}</div>
-              <div style={{ color: '#cbd5e1' }}>
+              <div style={{ color: '#B7C4D0' }}>{formatCOP(s?.yesterday?.spend || 0)}</div>
+              <div style={{ color: '#B7C4D0' }}>
                 {formatCOP(s?.today?.spend || 0)}
                 {s?.yesterday?.spend > 0 && (
                   <span style={{ fontSize: 10, marginLeft: 6, color: (s.today?.spend || 0) < (s.yesterday?.spend || 0) ? '#f87171' : '#4ade80' }}>
@@ -832,13 +820,13 @@ function ReportsHub({ adAccounts, loadingAccounts, accessToken }) {
                 )}
               </div>
               <div>
-                <span style={{ fontWeight: 600, color: (s?.today?.results || 0) === 0 && (s?.today?.spend || 0) > 0 ? '#f87171' : '#e2e8f0' }}>
+                <span style={{ fontWeight: 600, color: (s?.today?.results || 0) === 0 && (s?.today?.spend || 0) > 0 ? '#f87171' : '#EAF1F8' }}>
                   {s?.today?.results || 0}
                 </span>
-                <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>{s?.today?.label || ''}</span>
+                <span style={{ fontSize: 10, color: '#566575', marginLeft: 4 }}>{s?.today?.label || ''}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 600 }}>Ver →</span>
+                <span style={{ fontSize: 11, color: '#4CCCF4', fontWeight: 600 }}>Ver →</span>
               </div>
             </div>
           );

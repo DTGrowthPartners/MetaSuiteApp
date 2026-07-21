@@ -12,7 +12,7 @@ const SOURCES = [
     id: 'instagram',
     label: 'Cuenta de Instagram',
     icon: Instagram,
-    color: '#E4405F',
+    color: '#199BE4',
     sourceType: 'ig_business',
     maxDays: 730,
     events: [
@@ -27,7 +27,7 @@ const SOURCES = [
     id: 'page',
     label: 'Página de Facebook',
     icon: Globe,
-    color: '#1877F2',
+    color: '#199BE4',
     sourceType: 'page',
     maxDays: 730,
     events: [
@@ -57,7 +57,7 @@ const SOURCES = [
     id: 'website',
     label: 'Sitio Web (Pixel)',
     icon: Monitor,
-    color: '#8B5CF6',
+    color: '#199BE4',
     sourceType: 'pixel',
     maxDays: 180,
     needsPixel: true,

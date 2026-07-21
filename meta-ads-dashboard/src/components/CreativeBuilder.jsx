@@ -24,6 +24,7 @@ import {
   MapPin, Search, Heart
 } from 'lucide-react';
 import CustomSelect from './ui/CustomSelect';
+import FaroLogo from './ui/FaroLogo';
 import './CreativeBuilder.css';
 
 // Mapa de nombres de icono (string) a componentes Lucide
@@ -59,8 +60,8 @@ function getCampaignPrefix(objective) {
 function getObjectiveColor(objective) {
   if (objective === 'OUTCOME_LEADS') return '#f0b429'; // amarillo
   if (objective === 'OUTCOME_SALES') return '#e53e3e'; // rojo
-  if (objective === 'OUTCOME_ENGAGEMENT') return '#4A9FFF'; // azul
-  return '#4A9FFF'; // azul — TRAFFIC, AWARENESS, etc.
+  if (objective === 'OUTCOME_ENGAGEMENT') return '#199BE4'; // azul
+  return '#199BE4'; // azul — TRAFFIC, AWARENESS, etc.
 }
 
 // ============================================
@@ -82,8 +83,8 @@ function TemplateSelector({ onSelectTemplate, lang }) {
     const badges = [];
     if (reqs.pixel) badges.push({ label: 'Pixel', color: '#e74c3c' });
     if (reqs.whatsapp) badges.push({ label: 'WhatsApp', color: '#25D366' });
-    if (reqs.catalog) badges.push({ label: 'Catálogo', color: '#9b59b6' });
-    if (reqs.leadForm) badges.push({ label: 'Formulario', color: '#3498db' });
+    if (reqs.catalog) badges.push({ label: 'Catálogo', color: '#199BE4' });
+    if (reqs.leadForm) badges.push({ label: 'Formulario', color: '#199BE4' });
     if (reqs.website) badges.push({ label: 'URL', color: '#2ecc71' });
     return badges;
   };
@@ -2293,16 +2294,16 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
 
           {/* Advantage+ Audience Toggle */}
           {selectedAudience && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.12)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', padding: '8px 12px', background: 'rgba(25, 155, 228, 0.06)', borderRadius: '8px', border: '1px solid rgba(25, 155, 228, 0.12)' }}>
               <label className="switch" style={{ flexShrink: 0 }}>
                 <input type="checkbox" checked={advantageAudience} onChange={(e) => setAdvantageAudience(e.target.checked)} />
                 <span className="slider round"></span>
               </label>
               <div>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: advantageAudience ? '#a5b4fc' : '#94a3b8' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: advantageAudience ? '#4CCCF4' : '#8FA3B5' }}>
                   {tr('advantage_audience', lang)}
                 </span>
-                <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0' }}>
+                <p style={{ fontSize: '11px', color: '#566575', margin: '2px 0 0' }}>
                   {advantageAudience ? tr('advantage_on_desc', lang) : tr('advantage_off_desc', lang)}
                 </p>
               </div>
@@ -2381,12 +2382,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                     >×</button>
                   </div>
                   {/* Advantage+ toggle por conjunto */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', padding: '5px 10px', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', padding: '5px 10px', background: 'rgba(25, 155, 228, 0.04)', borderRadius: '6px' }}>
                     <label className="switch" style={{ flexShrink: 0, transform: 'scale(0.8)' }}>
                       <input type="checkbox" checked={aud.advantageAudience !== false} onChange={(e) => setMultiAudiences(prev => prev.map((a, i) => i === index ? { ...a, advantageAudience: e.target.checked } : a))} />
                       <span className="slider round"></span>
                     </label>
-                    <span style={{ fontSize: '11px', color: aud.advantageAudience !== false ? '#a5b4fc' : '#64748b' }}>
+                    <span style={{ fontSize: '11px', color: aud.advantageAudience !== false ? '#4CCCF4' : '#566575' }}>
                       Advantage+ {aud.advantageAudience !== false ? 'ON' : 'OFF'}
                     </span>
                   </div>
@@ -2447,7 +2448,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             {(locationResults.length > 0 || searchingLocations) && locationSearch.length >= 2 && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
-                background: '#1e2840', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
+                background: '#161D27', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
                 boxShadow: '0 12px 40px rgba(0,0,0,0.5)', maxHeight: '200px', overflowY: 'auto', marginTop: '4px'
               }}>
                 {searchingLocations ? (
@@ -2508,7 +2509,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   key={loc.key}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    background: loc.type === 'place' ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                    background: loc.type === 'place' ? 'rgba(245,158,11,0.15)' : 'rgba(25,155,228,0.15)',
                     color: loc.type === 'place' ? '#f59e0b' : 'var(--accent)',
                     padding: '4px 10px', borderRadius: '16px', fontSize: '12px'
                   }}
@@ -2568,7 +2569,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
             {(interestResults.length > 0 || searchingInterests) && interestSearch.length >= 2 && (
               <div style={{
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
-                background: '#1e2840', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
+                background: '#161D27', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
                 boxShadow: '0 12px 40px rgba(0,0,0,0.5)', maxHeight: '220px', overflowY: 'auto', marginTop: '4px'
               }}>
                 {searchingInterests ? (
@@ -2598,7 +2599,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                       }}
                       className={alreadyAdded ? '' : 'custom-select-option'}
                     >
-                      <Heart size={12} style={{ color: '#f472b6', flexShrink: 0 }} />
+                      <Heart size={12} style={{ color: '#199BE4', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ color: 'var(--text-primary)' }}>{interest.name}</div>
                         {(interest.path?.length > 0 || audienceSize) && (
@@ -2623,7 +2624,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   key={interest.id}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    background: 'rgba(244,114,182,0.15)', color: '#f472b6',
+                    background: 'rgba(25,155,228,0.15)', color: '#199BE4',
                     padding: '4px 10px', borderRadius: '16px', fontSize: '12px'
                   }}
                 >
@@ -2643,7 +2644,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
         {customLocations.length > 0 && (
           <div style={{
             padding: '10px 14px', borderRadius: 'var(--radius-sm)',
-            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+            background: 'rgba(25,155,228,0.08)', border: '1px solid rgba(25,155,228,0.2)',
             fontSize: '12px', color: 'var(--text-muted)'
           }}>
             <strong style={{ color: 'var(--text-primary)' }}>Targeting personalizado:</strong>{' '}
@@ -2788,7 +2789,7 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
                   borderRadius: '6px',
                   background: multiUploadProgress.startsWith('✓') ? 'rgba(34, 197, 94, 0.1)'
                     : multiUploadProgress.startsWith('Los archivos') ? 'rgba(251, 191, 36, 0.1)'
-                    : 'rgba(99, 102, 241, 0.1)',
+                    : 'rgba(25, 155, 228, 0.1)',
                   animation: 'none'
                 }}
               >
@@ -4241,7 +4242,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
         setCreated(true);
 
         // Confetti — explosión central en 3 oleadas
-        const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#22c55e', '#34d399', '#fbbf24'];
+        const colors = ['#199BE4', '#4CCCF4', '#4CCCF4', '#22c55e', '#34d399', '#fbbf24'];
         confetti({ particleCount: 100, spread: 70, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 55, gravity: 1, ticks: 300, scalar: 1.3, shapes: ['circle', 'square'] });
         setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 40, gravity: 0.8, ticks: 250 }), 250);
         setTimeout(() => confetti({ particleCount: 40, spread: 130, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 30, gravity: 0.6, ticks: 200, scalar: 0.8 }), 500);
@@ -4335,7 +4336,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
             </div>
 
             <div className="success-view-card">
-              <div className="success-view-card-icon" style={{ background: adWasCreated ? 'rgba(69, 183, 209, 0.1)' : 'var(--warning-bg)', color: adWasCreated ? '#45b7d1' : 'var(--warning)' }}>
+              <div className="success-view-card-icon" style={{ background: adWasCreated ? 'rgba(76,204,244,0.1)' : 'var(--warning-bg)', color: adWasCreated ? '#4CCCF4' : 'var(--warning)' }}>
                 <Film size={18} />
               </div>
               <div className="success-view-card-body">
@@ -4374,9 +4375,9 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
   return (
     <div className="draft-step">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', padding: '24px 0 16px' }}>
-        <img src="/DT-GROWTH-LOGO-DYCI6Arf.png" alt="DT Growth Partners" style={{ height: '40px', objectFit: 'contain', opacity: 0.9 }} />
+        <FaroLogo size={40} glow />
         <h2 style={{ margin: 0, fontSize: '20px' }}>{tr('creating_campaign', lang)}</h2>
-        <PropagateLoader color="#6366f1" size={12} speedMultiplier={0.8} />
+        <PropagateLoader color="#199BE4" size={12} speedMultiplier={0.8} />
         <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>{tr('sending_meta', lang)}</p>
       </div>
 
@@ -4405,7 +4406,7 @@ function DraftStep({ job, onComplete, onBack, accessToken, lang }) {
               return (
                 <p key={i} className="log-line">
                   {before}
-                  <a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: '#4f8cff', textDecoration: 'underline', fontWeight: 600 }}>
+                  <a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: '#199BE4', textDecoration: 'underline', fontWeight: 600 }}>
                     {urlMatch[1].includes('leadgen/tos') ? 'Aceptar Condiciones de Lead Ads →' : urlMatch[1]}
                   </a>
                   {after}

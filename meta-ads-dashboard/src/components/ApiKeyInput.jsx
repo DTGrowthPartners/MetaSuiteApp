@@ -21,7 +21,7 @@ function ApiKeyInput({ onApiKeySubmit }) {
   return (
     <div className="api-key-container">
       <div className="api-key-card">
-        <h1>Meta Ads Dashboard</h1>
+        <h1>Faro</h1>
         <p className="subtitle">Ingresa tu Access Token de Meta Ads para comenzar</p>
 
         <form onSubmit={handleSubmit}>

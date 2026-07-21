@@ -89,7 +89,7 @@ function FacebookLogin({ onLoginSuccess, onManualToken }) {
   return (
     <div className="fb-login-container">
       <div className="fb-login-card">
-        <h1>Meta Ads Dashboard</h1>
+        <h1>Faro</h1>
         <p className="subtitle">Conecta tu cuenta de Facebook para ver tus campañas</p>
 
         {!showManualInput ? (

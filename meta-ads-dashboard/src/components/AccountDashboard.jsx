@@ -4,10 +4,10 @@ import { CheckCircle, XCircle, CreditCard, Clock, AlertTriangle, Lock, HelpCircl
 const ACCOUNT_STATUS_MAP = {
   1: { label: 'Activa', color: '#22c55e', IconComp: CheckCircle },
   2: { label: 'Deshabilitada', color: '#ef4444', IconComp: XCircle },
-  3: { label: 'Sin liquidar (Pago pendiente)', color: '#f97316', IconComp: CreditCard },
+  3: { label: 'Sin liquidar (Pago pendiente)', color: '#f59e0b', IconComp: CreditCard },
   7: { label: 'Revision de riesgo pendiente', color: '#eab308', IconComp: Clock },
   8: { label: 'Liquidacion pendiente', color: '#eab308', IconComp: Clock },
-  9: { label: 'En periodo de gracia', color: '#f97316', IconComp: AlertTriangle },
+  9: { label: 'En periodo de gracia', color: '#f59e0b', IconComp: AlertTriangle },
   100: { label: 'Cierre pendiente', color: '#ef4444', IconComp: Lock },
   101: { label: 'Cerrada', color: '#6b7280', IconComp: XCircle },
   201: { label: 'Cualquiera activa', color: '#22c55e', IconComp: CheckCircle },
@@ -80,7 +80,7 @@ function AccountDashboard({ adAccounts, onBack }) {
           <div style={{ fontSize: 13, color: '#999' }}>Con problemas</div>
         </div>
         <div style={{ background: paymentCount > 0 ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)', borderRadius: 12, padding: '16px 20px', border: `1px solid ${paymentCount > 0 ? 'rgba(249,115,22,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: paymentCount > 0 ? '#f97316' : '#22c55e' }}>{paymentCount}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: paymentCount > 0 ? '#f59e0b' : '#22c55e' }}>{paymentCount}</div>
           <div style={{ fontSize: 13, color: '#999' }}>Problema de pago</div>
         </div>
       </div>
@@ -96,9 +96,9 @@ function AccountDashboard({ adAccounts, onBack }) {
             key={tab.key}
             onClick={() => setFilter(tab.key)}
             style={{
-              background: filter === tab.key ? 'rgba(74,159,255,0.2)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${filter === tab.key ? 'rgba(74,159,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
-              color: filter === tab.key ? '#4A9FFF' : '#ccc',
+              background: filter === tab.key ? 'rgba(25, 155, 228,0.2)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${filter === tab.key ? 'rgba(25, 155, 228,0.5)' : 'rgba(255,255,255,0.1)'}`,
+              color: filter === tab.key ? '#199BE4' : '#ccc',
               borderRadius: 8,
               padding: '6px 14px',
               cursor: 'pointer',
@@ -141,7 +141,7 @@ function AccountDashboard({ adAccounts, onBack }) {
                 {acc.currency && <span> &middot; {acc.currency}</span>}
               </div>
               {acc.hasIssue && acc.disable_reason > 0 && (
-                <div style={{ fontSize: 12, color: '#f97316', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>
                   Razon: {acc.disableReasonLabel}
                 </div>
               )}
