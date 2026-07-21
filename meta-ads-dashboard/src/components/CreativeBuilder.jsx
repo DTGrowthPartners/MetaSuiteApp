@@ -2691,14 +2691,12 @@ function UploadStep({ adAccounts, onJobCreated, selectedTemplate, onBackToTempla
               <strong>{tr('per_ad', lang)}</strong>
               <small>{tr('per_ad_desc', lang)}</small>
             </button>
-            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) &&
-              // WhatsApp usa OUTCOME_SALES + optimization_goal CONVERSATIONS por defecto, pero
-              // Meta rechaza Flexible Ads ahí igual (error_subcode 3858343), confirmado en
-              // producción junto con VISIT_INSTAGRAM_PROFILE (IG Profile) y LANDING_PAGE_VIEWS
-              // (Website) — el objetivo alto nivel no predice si Meta lo acepta, el
-              // optimization_goal real sí importa. El fallback a DC clásico funciona bien, pero
-              // mejor no ofrecer un botón que siempre va a fallar y generar ruido.
-              templateAdSetConfig?.conversionLocation !== 'WHATSAPP' && (
+            {['OUTCOME_SALES', 'OUTCOME_APP_PROMOTION'].includes(selectedTemplate?.objective) && (
+              // NOTA: WhatsApp (conversionLocation === 'WHATSAPP') se excluía antes porque Meta
+              // rechazaba Flexible Ads ahí (error_subcode 3858343). Reactivado por pedido de Dairo
+              // (2026-07-05): el botón vuelve a mostrarse para TODAS las plantillas de Ventas/Apps.
+              // Ojo: si Meta lo sigue rechazando en WhatsApp, la creación fallará (el fallback a
+              // Dynamic Creative para WhatsApp también está bloqueado desde commit 761528d).
               <button
                 type="button"
                 className={`ad-mode-btn ${adSetMode === 'flexible' ? 'active' : ''}`}
